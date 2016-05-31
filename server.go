@@ -1,11 +1,13 @@
 package main
 
 import (
+	"os"
 	"log"
 	"fmt"
 	"time"
 	"sync"
 	"net/http"
+	"encoding/json"
 )
 //	"encoding/hex"
 
@@ -335,34 +337,56 @@ func (s *Stream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	streams := map[string]*Stream {
-		"/stream1.ts": NewStream("http://localhost:8000/stream1.ts", 10),
-		//"/stream2.ts": NewStream("http://localhost:8000/stream2.ts", 10),
-		//"/stream3.ts": NewStream("http://localhost:8000/stream3.ts", 10),
+type Configuration struct {
+	Listen string
+	Timeout int
+	Buffer int
+	Streams []struct {
+		Serve string
+		Remote string
 	}
-	
+}
+
+func main() {
+	cfgfile, err := os.Open("server.json")
+	if err != nil {
+		log.Fatal("Can't read configuration from server.json\n", err)
+	}
+	decoder := json.NewDecoder(cfgfile)
+	cfg := Configuration { }
+	err = decoder.Decode(&cfg)
+	if err != nil {
+		log.Fatal("Error parsing configuration\n", err)
+	}
+	cfgfile.Close()
+
+	log.Printf("Listen = %s\n", cfg.Listen)
+	log.Printf("Timeout = %d\n", cfg.Timeout)
+
 	i := 0
 	mux := http.NewServeMux()
-	for k, s := range streams {
+	for _, m := range cfg.Streams {
+		log.Printf("Testing stream %s\n", m.Remote)
+		s := NewStream(m.Remote, cfg.Buffer)
 		err := s.Connect()
 		if err == nil {
-			mux.Handle(k, s)
+			mux.Handle(m.Serve, s)
 			log.Printf("Handled connection %d", i)
 			i++
 		} else {
 			log.Print(err)
 		}
 	}
+	
 	if i == 0 {
 		log.Fatal(HttpClientError { "No streams available" })
 	} else {
 		log.Print("Starting server")
 		server := &http.Server {
-			Addr: "localhost:8080",
+			Addr: cfg.Listen,
 			Handler: mux,
-			ReadTimeout: 10 * time.Second,
-			WriteTimeout: 10 * time.Second,
+			ReadTimeout: time.Duration(cfg.Timeout) * time.Second,
+			WriteTimeout: time.Duration(cfg.Timeout) * time.Second,
 			//MaxHeaderBytes: 1 << 20,
 		}
 		log.Fatal(server.ListenAndServe())
