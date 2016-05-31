@@ -348,7 +348,14 @@ type Configuration struct {
 }
 
 func main() {
-	cfgfile, err := os.Open("server.json")
+	var cfgname string
+	if len(os.Args) > 1 {
+		cfgname = os.Args[1]
+	} else {
+		cfgname = "server.json"
+	}
+	
+	cfgfile, err := os.Open(cfgname)
 	if err != nil {
 		log.Fatal("Can't read configuration from server.json\n", err)
 	}
