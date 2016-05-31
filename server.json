@@ -5,7 +5,7 @@
 	"streams": [
 		{ "serve": "/stream1.ts", "remote": "http://localhost:8000/stream1.ts" },
 		{ "serve": "/stream2.ts", "remote": "http://localhost:8000/stream2.ts" },
-		{ "serve": "/stream3.ts", "remote": "http://localhost:8000/stream3.ts" },
+		{ "serve": "/stream3.ts", "remote": "http://localhost:8000/stream3.ts" }
 	]
 }
 
