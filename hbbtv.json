@@ -1,0 +1,9 @@
+{
+	"listen": "localhost:8001",
+	"timeout": 10,
+	"buffer": 200000,
+	"streams": [
+        { "serve": "/stream11.ts", "remote": "http://streaming.hbbtv.swisstxt.ch/srg/stream11.ts" }
+	]
+}
+
