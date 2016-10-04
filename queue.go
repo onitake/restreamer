@@ -1,3 +1,5 @@
+package restreamer
+
 type Queue chan<- interface{}
 
 func NewQueue(size int) *Queue {

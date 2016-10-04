@@ -1,5 +1,6 @@
+package restreamer
+
 import (
-	"myerrors"
 	"fmt"
 	"net/http"
 )

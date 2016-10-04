@@ -1,11 +1,17 @@
+package restreamer
+
+import (
+	"net/http"
+)
 
 type Server struct {
 	
 }
 
-func NewStream(pullurl string, packets int) (*Stream) {
-	server := &http.Server {
-		Addr: cfg.Listen,
+func NewServer(listenon string, pullurl string, packets int) (*Server) {
+	s := Server{}
+	&http.Server{
+		Addr: listenon,
 		Handler: mux,
 		ReadTimeout: time.Duration(cfg.Timeout) * time.Second,
 		WriteTimeout: time.Duration(cfg.Timeout) * time.Second,
@@ -15,6 +21,7 @@ func NewStream(pullurl string, packets int) (*Stream) {
 }
 
 // connects the data source
+/*
 func (s *Stream) Connect() error {
 	log.Printf("Connecting to %s\n", s.Source.Url)
 
@@ -31,6 +38,7 @@ func (s *Stream) Connect() error {
 	
 	return nil
 }
+*/
 
 // handles incoming connections
 // continuously streams packets from the ring buffer,
