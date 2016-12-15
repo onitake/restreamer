@@ -40,12 +40,13 @@ func NewPacket(data []byte) Packet {
 // in that case, the second packet will always be a full one
 // if a sync byte can't be found among the next 188 bytes,
 // only one packet containing the non-sync data is returned
-func ReadPacket(r *Reader) ([]Packet, error) {
+func ReadPacket(reader io.Reader) ([]Packet, error) {
 	garbage := NewPacket(nil)
 	// read 188 bytes ahead (assume we are at the start of a packet)
-	_, err := r.Read(p[:PACKET_SIZE])
+	_, err := reader.Read(garbage[:PACKET_SIZE])
+	// if we fuck up here, there's no point to go on
 	if err != nil {
-		return []Packet{}, err
+		return nil, err
 	}
 	//log.Printf("Read %d bytes\n", n)
 	
@@ -53,7 +54,7 @@ func ReadPacket(r *Reader) ([]Packet, error) {
 	if garbage[0] != SYNC_BYTE {
 		// nope, scan first
 		sync := -1
-		for i, bytes := range g[:PACKET_SIZE] {
+		for i, bytes := range garbage[:PACKET_SIZE] {
 			if bytes == SYNC_BYTE {
 				// found, very good
 				sync = i
@@ -70,7 +71,7 @@ func ReadPacket(r *Reader) ([]Packet, error) {
 		// so performance impact is minimal
 		packet := NewPacket(garbage[sync:])
 		offset := PACKET_SIZE - sync
-		_, err := r.Read(packet[offset:PACKET_SIZE])
+		_, err := reader.Read(packet[offset:PACKET_SIZE])
 		if err != nil {
 			return []Packet{garbage[:sync]}, err
 		}
@@ -80,5 +81,5 @@ func ReadPacket(r *Reader) ([]Packet, error) {
 	}
 	
 	// and done
-	return []Packet{packet}, nil
+	return []Packet{garbage}, nil
 }
