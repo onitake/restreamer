@@ -2,6 +2,7 @@ package restreamer
 
 import (
 	"io"
+	"log"
 )
 
 const (
@@ -43,12 +44,12 @@ func NewPacket(data []byte) Packet {
 func ReadPacket(reader io.Reader) ([]Packet, error) {
 	garbage := NewPacket(nil)
 	// read 188 bytes ahead (assume we are at the start of a packet)
-	_, err := reader.Read(garbage[:PACKET_SIZE])
+	nbytes, err := reader.Read(garbage[:PACKET_SIZE])
 	// if we fuck up here, there's no point to go on
 	if err != nil {
 		return nil, err
 	}
-	//log.Printf("Read %d bytes\n", n)
+	log.Printf("Read %d bytes\n", nbytes)
 	
 	// quick check if it starts with the sync byte 0x47
 	if garbage[0] != SYNC_BYTE {
@@ -71,11 +72,11 @@ func ReadPacket(reader io.Reader) ([]Packet, error) {
 		// so performance impact is minimal
 		packet := NewPacket(garbage[sync:])
 		offset := PACKET_SIZE - sync
-		_, err := reader.Read(packet[offset:PACKET_SIZE])
+		nbytes, err := reader.Read(packet[offset:PACKET_SIZE])
 		if err != nil {
 			return []Packet{garbage[:sync]}, err
 		}
-		//log.Printf("Appended %d bytes\n", n)
+		log.Printf("Appended %d bytes\n", nbytes)
 		// return the assembled packet and the remaining data
 		return []Packet{packet, garbage[:sync]}, nil
 	}

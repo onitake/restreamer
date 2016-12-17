@@ -5,8 +5,8 @@ import (
 	"time"
 	"errors"
 	"net/http"
+	"encoding/hex"
 )
-//	"encoding/hex"
 
 const (
 	DEFAULT_TIMEOUT time.Duration = 10 * time.Second
@@ -60,7 +60,7 @@ func NewClient(url string, queue chan<- Packet) *Client {
 // connects the socket, sends the HTTP request
 // and spawns the streaming thread
 func (client *Client) Connect() error {
-	if client.Socket == nil {
+	if !client.Running {
 		getter := &http.Client {
 			Timeout: client.Timeout,
 		}
@@ -69,17 +69,11 @@ func (client *Client) Connect() error {
 			return err
 		}
 		client.Socket = response
+		client.Running = true
+		go client.pull()
 		return nil
 	}
 	return ErrAlreadyConnected
-}
-
-// reads some body data from the connection
-func (client *Client) Read(data []byte) (int, error) {
-	if client.Socket == nil {
-		return 0, ErrNoConnection
-	}
-	return client.Socket.Body.Read(data)
 }
 
 // closes the connection
@@ -110,15 +104,7 @@ func (client *Client) Status() string {
 
 // returns true if the socket is connected
 func (client *Client) Connected() bool {
-	return client.Socket != nil
-}
-
-// spawns the streaming thread
-func (client *Client) Stream() {
-	if !client.Running {
-		client.Running = true
-		go client.pull()
-	}
+	return client.Running
 }
 
 // streams data from the socket to the queue
@@ -128,17 +114,19 @@ func (client *Client) pull() {
 	for client.Running {
 		packets, err := ReadPacket(client.Socket.Body)
 		if err != nil {
-			log.Println(err)
+			log.Printf("Got error on stream %s: %s\n", client.Url, err)
 			client.Running = false
 		} else {
-			//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 			for _, packet := range packets {
+				log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				client.Queue<- packet
 			}
 		}
 	}
 	
 	log.Printf("Socket for stream %s closed, exiting\n", client.Url)
+	client.Socket.Body.Close()
+	client.Socket = nil
 }
 
 // connects the data source

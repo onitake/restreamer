@@ -72,8 +72,8 @@ func main() {
 		client := restreamer.NewClient(streamdef.Remote, queue)
 		err := client.Connect()
 		if err == nil {
-			server := restreamer.NewServer(streamdef.Serve, queue, config.Timeout, config.MaxConnections, config.OutputBuffer)
-			mux.Handle(streamdef.Serve, server)
+			streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer)
+			mux.Handle(streamdef.Serve, streamer)
 			log.Printf("Handled connection %d", i)
 			i++
 		} else {

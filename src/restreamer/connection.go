@@ -12,10 +12,10 @@ type Connection struct {
 	Queue chan Packet
 	// internal communication channel
 	// for signalling connection shutdown
-	Shutdown chan bool
+	shutdown chan bool
 	// internal flag
 	// true while the connection is up
-	Running bool
+	running bool
 }
 
 // creates a new connection object
@@ -23,10 +23,16 @@ type Connection struct {
 func NewConnection(qsize int) (*Connection) {
 	conn := &Connection{
 		Queue: make(chan Packet, qsize),
-		Shutdown: make(chan bool),
-		Running: true,
+		shutdown: make(chan bool),
+		running: true,
 	}
 	return conn
+}
+
+// close a connection
+func (conn *Connection) Close() error {
+	conn.shutdown<- true
+	return nil
 }
 
 // serves a connection,
@@ -41,7 +47,7 @@ func (conn *Connection) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 	writer.WriteHeader(http.StatusOK)
 	
 	// start reading packets
-	for conn.Running {
+	for conn.running {
 		select {
 			case packet := <-conn.Queue:
 				// packet received, log
@@ -50,15 +56,16 @@ func (conn *Connection) ServeHTTP(writer http.ResponseWriter, request *http.Requ
 				_, err := writer.Write(packet[:PACKET_SIZE])
 				if err != nil {
 					log.Printf("Connection from %s closed\n", request.RemoteAddr)
-					conn.Running = false
+					conn.running = false
 				}
 				//log.Printf("Wrote packet of %d bytes\n", bytes)
 			case <-time.After(1 * time.Second):
 				// timeout, just cycle
-			case <-conn.Shutdown:
+			case <-conn.shutdown:
 				// and shut down
-				conn.Running = false
+				conn.running = false
 		}
 	}
+	
+	log.Printf("Stopping to serve data to %s\n", request.RemoteAddr);
 }
-

@@ -1,7 +1,9 @@
 {
 	"listen": "localhost:8001",
 	"timeout": 10,
-	"buffer": 200000,
+	"inputbuffer": 100,
+	"outputbuffer": 100,
+	"maxconnections": 3,
 	"streams": [
 		{ "serve": "/stream1.ts", "remote": "http://localhost:8000/stream1.ts" },
 		{ "serve": "/stream2.ts", "remote": "http://localhost:8000/stream2.ts" },
