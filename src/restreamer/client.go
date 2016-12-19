@@ -8,7 +8,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"encoding/hex"
 )
 
 const (
@@ -150,9 +149,7 @@ func (client *Client) pull() {
 			client.running = false
 		} else {
 			if packet != nil {
-				if false {
-					log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-				}
+				//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				client.queue<- packet
 			} else {
 				log.Printf("No packet received\n")

@@ -4,7 +4,6 @@ import (
 	"log"
 	"time"
 	"net/http"
-	"encoding/hex"
 )
 
 // a single active connection
@@ -61,9 +60,7 @@ func (conn *Connection) Serve() {
 		select {
 			case packet := <-conn.Queue:
 				// packet received, log
-				if false {
-					log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-				}
+				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				// send the packet out
 				_, err := conn.writer.Write(packet)
 				if err != nil {

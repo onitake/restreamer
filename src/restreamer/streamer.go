@@ -6,7 +6,6 @@ import (
 	"sync"
 	"errors"
 	"net/http"
-	"encoding/hex"
 )
 
 var (
@@ -86,17 +85,13 @@ func (streamer *Streamer) stream() {
 		select {
 			case packet := <-streamer.input:
 				// got a packet, distribute
-				if false {
-					log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-				}
+				//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				streamer.lock.RLock()
 				for conn, _ := range streamer.connections {
 					select {
 						case conn.Queue<- packet:
 							// distributed packet, done
-							if false {
-								log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-							}
+							//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 						default:
 							// queue is full
 							log.Print(ErrSlowRead)
