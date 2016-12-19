@@ -7,80 +7,75 @@ import (
 
 const (
 	// TS packet size
-	PACKET_SIZE = 188
-	// TS packet size with padding
-	BUFFER_SIZE = PACKET_SIZE + 4
+	PacketSize = 188
 	// TS packet synchronization byte
-	SYNC_BYTE = 0x47
+	SyncByte = 0x47
 )
 
 // one TS packet
 // 188 bytes long
 // starts with 0x47
 // 4 bytes of padding
-// yes, this is a type alias to a byte slice
-// use NewPacket to construct a packet, optionally
-// by copying data from a data buffer or another packet
+// yes, this is a type alias to a byte array slice,
+// makes everything a bit easier
 type Packet []byte
 
-// creates a new packet
-// and optionally fills it with data
-func NewPacket(data []byte) Packet {
-	// allocate a padded data buffer and create
-	// a slice of the correct size from it
-	packet := make(Packet, PACKET_SIZE, BUFFER_SIZE)
-	if data != nil {
-		copy(packet, data)
-	}
-	return packet
-}
-
 // reads data from the input stream,
-// scans for the sync byte and returns zero, one or two packets
-// the first packet may be partial if it doesn't start with a sync byte
-// in that case, the second packet will always be a full one
-// if a sync byte can't be found among the next 188 bytes,
-// only one packet containing the non-sync data is returned
-func ReadPacket(reader io.Reader) ([]Packet, error) {
-	garbage := NewPacket(nil)
+// scans for the sync byte and returns one packet from that point on.
+// if a sync byte can't be found among the first 188 bytes,
+// no packets are returned
+func ReadPacket(reader io.Reader) (Packet, error) {
+	garbage := make(Packet, PacketSize)
+	offset := 0
 	// read 188 bytes ahead (assume we are at the start of a packet)
-	nbytes, err := reader.Read(garbage[:PACKET_SIZE])
-	// if we fuck up here, there's no point to go on
-	if err != nil {
-		return nil, err
+	for offset < PacketSize {
+		nbytes, err := reader.Read(garbage[offset:])
+		// read error - bail out
+		if err != nil {
+			return nil, err
+		}
+		offset += nbytes
+		//log.Printf("Read %d bytes\n", nbytes)
 	}
-	log.Printf("Read %d bytes\n", nbytes)
 	
 	// quick check if it starts with the sync byte 0x47
-	if garbage[0] != SYNC_BYTE {
+	if garbage[0] != SyncByte {
+		log.Printf("Scanning for sync byte\n")
+		
 		// nope, scan first
 		sync := -1
-		for i, bytes := range garbage[:PACKET_SIZE] {
-			if bytes == SYNC_BYTE {
+		for i, bytes := range garbage {
+			if bytes == SyncByte {
 				// found, very good
 				sync = i
 				break
 			}
 		}
-		// nothing found, just return the data
+		// nothing found, return nothing
 		if sync == -1 {
-			return []Packet{garbage}, nil
+			return nil, nil
 		}
+		log.Printf("Sync byte found at %d\n", sync)
+		
+		offset = 0
 		// if the sync byte was not at the beginning,
-		// create a new resized slice and append the remaining data
+		// create a new packet and append the remaining data.
 		// this should happen only when the stream is out of sync,
 		// so performance impact is minimal
-		packet := NewPacket(garbage[sync:])
-		offset := PACKET_SIZE - sync
-		nbytes, err := reader.Read(packet[offset:PACKET_SIZE])
-		if err != nil {
-			return []Packet{garbage[:sync]}, err
+		packet := make(Packet, PacketSize)
+		copy(packet, garbage[sync:])
+		for offset < PacketSize {
+			nbytes, err := reader.Read(packet[len(packet):PacketSize])
+			if err != nil {
+				return nil, err
+			}
+			offset += nbytes
+			log.Printf("Appended %d bytes\n", nbytes)
 		}
-		log.Printf("Appended %d bytes\n", nbytes)
-		// return the assembled packet and the remaining data
-		return []Packet{packet, garbage[:sync]}, nil
+		// return the assembled packet
+		return packet, nil
 	}
 	
 	// and done
-	return []Packet{garbage}, nil
+	return garbage, nil
 }

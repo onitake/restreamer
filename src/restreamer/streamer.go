@@ -3,8 +3,10 @@ package restreamer
 import (
 	"log"
 	"time"
+	"sync"
 	"errors"
 	"net/http"
+	"encoding/hex"
 )
 
 var (
@@ -14,14 +16,18 @@ var (
 	// ErrSlowRead is logged (not thrown) when a client can not
 	// handle the bandwidth
 	ErrSlowRead = errors.New("restreamer: send buffer overrun, increase client bandwidth")
+	// ErrPoolFull is logged when the connection pool is full.
+	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
 
 // a packet streamer
 type Streamer struct {
 	// input queue, serving packets
 	input <-chan Packet
-	// list of connections
-	connections []*Connection
+	// pool lock
+	lock sync.RWMutex
+	// connection pool
+	connections map[*Connection]bool
 	// internal communication channel
 	// for signalling global shutdown
 	shutdown chan bool
@@ -41,7 +47,7 @@ type Streamer struct {
 func NewStreamer(queue <-chan Packet, maxconn int, qsize int) (*Streamer) {
 	streamer := &Streamer{
 		input: queue,
-		connections: make([]*Connection, 0, maxconn),
+		connections: make(map[*Connection]bool),
 		shutdown: make(chan bool),
 		running: false,
 		maxconnections: maxconn,
@@ -54,9 +60,11 @@ func NewStreamer(queue <-chan Packet, maxconn int, qsize int) (*Streamer) {
 // and all incoming connections
 func (streamer *Streamer) Close() error {
 	streamer.shutdown<- true
-	for _, conn := range streamer.connections {
+	streamer.lock.Lock()
+	for conn, _ := range streamer.connections {
 		conn.Close()
 	}
+	streamer.lock.Unlock()
 	return nil
 }
 
@@ -73,20 +81,28 @@ func (streamer *Streamer) Connect() error {
 // stream multiplier
 // reads data from the input and distributes it to the connections
 func (streamer *Streamer) stream() {
-	log.Printf("Starting to stream")
+	log.Printf("Starting streaming")
 	for streamer.running {
 		select {
 			case packet := <-streamer.input:
 				// got a packet, distribute
-				for _, conn := range streamer.connections {
+				if false {
+					log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				}
+				streamer.lock.RLock()
+				for conn, _ := range streamer.connections {
 					select {
 						case conn.Queue<- packet:
 							// distributed packet, done
+							if false {
+								log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+							}
 						default:
 							// queue is full
-							log.Println(ErrSlowRead)
+							log.Print(ErrSlowRead)
 					}
 				}
+				streamer.lock.RUnlock()
 			case <-time.After(1 * time.Second):
 				// timeout, just cycle
 			case <-streamer.shutdown:
@@ -97,14 +113,30 @@ func (streamer *Streamer) stream() {
 	log.Printf("Ending streaming")
 }
 
-// handles and defers an incoming connection
+// handles an incoming connection
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	var conn *Connection
+	
+	streamer.lock.Lock()
 	log.Printf("Got a connection from %s, number of active connections is %d, max number of connections is %d\n", request.RemoteAddr, len(streamer.connections), streamer.maxconnections)
+	// check if we still have free connections first
 	if (len(streamer.connections) < streamer.maxconnections) {
-		conn := NewConnection(streamer.queueSize)
-		streamer.connections = append(streamer.connections, conn)
-		conn.ServeHTTP(writer, request)
+		conn = NewConnection(writer, streamer.queueSize)
+		streamer.connections[conn] = true
 	} else {
-		log.Printf("Error: maximum number of connections reached")
+		// no error return, so just log
+		log.Print(ErrPoolFull)
+	}
+	streamer.lock.Unlock()
+	
+	if conn != nil {
+		log.Printf("Streaming to %s\n", request.RemoteAddr);
+		conn.Serve()
+		
+		// done, remove the stale connection
+		streamer.lock.Lock()
+		delete(streamer.connections, conn)
+		streamer.lock.Unlock()
+		log.Printf("Connection from %s closed\n", request.RemoteAddr);
 	}
 }

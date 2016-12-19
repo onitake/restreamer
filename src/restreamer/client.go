@@ -1,15 +1,18 @@
 package restreamer
 
 import (
+	"os"
+	"io"
 	"log"
 	"time"
 	"errors"
 	"net/http"
+	"net/url"
 	"encoding/hex"
 )
 
 const (
-	DEFAULT_TIMEOUT time.Duration = 10 * time.Second
+	DefaultTimeout time.Duration = 10 * time.Second
 )
 
 var (
@@ -33,43 +36,65 @@ var (
 // a streaming HTTP client
 type Client struct {
 	// the URL to GET
-	Url string
+	Url *url.URL
 	// the response, including the body reader
-	Socket *http.Response
+	socket *http.Response
+	// the input stream (socket)
+	input io.ReadCloser
 	// the I/O timeout
 	Timeout time.Duration
 	// the packet queue
-	Queue chan<- Packet
+	queue chan<- Packet
 	// true while the client is streaming into the queue
-	Running bool
+	running bool
 }
 
-// construct a new streaming HTTP client
-// the client is still unconnected, you
-// need to call Connect next
-func NewClient(url string, queue chan<- Packet) *Client {
-	return &Client {
-		Url: url,
-		Socket: nil,
-		Timeout: DEFAULT_TIMEOUT,
-		Queue: queue,
-		Running: false,
+// construct a new streaming HTTP client,
+// without connecting the socket yet.
+// you need to call Connect() to do that.
+// after a connection has been closed,
+// the client can not be reused and must
+// be cloned and restarted.
+func NewClient(uri string, queue chan<- Packet) (*Client, error) {
+	parsed, err := url.Parse(uri)
+	if err != nil {
+		return nil, err
 	}
+	return &Client {
+		Url: parsed,
+		socket: nil,
+		input: nil,
+		Timeout: DefaultTimeout,
+		queue: queue,
+		running: false,
+	}, nil
 }
 
 // connects the socket, sends the HTTP request
 // and spawns the streaming thread
 func (client *Client) Connect() error {
-	if !client.Running {
-		getter := &http.Client {
-			Timeout: client.Timeout,
+	if client.input == nil {
+		if client.Url.Scheme == "file" {
+			log.Printf("Opening %s\n", client.Url.Path)
+			file, err := os.Open(client.Url.Path)
+			if err != nil {
+				return err
+			}
+			client.input = file
+		} else {
+			log.Printf("Connecting to %s\n", client.Url)
+			getter := &http.Client {
+				Timeout: client.Timeout,
+			}
+			response, err := getter.Get(client.Url.String())
+			if err != nil {
+				return err
+			}
+			client.socket = response
+			client.input = response.Body
 		}
-		response, err := getter.Get(client.Url)
-		if err != nil {
-			return err
-		}
-		client.Socket = response
-		client.Running = true
+		client.running = true
+		log.Printf("Starting to pull from %s\n", client.Url)
 		go client.pull()
 		return nil
 	}
@@ -78,9 +103,8 @@ func (client *Client) Connect() error {
 
 // closes the connection
 func (client *Client) Close() error {
-	if client.Socket != nil {
-		err := client.Socket.Body.Close()
-		client.Socket = nil
+	if client.input != nil {
+		err := client.input.Close()
 		return err
 	}
 	return ErrNoConnection
@@ -88,64 +112,54 @@ func (client *Client) Close() error {
 
 // returns the HTTP status code or 0 if not connected
 func (client *Client) StatusCode() int {
-	if client.Socket != nil {
-		return client.Socket.StatusCode
+	if client.socket != nil {
+		return client.socket.StatusCode
+	}
+	// always return OK when our "socket" is an open file
+	if client.input != nil {
+		return http.StatusOK
 	}
 	return 0
 }
 
 // returns the HTTP status message or the empty string if not connected
 func (client *Client) Status() string {
-	if client.Socket != nil {
-		return client.Socket.Status
-	}
-	return ""
+	return http.StatusText(client.StatusCode())
 }
 
 // returns true if the socket is connected
 func (client *Client) Connected() bool {
-	return client.Running
+	return client.running
+}
+
+// returns true if the connection is dead
+// (i.e. has been opened and closed)
+func (client *Client) Dead() bool {
+	return !client.running && client.input != nil
 }
 
 // streams data from the socket to the queue
 func (client *Client) pull() {
 	log.Printf("Reading stream from %s\n", client.Url)
 	
-	for client.Running {
-		packets, err := ReadPacket(client.Socket.Body)
+	for client.running {
+		packet, err := ReadPacket(client.input)
+		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
 			log.Printf("Got error on stream %s: %s\n", client.Url, err)
-			client.Running = false
+			client.running = false
 		} else {
-			for _, packet := range packets {
-				log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-				client.Queue<- packet
+			if packet != nil {
+				if false {
+					log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				}
+				client.queue<- packet
+			} else {
+				log.Printf("No packet received\n")
 			}
 		}
 	}
 	
 	log.Printf("Socket for stream %s closed, exiting\n", client.Url)
-	client.Socket.Body.Close()
-	client.Socket = nil
+	client.Close()
 }
-
-// connects the data source
-/*
-func (s *Stream) Connect() error {
-	log.Printf("Connecting to %s\n", s.Source.Url)
-
-	err := s.Source.Connect()
-	if err != nil {
-		return err
-	}
-	if s.Source.StatusCode() != http.StatusOK && s.Source.StatusCode() != http.StatusPartialContent {
-		return ClientError { fmt.Sprintf("Unsupported response code: %s", s.Source.Status()) }
-	}
-	
-	// start streaming
-	go s.Pull()
-	
-	return nil
-}
-*/
-
