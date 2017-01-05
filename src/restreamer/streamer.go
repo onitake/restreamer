@@ -59,6 +59,7 @@ func NewStreamer(queue <-chan Packet, maxconn int, qsize int) (*Streamer) {
 // and all incoming connections
 func (streamer *Streamer) Close() error {
 	streamer.shutdown<- true
+	// structural change, exclusive lock
 	streamer.lock.Lock()
 	for conn, _ := range streamer.connections {
 		conn.Close()
@@ -86,11 +87,12 @@ func (streamer *Streamer) stream() {
 			case packet := <-streamer.input:
 				// got a packet, distribute
 				//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				// content distribution only, lock in non-exclusive read mode
 				streamer.lock.RLock()
 				for conn, _ := range streamer.connections {
 					select {
 						case conn.Queue<- packet:
-							// distributed packet, done
+							// packet distributed, done
 							//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 						default:
 							// queue is full
@@ -112,6 +114,7 @@ func (streamer *Streamer) stream() {
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var conn *Connection
 	
+	// structural change, exclusive lock
 	streamer.lock.Lock()
 	log.Printf("Got a connection from %s, number of active connections is %d, max number of connections is %d\n", request.RemoteAddr, len(streamer.connections), streamer.maxconnections)
 	// check if we still have free connections first
