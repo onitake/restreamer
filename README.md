@@ -3,7 +3,7 @@ restreamer
 
 HTTP transport stream proxy
 
-Copyright (c) 2016 Gregor Riepl
+Copyright © 2016 Gregor Riepl
 All rights reserved.
 
 Please see the LICENSE file for details on permitted use of this software.
@@ -36,6 +36,7 @@ There are several key components:
 * Connection - an abstraction of a downstream client connection
 * Streamer - a connection broker and data dispatcher
 * server - the core program that glues the components together
+* source - simple HTTP file server (for testing, better use ffmpeg)
 
 Additionally, there is a packet source tool that acts as a simple
 web server, serving data from a file to the streaming proxy.
@@ -84,5 +85,5 @@ bin/server
 ```
 Start playing:
 ```
-mpv http://localhost:8001/pipe.ts
+mpv http://localhost:8000/pipe.ts
 ```

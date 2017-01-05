@@ -1,13 +1,11 @@
 {
-	"listen": "localhost:8001",
+	"listen": "localhost:8000",
 	"timeout": 10,
 	"inputbuffer": 1000,
 	"outputbuffer": 300,
 	"maxconnections": 3,
 	"streams": [
-		{ "serve": "/stream1.ts", "remote": "http://localhost:8000/stream1.ts" },
-		{ "serve": "/stream2.ts", "remote": "http://localhost:8000/stream2.ts" },
-		{ "serve": "/stream3.ts", "remote": "http://localhost:8000/stream3.ts" },
+		{ "serve": "/stream.ts", "remote": "http://localhost:10000/stream.ts" },
 		{ "serve": "/pipe.ts", "remote": "file:///tmp/pipe.ts" }
 	]
 }
