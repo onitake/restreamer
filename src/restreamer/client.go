@@ -54,7 +54,7 @@ type Client struct {
 // after a connection has been closed,
 // the client can not be reused and must
 // be cloned and restarted.
-func NewClient(uri string, queue chan<- Packet) (*Client, error) {
+func NewClient(uri string, queue chan<- Packet, timeout int) (*Client, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func NewClient(uri string, queue chan<- Packet) (*Client, error) {
 		Url: parsed,
 		socket: nil,
 		input: nil,
-		Timeout: DefaultTimeout,
+		Timeout: time.Duration(timeout) * time.Second,
 		queue: queue,
 		running: false,
 	}, nil
@@ -104,6 +104,7 @@ func (client *Client) Connect() error {
 func (client *Client) Close() error {
 	if client.input != nil {
 		err := client.input.Close()
+		client.input = nil
 		return err
 	}
 	return ErrNoConnection
@@ -150,6 +151,7 @@ func (client *Client) pull() {
 		} else {
 			if packet != nil {
 				//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				//log.Printf("Got a packet (length %d)\n", len(packet))
 				client.queue<- packet
 			} else {
 				log.Printf("No packet received\n")
@@ -157,6 +159,10 @@ func (client *Client) pull() {
 		}
 	}
 	
-	log.Printf("Socket for stream %s closed, exiting\n", client.Url)
+	log.Printf("Socket for stream %s closed\n", client.Url)
 	client.Close()
+	
+	// reconnect after a while
+	time.Sleep(10 * time.Second)
+	go client.Connect()
 }

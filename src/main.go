@@ -69,7 +69,7 @@ func main() {
 	for _, streamdef := range config.Streams {
 		log.Printf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote)
 		queue := make(chan restreamer.Packet, config.InputBuffer)
-		client, err := restreamer.NewClient(streamdef.Remote, queue)
+		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout)
 		if err == nil {
 			err = client.Connect()
 		}
