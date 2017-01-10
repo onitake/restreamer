@@ -3,7 +3,7 @@ restreamer
 
 HTTP transport stream proxy
 
-Copyright © 2016 Gregor Riepl
+Copyright © 2016-2017 Gregor Riepl
 All rights reserved.
 
 Please see the LICENSE file for details on permitted use of this software.

@@ -2,12 +2,11 @@
 	"listen": "localhost:8000",
 	"timeout": 0,
 	"inputbuffer": 1000,
-	"outputbuffer": 300,
-	"maxconnections": 1000,
+	"outputbuffer": 400,
+	"maxconnections": 100,
 	"streams": [
 		{ "serve": "/stream.ts", "remote": "http://localhost:10000/stream.ts" },
 		{ "serve": "/pipe.ts", "remote": "file:///tmp/pipe.ts" },
-		{ "serve": "/stream11.ts", "remote": "http://streaming.hbbtv.swisstxt.ch/srg/stream11.ts" }
 	]
 }
 
