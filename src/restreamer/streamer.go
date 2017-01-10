@@ -2,7 +2,7 @@ package restreamer
 
 import (
 	"log"
-	"time"
+	//"time"
 	"sync"
 	"errors"
 	"net/http"
@@ -96,11 +96,11 @@ func (streamer *Streamer) stream() {
 							//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 						default:
 							// queue is full
-							log.Print(ErrSlowRead)
+							//log.Print(ErrSlowRead)
 					}
 				}
 				streamer.lock.RUnlock()
-			case <-time.After(1 * time.Second):
+			//case <-time.After(1 * time.Second):
 				// timeout, just cycle
 			case <-streamer.shutdown:
 				// and shut down
