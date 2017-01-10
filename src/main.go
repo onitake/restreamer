@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"log"
+	"time"
 	"net/http"
 	"encoding/json"
 	"restreamer"
@@ -41,6 +42,72 @@ type Configuration struct {
 	}
 }
 
+// TODO
+// this is currently only a stub
+// please implement proper status monitoring
+func HandleHealth(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Add("Content-Type", "application/json")
+	response, err := json.Marshal(map[string]interface{}{
+		"status": "ok",
+		"viewer": 0,
+		"limit": 1000,
+		"bandwidth": 0,
+	})
+	if err == nil {
+		writer.WriteHeader(http.StatusOK);
+		writer.Write(response)
+	} else {
+		writer.WriteHeader(http.StatusInternalServerError);
+		writer.Write([]byte("500 internal server error"))
+		log.Print(err)
+	}
+}
+
+// TODO
+// this is currently only a stub
+// please implement proper status monitoring
+func HandleStats(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Add("Content-Type", "application/json")
+	response, err := json.Marshal(map[string]interface{}{
+		"lastUpdate": time.Now().Unix(),
+		"total": map[string]interface{}{
+			"counter": 0,
+			"free": 1000,
+		},
+		"servers": []interface{}{
+			map[string]interface{}{
+				"counter": 0,
+				"name": "streaming-test.local",
+				"free": 1000,
+			},
+		},
+	})
+	if err == nil {
+		writer.WriteHeader(http.StatusOK);
+		writer.Write(response)
+	} else {
+		writer.WriteHeader(http.StatusInternalServerError);
+		writer.Write([]byte("500 internal server error"))
+		log.Print(err)
+	}
+}
+
+// TODO
+// this should not be here
+// please move all API stuff to a separate module
+type StreamStat struct {
+	Client *restreamer.Client
+}
+
+func (stat *StreamStat) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	writer.Header().Add("Content-Type", "application/octet-stream")
+	if stat.Client.Connected() {
+		writer.WriteHeader(http.StatusOK);
+	} else {
+		writer.WriteHeader(http.StatusNotFound);
+	}
+}
+
 func main() {
 	var configname string
 	if len(os.Args) > 1 {
@@ -71,6 +138,7 @@ func main() {
 		queue := make(chan restreamer.Packet, config.InputBuffer)
 		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout)
 		if err == nil {
+			mux.Handle("/check" + streamdef.Serve, &StreamStat{Client: client})
 			err = client.Connect()
 		}
 		if err == nil {
@@ -83,6 +151,9 @@ func main() {
 			log.Print(err)
 		}
 	}
+	
+	mux.HandleFunc("/health", HandleHealth)
+	mux.HandleFunc("/stats", HandleStats)
 	
 	if i == 0 {
 		log.Fatal("No streams available")
