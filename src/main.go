@@ -100,11 +100,13 @@ type StreamStat struct {
 }
 
 func (stat *StreamStat) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	writer.Header().Add("Content-Type", "application/octet-stream")
+	writer.Header().Add("Content-Type", "text/plain")
 	if stat.Client.Connected() {
 		writer.WriteHeader(http.StatusOK);
+		writer.Write([]byte("200 ok"))
 	} else {
 		writer.WriteHeader(http.StatusNotFound);
+		writer.Write([]byte("404 not found"))
 	}
 }
 
