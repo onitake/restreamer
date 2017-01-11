@@ -121,8 +121,6 @@ func (streamer *Streamer) stream() {
 					}
 				}
 				streamer.lock.RUnlock()
-			//case <-time.After(1 * time.Second):
-				// timeout, just cycle
 			case <-streamer.shutdown:
 				// and shut down
 				streamer.running = false

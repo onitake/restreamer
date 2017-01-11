@@ -88,8 +88,6 @@ func (conn *Connection) Serve() {
 				// connection closed while we were waiting for more data
 				log.Printf("Client connection closed (while waiting)\n")
 				conn.running = false
-			//case <-time.After(1 * time.Second):
-				// timeout, just cycle
 			case <-conn.shutdown:
 				// and shut down
 				log.Printf("Shutting down client connection\n")
