@@ -35,26 +35,31 @@ var (
 	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
 
-// a packet streamer
+// Streamer implements a TS packet multiplier,
+// distributing received packets on the input queue to the output queues.
+// It also handles and manages HTTP connections when added to an HTTP server.
 type Streamer struct {
-	// input queue, serving packets
+	// input is the input queue, serving packets
 	input <-chan Packet
-	// pool lock
+	// lock is the outgoing queue pool lock
 	lock sync.RWMutex
-	// connection pool
+	// connections is the outgoing connection pool
 	connections map[*Connection]bool
-	// internal communication channel
+	// shutdown is an internal communication channel
 	// for signalling global shutdown
 	shutdown chan bool
-	// global running flag
+	// running is the global running state flag;
+	// setting it to false causes a shutdown on the
+	// the next queue run - but you should not do this.
+	// Better just send something to the shutdown channel.
 	running bool
-	// limit on the number of connections
+	// maxconnections is the limit on the number of connections
 	maxconnections int
-	// the maximum number of packets to queue per per connection
+	// queueSize defines the maximum number of packets to queue per per connection
 	queueSize int
 }
 
-// create a new packet streamer
+// NewStreamer creates a new packet streamer.
 // listenon: the listen address:port tuple - use ":http" or "" to listen on port 80 on all interfaces
 // queue: an input packet queue
 // maxconn: the maximum number of connections to accept concurrently
@@ -71,8 +76,7 @@ func NewStreamer(queue <-chan Packet, maxconn int, qsize int) (*Streamer) {
 	return streamer
 }
 
-// shuts down the streamer
-// and all incoming connections
+// Close shuts the streamer and all incoming connections down.
 func (streamer *Streamer) Close() error {
 	streamer.shutdown<- true
 	// structural change, exclusive lock
@@ -84,7 +88,7 @@ func (streamer *Streamer) Close() error {
 	return nil
 }
 
-// starts serving and streaming
+// Connect starts serving and streaming.
 func (streamer *Streamer) Connect() error {
 	if (!streamer.running) {
 		streamer.running = true
@@ -94,8 +98,9 @@ func (streamer *Streamer) Connect() error {
 	return ErrAlreadyrunning
 }
 
-// stream multiplier
-// reads data from the input and distributes it to the connections
+// stream is the internal stream multiplier loop.
+// It reads data from the input and distributes it to the connections.
+// Will be called asynchronously from Connect()
 func (streamer *Streamer) stream() {
 	log.Printf("Starting streaming")
 	for streamer.running {
@@ -126,7 +131,8 @@ func (streamer *Streamer) stream() {
 	log.Printf("Ending streaming")
 }
 
-// handles an incoming connection
+// ServeHTTP handles an incoming connection.
+// Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var conn *Connection
 	
