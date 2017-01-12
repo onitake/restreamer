@@ -23,13 +23,6 @@ import (
 	"encoding/json"
 )
 
-// Statistics holds complete system status information and is continually updated.
-// Information can be retrieved by calling the various Get... methods.
-// There is also an HTTP/JSON API facility available through the New...Api() methods.
-type Statistics struct {
-	
-}
-
 // healthApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting system health.
 type healthApi struct {
@@ -109,14 +102,14 @@ func (api *statsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request
 // StreamStatApi provides an API for checking stream availability.
 // The HTTP handler returns status code 200 if a stream is connected
 // and 404 if not.
-type StreamStatApi struct {
+type streamStatApi struct {
 	client *Client
 }
 
 // NewStreamStatApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
-func NewStreamStatApi(client *Client) *StreamStatApi {
-	return &StreamStatApi{
+func (*Statistics) NewStreamStatApi(client *Client) http.Handler {
+	return &streamStatApi{
 		client: client,
 	}
 }
@@ -124,7 +117,7 @@ func NewStreamStatApi(client *Client) *StreamStatApi {
 // ServeHTTP is the http handler method.
 // It sends back "200 ok" if the stream is connected and "404 not found" if not,
 // along with the corresponding HTTP status code.
-func (stat *StreamStatApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (stat *streamStatApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Add("Content-Type", "text/plain")
 	if stat.client.Connected() {
 		writer.WriteHeader(http.StatusOK);

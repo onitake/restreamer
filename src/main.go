@@ -79,7 +79,9 @@ func main() {
 
 	log.Printf("Listen = %s", config.Listen)
 	log.Printf("Timeout = %d", config.Timeout)
-
+	
+	stats := &restreamer.Statistics{}
+	
 	i := 0
 	mux := http.NewServeMux()
 	for _, streamdef := range config.Streams {
@@ -87,7 +89,7 @@ func main() {
 		queue := make(chan restreamer.Packet, config.InputBuffer)
 		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout)
 		if err == nil {
-			mux.Handle("/check" + streamdef.Serve, restreamer.NewStreamStatApi(client))
+			mux.Handle("/check" + streamdef.Serve, stats.NewStreamStatApi(client))
 			err = client.Connect()
 		}
 		if err == nil {
@@ -100,8 +102,6 @@ func main() {
 			log.Print(err)
 		}
 	}
-	
-	stats := &restreamer.Statistics{}
 	
 	mux.Handle("/health", stats.NewHealthApi())
 	mux.Handle("/stats", stats.NewStatsApi())
