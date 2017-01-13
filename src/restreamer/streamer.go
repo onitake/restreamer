@@ -64,14 +64,14 @@ type Streamer struct {
 // queue: an input packet queue
 // maxconn: the maximum number of connections to accept concurrently
 // qsize: the length of each connection's queue (in packets)
-func NewStreamer(queue <-chan Packet, maxconn int, qsize int) (*Streamer) {
+func NewStreamer(queue <-chan Packet, maxconn uint, qsize uint) (*Streamer) {
 	streamer := &Streamer{
 		input: queue,
 		connections: make(map[*Connection]bool),
 		shutdown: make(chan bool),
 		running: false,
-		maxconnections: maxconn,
-		queueSize: qsize,
+		maxconnections: int(maxconn),
+		queueSize: int(qsize),
 	}
 	return streamer
 }

@@ -40,13 +40,24 @@ func (stats *Statistics) NewHealthApi() http.Handler {
 // ServeHTTP is the http handler method.
 // It sends back information about system health.
 func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	global := api.stats.GetGlobalStatistics()
+	var stats struct {
+		Status string `json:"status"`
+		Viewer int `json:"viewer"`
+		Limit int `json:"limit"`
+		Bandwidth int `json:"bandwidth"`
+	}
+	if global.Connections < global.MaxConnections {
+		stats.Status = "ok"
+	} else {
+		stats.Status = "full"
+	}
+	stats.Viewer = int(global.Connections)
+	stats.Limit = int(global.MaxConnections)
+	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024)
+	
 	writer.Header().Add("Content-Type", "application/json")
-	response, err := json.Marshal(map[string]interface{}{
-		"status": "ok",
-		"viewer": 0,
-		"limit": 1000,
-		"bandwidth": 0,
-	})
+	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK);
 		writer.Write(response)

@@ -70,7 +70,7 @@ type Client struct {
 // after a connection has been closed,
 // the client can not be reused and must
 // be cloned and restarted.
-func NewClient(uri string, queue chan<- Packet, timeout int) (*Client, error) {
+func NewClient(uri string, queue chan<- Packet, timeout uint) (*Client, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err

@@ -33,10 +33,10 @@ type Configuration struct {
 	Listen string
 	// the connection timeout
 	// (both input and output)
-	Timeout int
+	Timeout uint
 	// the maximum number of packets
 	// on the input buffer
-	InputBuffer int
+	InputBuffer uint
 	// the size of the output buffer
 	// per connection
 	// note that each connection will
@@ -44,10 +44,10 @@ type Configuration struct {
 	// when the queue is full, so
 	// you should adjust the value according
 	// to the amount of RAM available
-	OutputBuffer int
+	OutputBuffer uint
 	// the maximum number of concurrent connections
 	// per stream URL
-	MaxConnections int
+	MaxConnections uint
 	// the list of streams
 	Streams []struct {
 		// the local URL to serve this stream under
@@ -80,7 +80,7 @@ func main() {
 	log.Printf("Listen = %s", config.Listen)
 	log.Printf("Timeout = %d", config.Timeout)
 	
-	stats := &restreamer.Statistics{}
+	stats := restreamer.NewStatistics()
 	
 	i := 0
 	mux := http.NewServeMux()
@@ -89,6 +89,7 @@ func main() {
 		queue := make(chan restreamer.Packet, config.InputBuffer)
 		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout)
 		if err == nil {
+			//reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
 			mux.Handle("/check" + streamdef.Serve, stats.NewStreamStatApi(client))
 			err = client.Connect()
 		}
