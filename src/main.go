@@ -86,17 +86,22 @@ func main() {
 	mux := http.NewServeMux()
 	for _, streamdef := range config.Streams {
 		log.Printf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote)
+		
 		queue := make(chan restreamer.Packet, config.InputBuffer)
-		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout)
+		reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
+		
+		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, reg)
+		
 		if err == nil {
-			//reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
-			mux.Handle("/check" + streamdef.Serve, stats.NewStreamStatApi(client))
+			mux.Handle("/check" + streamdef.Serve, restreamer.NewStreamStateApi(client))
 			err = client.Connect()
 		}
+		
 		if err == nil {
-			streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer)
+			streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer, reg)
 			mux.Handle(streamdef.Serve, streamer)
 			streamer.Connect()
+			
 			log.Printf("Handled connection %d", i)
 			i++
 		} else {
@@ -104,12 +109,15 @@ func main() {
 		}
 	}
 	
+	log.Print("Registering global API endpoints");
 	mux.Handle("/health", stats.NewHealthApi())
 	mux.Handle("/stats", stats.NewStatsApi())
 	
 	if i == 0 {
 		log.Fatal("No streams available")
 	} else {
+		log.Print("Starting stats monitor")
+		stats.Start()
 		log.Print("Starting server")
 		log.Fatal(http.ListenAndServe(config.Listen, mux))
 	}

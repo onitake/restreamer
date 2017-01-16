@@ -26,51 +26,89 @@ import (
 // and is continuously updated by the corresponding streamer.
 // Use the provided accessor methods for this purpose.
 type CurrentStreamStatistics struct {
+	// total number of connections
 	connections int64
+	// total number of received packets
 	packetsReceived uint64
+	// total number of sent packets
 	packetsSent uint64
+	// total number of dropped packets
 	packetsDropped uint64
+	// upstream connection state, 0 = offline, !0 = connected
 	connected int32
 }
 
-// Notify that a new connection was added
+// ConnectionAdded notifies that a new downstream client connected.
 func (stats *CurrentStreamStatistics) ConnectionAdded() {
 	atomic.AddInt64(&stats.connections, 1)
 }
 
-// Notify that a connection was removed
+// ConnectionRemoved notifies that a downstream client disconnected.
 func (stats *CurrentStreamStatistics) ConnectionRemoved() {
 	atomic.AddInt64(&stats.connections, -1)
 }
 
-// Notify that a packet was received
+// PacketReceived notifies that a packet was received.
 func (stats *CurrentStreamStatistics) PacketReceived() {
 	atomic.AddUint64(&stats.packetsReceived, 1)
 }
 
-// Notify that a packet was sent
+// PacketReceived notifies that a packet was sent.
 func (stats *CurrentStreamStatistics) PacketSent() {
 	atomic.AddUint64(&stats.packetsSent, 1)
 }
 
-// Notify that a packet was dropped
+// PacketReceived notifies that a packet was dropped.
 func (stats *CurrentStreamStatistics) PacketDropped() {
 	atomic.AddUint64(&stats.packetsDropped, 1)
 }
 
-// Notify that upstream is live
-func (stats *CurrentStreamStatistics) Connect() {
+// SourceConnected notifies that upstream is live.
+func (stats *CurrentStreamStatistics) SourceConnected() {
 	atomic.StoreInt32(&stats.connected, 1)
 }
 
-// Notify that upstream is offline
-func (stats *CurrentStreamStatistics) Disconnect() {
+// SourceDisconnected notifies that upstream is offline.
+func (stats *CurrentStreamStatistics) SourceDisconnected() {
 	atomic.StoreInt32(&stats.connected, 0)
 }
 
-// Notify that upstream is offline
-func (stats *CurrentStreamStatistics) IsConnected() bool {
+// IsUpstreamConnected tells you if upstream is connected.
+func (stats *CurrentStreamStatistics) IsUpstreamConnected() bool {
 	return atomic.LoadInt32(&stats.connected) != 0
+}
+
+// clone creates a copy of the stats object - useful for
+// storing state temporarily.
+func (stats *CurrentStreamStatistics) clone() *CurrentStreamStatistics {
+	return &CurrentStreamStatistics{
+		connections: atomic.LoadInt64(&stats.connections),
+		packetsReceived: atomic.LoadUint64(&stats.packetsReceived),
+		packetsSent: atomic.LoadUint64(&stats.packetsSent),
+		packetsDropped: atomic.LoadUint64(&stats.packetsDropped),
+		connected: atomic.LoadInt32(&stats.connected),
+	}
+}
+
+// invsub subtracts this stats object from another and sets each
+// value to the difference. Note: Should not be used on atomic values
+// directly. clone() first.
+// "connected" is copied directly from "to".
+// Useful if you want to calculate a delta, then replace the previous
+// value with the current one:
+// prev := CurrentStreamStatistics{}
+// for {
+//   current := CurrentStreamStatistics{}
+//   prev.invsub(current)
+//   doSomethingWithPrev(prev)
+//   prev = current
+// }
+func (from *CurrentStreamStatistics) invsub(to *CurrentStreamStatistics) {
+	from.connections = to.connections - from.connections
+	from.packetsReceived = to.packetsReceived - from.packetsReceived
+	from.packetsSent= to.packetsSent - from.packetsSent
+	from.packetsDropped= to.packetsDropped - from.packetsDropped
+	from.connected = to.connected
 }
 
 // StreamStatistics is the current state of a single stream
@@ -80,7 +118,6 @@ func (stats *CurrentStreamStatistics) IsConnected() bool {
 type StreamStatistics struct {
 	Connections int64
 	MaxConnections int64
-	TotalConnections int64
 	TotalPacketsReceived uint64
 	TotalPacketsSent uint64
 	TotalPacketsDropped uint64
@@ -109,14 +146,13 @@ type Statistics struct {
 }
 
 // update updates the aggregated statistics from the current state of each stream.
-func (stats *Statistics) update(delta time.Duration) {
+func (stats *Statistics) update(delta time.Duration, change map[string]*CurrentStreamStatistics) {
 	// acquire the global write lock
 	stats.lock.Lock()
 	
-	// reset global counters temporarily
+	// reset the global counters
 	stats.global.Connections = 0
 	stats.global.MaxConnections = 0
-	stats.global.TotalConnections = 0
 	stats.global.TotalPacketsReceived = 0
 	stats.global.TotalPacketsSent = 0
 	stats.global.TotalPacketsDropped = 0
@@ -132,61 +168,41 @@ func (stats *Statistics) update(delta time.Duration) {
 	stats.global.Connected = false
 	
 	// loop over all streams
-	for name, internal := range stats.internal {
-		stream := stats.streams[name]
+	for name, stream := range stats.streams {
+		diff := change[name]
 		
-		// fetch data from the atomic counters
-		connections := atomic.LoadInt64(&internal.connections)
-		packetsReceived := atomic.LoadUint64(&internal.packetsReceived)
-		packetsSent := atomic.LoadUint64(&internal.packetsSent)
-		packetsDropped := atomic.LoadUint64(&internal.packetsDropped)
-		connected := internal.IsConnected()
-		
-		// calculate the updated values
-		bytesReceived := packetsReceived * PacketSize
-		bytesSent := packetsSent * PacketSize
-		bytesDropped := packetsDropped * PacketSize
-		packetsPerSecondReceived := float64(packetsReceived) / delta.Seconds()
-		packetsPerSecondSent := float64(packetsSent) / delta.Seconds()
-		packetsPerSecondDropped := float64(packetsDropped) / delta.Seconds()
-		bytesPerSecondReceived := float64(bytesReceived) / delta.Seconds()
-		bytesPerSecondSent := float64(bytesSent) / delta.Seconds()
-		bytesPerSecondDropped := float64(bytesDropped) / delta.Seconds()
-		
-		// and assign them to the stream stats
-		stream.Connections = connections
-		stream.TotalConnections += connections
-		stream.TotalPacketsReceived = packetsReceived
-		stream.TotalPacketsSent = packetsSent
-		stream.TotalPacketsDropped = packetsDropped
-		stream.TotalBytesReceived += bytesReceived
-		stream.TotalBytesSent += bytesSent
-		stream.TotalBytesDropped += bytesDropped
-		stream.PacketsPerSecondReceived = uint64(packetsPerSecondReceived)
-		stream.PacketsPerSecondSent = uint64(packetsPerSecondSent)
-		stream.PacketsPerSecondDropped = uint64(packetsPerSecondDropped)
-		stream.BytesPerSecondReceived = uint64(bytesPerSecondReceived)
-		stream.BytesPerSecondSent = uint64(bytesPerSecondSent)
-		stream.BytesPerSecondDropped = uint64(bytesPerSecondDropped)
-		stream.Connected = connected
+		// update the stats
+		stream.Connections += diff.connections
+		stream.TotalPacketsReceived += diff.packetsReceived
+		stream.TotalPacketsSent += diff.packetsSent
+		stream.TotalPacketsDropped += diff.packetsDropped
+		stream.TotalBytesReceived = stream.TotalPacketsReceived * PacketSize
+		stream.TotalBytesSent = stream.TotalPacketsSent * PacketSize
+		stream.TotalBytesDropped = stream.TotalPacketsDropped * PacketSize
+		stream.PacketsPerSecondReceived = uint64(float64(diff.packetsReceived) / delta.Seconds())
+		stream.PacketsPerSecondSent = uint64(float64(diff.packetsSent) / delta.Seconds())
+		stream.PacketsPerSecondDropped = uint64(float64(diff.packetsDropped) / delta.Seconds())
+		stream.BytesPerSecondReceived = stream.PacketsPerSecondReceived * PacketSize
+		stream.BytesPerSecondSent = stream.PacketsPerSecondSent * PacketSize
+		stream.BytesPerSecondDropped = stream.PacketsPerSecondDropped * PacketSize
+		stream.Connected = diff.connected != 0
 		
 		// update the global counters as well
-		stats.global.Connections += connections
+		stats.global.Connections += stream.Connections
 		stats.global.MaxConnections += stream.MaxConnections
-		stats.global.TotalConnections += stream.TotalConnections
-		stats.global.TotalPacketsReceived += packetsReceived
-		stats.global.TotalPacketsSent += packetsSent
-		stats.global.TotalPacketsDropped += packetsDropped
-		stats.global.TotalBytesReceived += bytesReceived
-		stats.global.TotalBytesSent += bytesSent
-		stats.global.TotalBytesDropped += bytesDropped
-		stats.global.PacketsPerSecondReceived += uint64(packetsPerSecondReceived)
-		stats.global.PacketsPerSecondSent += uint64(packetsPerSecondSent)
-		stats.global.PacketsPerSecondDropped += uint64(packetsPerSecondDropped)
-		stats.global.BytesPerSecondReceived += uint64(bytesPerSecondReceived)
-		stats.global.BytesPerSecondSent += uint64(bytesPerSecondSent)
-		stats.global.BytesPerSecondDropped += uint64(bytesPerSecondDropped)
-		if connected {
+		stats.global.TotalPacketsReceived += stream.TotalPacketsReceived
+		stats.global.TotalPacketsSent += stream.TotalPacketsSent
+		stats.global.TotalPacketsDropped += stream.TotalPacketsDropped
+		stats.global.TotalBytesReceived += stream.TotalBytesReceived
+		stats.global.TotalBytesSent += stream.TotalBytesSent
+		stats.global.TotalBytesDropped += stream.TotalPacketsDropped
+		stats.global.PacketsPerSecondReceived += stream.PacketsPerSecondReceived
+		stats.global.PacketsPerSecondSent += stream.PacketsPerSecondSent
+		stats.global.PacketsPerSecondDropped += stream.PacketsPerSecondDropped
+		stats.global.BytesPerSecondReceived += stream.BytesPerSecondReceived
+		stats.global.BytesPerSecondSent += stream.BytesPerSecondSent
+		stats.global.BytesPerSecondDropped += stream.BytesPerSecondDropped
+		if stream.Connected {
 			stats.global.Connected = true
 		}
 	}
@@ -195,21 +211,49 @@ func (stats *Statistics) update(delta time.Duration) {
 	stats.lock.Unlock()
 }
 
+// delta calculates the difference between a previous internal state
+// and the current state and returns a copy of the current state.
+// The previous state (the argument) is replaced with the difference.
+func (stats *Statistics) delta(previous map[string]*CurrentStreamStatistics) map[string]*CurrentStreamStatistics {
+	stats.lock.RLock()
+	current := make(map[string]*CurrentStreamStatistics)
+	for name, stream := range stats.internal {
+		update := stream.clone()
+		previous[name].invsub(update)
+		current[name] = update
+	}
+	stats.lock.RUnlock()
+	return current
+}
+
 // loop runs a ticker to update all statistics periodically.
 func (stats *Statistics) loop() {
 	running := true
 	// TODO make the interval configurable
-	ticker := time.NewTicker(5 * time.Second)
-	// pre-init
+	ticker := time.NewTicker(1 * time.Second)
+
+	// pre-init - store the current time and state
 	before := time.Now()
+	stats.lock.RLock()
+	previous := make(map[string]*CurrentStreamStatistics)
+	for name, stream := range stats.internal {
+		previous[name] = stream.clone()
+	}
+	stats.lock.RUnlock()
+
 	for running {
 		select {
 			case <-stats.shutdown:
 				running = false
 			case <-ticker.C:
-				// calculate the elapsed time and update
+				// calculate the elapsed time
 				now := time.Now()
-				stats.update(now.Sub(before))
+				// calculate the state delta and update the stored state
+				delta := previous
+				previous = stats.delta(previous)
+				// and update
+				stats.update(now.Sub(before), delta)
+				// stash the current time
 				before = now
 		}
 	}

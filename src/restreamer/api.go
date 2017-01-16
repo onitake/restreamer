@@ -46,6 +46,18 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		Viewer int `json:"viewer"`
 		Limit int `json:"limit"`
 		Bandwidth int `json:"bandwidth"`
+		TotalPacketsReceived uint64 `json:"total_packets_received"`
+		TotalPacketsSent uint64 `json:"total_packets_sent"`
+		TotalPacketsDropped uint64 `json:"total_packets_dropped"`
+		TotalBytesReceived uint64 `json:"total_bytes_received"`
+		TotalBytesSent uint64 `json:"total_bytes_sent"`
+		TotalBytesDropped uint64 `json:"total_bytes_dropped"`
+		PacketsPerSecondReceived uint64 `json:"packets_per_second_received"`
+		PacketsPerSecondSent uint64 `json:"packets_per_second_sent"`
+		PacketsPerSecondDropped uint64 `json:"packets_per_second_dropped"`
+		BytesPerSecondReceived uint64 `json:"bytes_per_second_received"`
+		BytesPerSecondSent uint64 `json:"bytes_per_second_sent"`
+		BytesPerSecondDropped uint64 `json:"bytes_per_second_dropped"`
 	}
 	if global.Connections < global.MaxConnections {
 		stats.Status = "ok"
@@ -54,7 +66,20 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	}
 	stats.Viewer = int(global.Connections)
 	stats.Limit = int(global.MaxConnections)
-	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024)
+	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
+	
+	stats.TotalPacketsReceived = global.TotalPacketsReceived
+	stats.TotalPacketsSent = global.TotalPacketsSent
+	stats.TotalPacketsDropped = global.TotalPacketsDropped
+	stats.TotalBytesReceived = global.TotalBytesReceived
+	stats.TotalBytesSent = global.TotalBytesSent
+	stats.TotalBytesDropped = global.TotalBytesDropped
+	stats.PacketsPerSecondReceived = global.PacketsPerSecondReceived
+	stats.PacketsPerSecondSent = global.PacketsPerSecondSent
+	stats.PacketsPerSecondDropped = global.PacketsPerSecondDropped
+	stats.BytesPerSecondReceived = global.BytesPerSecondReceived
+	stats.BytesPerSecondSent = global.BytesPerSecondSent
+	stats.BytesPerSecondDropped = global.BytesPerSecondDropped
 	
 	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
@@ -113,14 +138,14 @@ func (api *statsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request
 // StreamStatApi provides an API for checking stream availability.
 // The HTTP handler returns status code 200 if a stream is connected
 // and 404 if not.
-type streamStatApi struct {
+type streamStateApi struct {
 	client *Client
 }
 
-// NewStreamStatApi creates a new stream status API object,
+// NewStreamStateApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
-func (*Statistics) NewStreamStatApi(client *Client) http.Handler {
-	return &streamStatApi{
+func NewStreamStateApi(client *Client) http.Handler {
+	return &streamStateApi{
 		client: client,
 	}
 }
@@ -128,7 +153,7 @@ func (*Statistics) NewStreamStatApi(client *Client) http.Handler {
 // ServeHTTP is the http handler method.
 // It sends back "200 ok" if the stream is connected and "404 not found" if not,
 // along with the corresponding HTTP status code.
-func (stat *streamStatApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (stat *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Add("Content-Type", "text/plain")
 	if stat.client.Connected() {
 		writer.WriteHeader(http.StatusOK);

@@ -52,11 +52,14 @@ type Streamer struct {
 	// setting it to false causes a shutdown on the
 	// the next queue run - but you should not do this.
 	// Better just send something to the shutdown channel.
+	// TODO make this atomic
 	running bool
 	// maxconnections is the limit on the number of connections
 	maxconnections int
 	// queueSize defines the maximum number of packets to queue per per connection
 	queueSize int
+	// the stats collector for this stream
+	stats *CurrentStreamStatistics
 }
 
 // NewStreamer creates a new packet streamer.
@@ -64,7 +67,7 @@ type Streamer struct {
 // queue: an input packet queue
 // maxconn: the maximum number of connections to accept concurrently
 // qsize: the length of each connection's queue (in packets)
-func NewStreamer(queue <-chan Packet, maxconn uint, qsize uint) (*Streamer) {
+func NewStreamer(queue <-chan Packet, maxconn uint, qsize uint, stats *CurrentStreamStatistics) (*Streamer) {
 	streamer := &Streamer{
 		input: queue,
 		connections: make(map[*Connection]bool),
@@ -72,12 +75,14 @@ func NewStreamer(queue <-chan Packet, maxconn uint, qsize uint) (*Streamer) {
 		running: false,
 		maxconnections: int(maxconn),
 		queueSize: int(qsize),
+		stats: stats,
 	}
 	return streamer
 }
 
 // Close shuts the streamer and all incoming connections down.
 func (streamer *Streamer) Close() error {
+	// signal shutdown
 	streamer.shutdown<- true
 	// structural change, exclusive lock
 	streamer.lock.Lock()
@@ -108,6 +113,7 @@ func (streamer *Streamer) stream() {
 			case packet := <-streamer.input:
 				// got a packet, distribute
 				//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				
 				// content distribution only, lock in non-exclusive read mode
 				streamer.lock.RLock()
 				for conn, _ := range streamer.connections {
@@ -115,9 +121,15 @@ func (streamer *Streamer) stream() {
 						case conn.Queue<- packet:
 							// packet distributed, done
 							//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+							
+							// report the packet
+							streamer.stats.PacketSent()
 						default:
 							// queue is full
 							//log.Print(ErrSlowRead)
+							
+							// report the drop
+							streamer.stats.PacketDropped()
 					}
 				}
 				streamer.lock.RUnlock()
@@ -148,6 +160,9 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	streamer.lock.Unlock()
 	
 	if conn != nil {
+		// connection will be handled, report
+		streamer.stats.ConnectionAdded()
+		
 		log.Printf("Streaming to %s\n", request.RemoteAddr);
 		conn.Serve()
 		
@@ -156,5 +171,8 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		delete(streamer.connections, conn)
 		streamer.lock.Unlock()
 		log.Printf("Connection from %s closed\n", request.RemoteAddr);
+		
+		// and report
+		streamer.stats.ConnectionRemoved()
 	}
 }
