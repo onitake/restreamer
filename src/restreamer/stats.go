@@ -195,7 +195,7 @@ func (stats *Statistics) update(delta time.Duration, change map[string]*CurrentS
 		stats.global.TotalPacketsDropped += stream.TotalPacketsDropped
 		stats.global.TotalBytesReceived += stream.TotalBytesReceived
 		stats.global.TotalBytesSent += stream.TotalBytesSent
-		stats.global.TotalBytesDropped += stream.TotalPacketsDropped
+		stats.global.TotalBytesDropped += stream.TotalBytesDropped
 		stats.global.PacketsPerSecondReceived += stream.PacketsPerSecondReceived
 		stats.global.PacketsPerSecondSent += stream.PacketsPerSecondSent
 		stats.global.PacketsPerSecondDropped += stream.PacketsPerSecondDropped
