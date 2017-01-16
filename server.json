@@ -6,7 +6,7 @@
 	"maxconnections": 100,
 	"streams": [
 		{ "serve": "/stream.ts", "remote": "http://localhost:10000/stream.ts" },
-		{ "serve": "/pipe.ts", "remote": "file:///tmp/pipe.ts" },
+		{ "serve": "/pipe.ts", "remote": "file:///tmp/pipe.ts" }
 	]
 }
 
