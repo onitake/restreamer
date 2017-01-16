@@ -48,6 +48,8 @@ type Configuration struct {
 	// the maximum number of concurrent connections
 	// per stream URL
 	MaxConnections uint
+	// set to true to disable statistics
+	NoStats bool
 	// the list of streams
 	Streams []struct {
 		// the local URL to serve this stream under
@@ -80,7 +82,12 @@ func main() {
 	log.Printf("Listen = %s", config.Listen)
 	log.Printf("Timeout = %d", config.Timeout)
 	
-	stats := restreamer.NewStatistics()
+	var stats restreamer.Statistics
+	if config.NoStats {
+		stats = restreamer.NewDummyStatistics()
+	} else {
+		stats = restreamer.NewStatistics()
+	}
 	
 	i := 0
 	mux := http.NewServeMux()
@@ -110,8 +117,8 @@ func main() {
 	}
 	
 	log.Print("Registering global API endpoints");
-	mux.Handle("/health", stats.NewHealthApi())
-	mux.Handle("/stats", stats.NewStatsApi())
+	mux.Handle("/health", restreamer.NewHealthApi(stats))
+	mux.Handle("/stats", restreamer.NewStatsApi(stats))
 	
 	if i == 0 {
 		log.Fatal("No streams available")

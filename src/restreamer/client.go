@@ -61,7 +61,7 @@ type Client struct {
 	// the packet queue
 	queue chan<- Packet
 	// the stats collector for this stream
-	stats *CurrentStreamStatistics
+	stats Collector
 	// true while the client is streaming into the queue
 	// TODO make this atomic
 	running bool
@@ -70,7 +70,7 @@ type Client struct {
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
 // >ou need to call Connect() to do that.
 // After a connection has been closed, the client will attempt to reconnect after a short delay.
-func NewClient(uri string, queue chan<- Packet, timeout uint, stats *CurrentStreamStatistics) (*Client, error) {
+func NewClient(uri string, queue chan<- Packet, timeout uint, stats Collector) (*Client, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err

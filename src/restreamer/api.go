@@ -26,12 +26,12 @@ import (
 // healthApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting system health.
 type healthApi struct {
-	stats *Statistics
+	stats Statistics
 }
 
 // NewHealthApi creates a new health API object,
 // serving data from a system Statistics object.
-func (stats *Statistics) NewHealthApi() http.Handler {
+func NewHealthApi(stats Statistics) http.Handler {
 	return &healthApi{
 		stats: stats,
 	}
@@ -96,12 +96,12 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 // statsApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting system statistics.
 type statsApi struct {
-	stats *Statistics
+	stats Statistics
 }
 
 // NewStatsApi creates a new health API object,
 // serving data from a system Statistics object.
-func (stats *Statistics) NewStatsApi() http.Handler {
+func NewStatsApi(stats Statistics) http.Handler {
 	return &statsApi{
 		stats: stats,
 	}

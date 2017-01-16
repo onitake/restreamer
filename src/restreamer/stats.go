@@ -22,10 +22,31 @@ import (
 	"sync/atomic"
 )
 
-// CurrentStreamStatistics represents per-stream state information
+// Collector is the public face of a statistics collector.
+// It is implemented by the individual stream stats.
+type Collector interface {
+	// ConnectionAdded notifies that a new downstream client connected.
+	ConnectionAdded()
+	// ConnectionRemoved notifies that a downstream client disconnected.
+	ConnectionRemoved()
+	// PacketReceived notifies that a packet was received.
+	PacketReceived()
+	// PacketReceived notifies that a packet was sent.
+	PacketSent()
+	// PacketReceived notifies that a packet was dropped.
+	PacketDropped()
+	// SourceConnected notifies that upstream is live.
+	SourceConnected()
+	// SourceDisconnected notifies that upstream is offline.
+	SourceDisconnected()
+	// IsUpstreamConnected tells you if upstream is connected.
+	IsUpstreamConnected() bool
+}
+
+// realCollector represents per-stream state information
 // and is continuously updated by the corresponding streamer.
 // Use the provided accessor methods for this purpose.
-type CurrentStreamStatistics struct {
+type realCollector struct {
 	// total number of connections
 	connections int64
 	// total number of received packets
@@ -38,50 +59,42 @@ type CurrentStreamStatistics struct {
 	connected int32
 }
 
-// ConnectionAdded notifies that a new downstream client connected.
-func (stats *CurrentStreamStatistics) ConnectionAdded() {
+func (stats *realCollector) ConnectionAdded() {
 	atomic.AddInt64(&stats.connections, 1)
 }
 
-// ConnectionRemoved notifies that a downstream client disconnected.
-func (stats *CurrentStreamStatistics) ConnectionRemoved() {
+func (stats *realCollector) ConnectionRemoved() {
 	atomic.AddInt64(&stats.connections, -1)
 }
 
-// PacketReceived notifies that a packet was received.
-func (stats *CurrentStreamStatistics) PacketReceived() {
+func (stats *realCollector) PacketReceived() {
 	atomic.AddUint64(&stats.packetsReceived, 1)
 }
 
-// PacketReceived notifies that a packet was sent.
-func (stats *CurrentStreamStatistics) PacketSent() {
+func (stats *realCollector) PacketSent() {
 	atomic.AddUint64(&stats.packetsSent, 1)
 }
 
-// PacketReceived notifies that a packet was dropped.
-func (stats *CurrentStreamStatistics) PacketDropped() {
+func (stats *realCollector) PacketDropped() {
 	atomic.AddUint64(&stats.packetsDropped, 1)
 }
 
-// SourceConnected notifies that upstream is live.
-func (stats *CurrentStreamStatistics) SourceConnected() {
+func (stats *realCollector) SourceConnected() {
 	atomic.StoreInt32(&stats.connected, 1)
 }
 
-// SourceDisconnected notifies that upstream is offline.
-func (stats *CurrentStreamStatistics) SourceDisconnected() {
+func (stats *realCollector) SourceDisconnected() {
 	atomic.StoreInt32(&stats.connected, 0)
 }
 
-// IsUpstreamConnected tells you if upstream is connected.
-func (stats *CurrentStreamStatistics) IsUpstreamConnected() bool {
+func (stats *realCollector) IsUpstreamConnected() bool {
 	return atomic.LoadInt32(&stats.connected) != 0
 }
 
 // clone creates a copy of the stats object - useful for
 // storing state temporarily.
-func (stats *CurrentStreamStatistics) clone() *CurrentStreamStatistics {
-	return &CurrentStreamStatistics{
+func (stats *realCollector) clone() *realCollector {
+	return &realCollector{
 		connections: atomic.LoadInt64(&stats.connections),
 		packetsReceived: atomic.LoadUint64(&stats.packetsReceived),
 		packetsSent: atomic.LoadUint64(&stats.packetsSent),
@@ -96,14 +109,14 @@ func (stats *CurrentStreamStatistics) clone() *CurrentStreamStatistics {
 // "connected" is copied directly from "to".
 // Useful if you want to calculate a delta, then replace the previous
 // value with the current one:
-// prev := CurrentStreamStatistics{}
+// prev := realCollector{}
 // for {
-//   current := CurrentStreamStatistics{}
+//   current := realCollector{}
 //   prev.invsub(current)
 //   doSomethingWithPrev(prev)
 //   prev = current
 // }
-func (from *CurrentStreamStatistics) invsub(to *CurrentStreamStatistics) {
+func (from *realCollector) invsub(to *realCollector) {
 	from.connections = to.connections - from.connections
 	from.packetsReceived = to.packetsReceived - from.packetsReceived
 	from.packetsSent= to.packetsSent - from.packetsSent
@@ -136,17 +149,55 @@ type StreamStatistics struct {
 // Statistics holds system and stream status information.
 // Streams update their state continuously, but data fields are only updated in periodic intervals.
 // There is also an HTTP/JSON API facility available through the New...Api() methods in api.go.
-type Statistics struct {
+type Statistics interface {
+	// Start starts the updater thread.
+	Start()
+	// Stop stops the updater thread.
+	Stop()
+	// RegisterStream adds a new stream to the map.
+	// The name will be used as the lookup key, and maxconns is the maximum number of allowed connections.
+	RegisterStream(name string, maxconns uint) Collector
+	// RemoveStream removes a stream from the map.
+	RemoveStream(name string)
+	// GetStreamStatistics fetches the statistics for a stream.
+	// The returned object is a copy does not need to be handled with care.
+	GetStreamStatistics(name string) *StreamStatistics
+	// GetAllStreamStatistics fetches the statistics for all streams.
+	// The returned object is a copy does not need to be handled with care.
+	GetAllStreamStatistics() map[string]*StreamStatistics
+	// GetGlobalStatistics fetches the global statistics.
+	// The returned object is a copy does not need to be handled with care.
+	GetGlobalStatistics() *StreamStatistics
+}
+
+// realStatistics implements a full statistics collector and API endpoint generator.
+type realStatistics struct {
 	lock sync.RWMutex
 	running bool
 	shutdown chan bool
-	internal map[string]*CurrentStreamStatistics
+	internal map[string]*realCollector
 	streams map[string]*StreamStatistics
 	global *StreamStatistics
 }
 
+// NewStatistics creates a new statistics container.
+// You can start and stop the periodic updater using Start() and Stop().
+// Register your streams with RegisterStream(), this will return an updateable
+// statistics object. You should not write to the individual fields directly,
+// instead access them using the Add...() methods.
+// Snapshots of the aggregated statistics can then be means of the Get...() methods.
+func NewStatistics() Statistics {
+	stats := &realStatistics{
+		shutdown: make(chan bool),
+		internal: make(map[string]*realCollector),
+		streams: make(map[string]*StreamStatistics),
+		global: &StreamStatistics{},
+	}
+	return stats
+}
+
 // update updates the aggregated statistics from the current state of each stream.
-func (stats *Statistics) update(delta time.Duration, change map[string]*CurrentStreamStatistics) {
+func (stats *realStatistics) update(delta time.Duration, change map[string]*realCollector) {
 	// acquire the global write lock
 	stats.lock.Lock()
 	
@@ -214,9 +265,9 @@ func (stats *Statistics) update(delta time.Duration, change map[string]*CurrentS
 // delta calculates the difference between a previous internal state
 // and the current state and returns a copy of the current state.
 // The previous state (the argument) is replaced with the difference.
-func (stats *Statistics) delta(previous map[string]*CurrentStreamStatistics) map[string]*CurrentStreamStatistics {
+func (stats *realStatistics) delta(previous map[string]*realCollector) map[string]*realCollector {
 	stats.lock.RLock()
-	current := make(map[string]*CurrentStreamStatistics)
+	current := make(map[string]*realCollector)
 	for name, stream := range stats.internal {
 		update := stream.clone()
 		previous[name].invsub(update)
@@ -227,7 +278,7 @@ func (stats *Statistics) delta(previous map[string]*CurrentStreamStatistics) map
 }
 
 // loop runs a ticker to update all statistics periodically.
-func (stats *Statistics) loop() {
+func (stats *realStatistics) loop() {
 	running := true
 	// TODO make the interval configurable
 	ticker := time.NewTicker(1 * time.Second)
@@ -235,7 +286,7 @@ func (stats *Statistics) loop() {
 	// pre-init - store the current time and state
 	before := time.Now()
 	stats.lock.RLock()
-	previous := make(map[string]*CurrentStreamStatistics)
+	previous := make(map[string]*realCollector)
 	for name, stream := range stats.internal {
 		previous[name] = stream.clone()
 	}
@@ -263,7 +314,7 @@ func (stats *Statistics) loop() {
 }
 
 // Start starts the updater thread.
-func (stats *Statistics) Start() {
+func (stats *realStatistics) Start() {
 	if !stats.running {
 		stats.running = true
 		go stats.loop()
@@ -271,32 +322,16 @@ func (stats *Statistics) Start() {
 }
 
 // Stop stops the updater thread.
-func (stats *Statistics) Stop() {
+func (stats *realStatistics) Stop() {
 	if stats.running {
 		stats.shutdown<- true
 	}
 }
 
-// NewStatistics creates a new statistics container.
-// You can start and stop the periodic updater using Start() and Stop().
-// Register your streams with RegisterStream(), this will return an updateable
-// statistics object. You should not write to the individual fields directly,
-// instead access them using the Add...() methods.
-// Snapshots of the aggregated statistics can then be means of the Get...() methods.
-func NewStatistics() (*Statistics) {
-	stats := &Statistics{
-		shutdown: make(chan bool),
-		internal: make(map[string]*CurrentStreamStatistics),
-		streams: make(map[string]*StreamStatistics),
-		global: &StreamStatistics{},
-	}
-	return stats
-}
-
 // RegisterStream adds a new stream to the map.
 // The name will be used as the lookup key, and maxconns is the maximum number of allowed connections.
-func (stats *Statistics) RegisterStream(name string, maxconns uint) *CurrentStreamStatistics {
-	current := &CurrentStreamStatistics{}
+func (stats *realStatistics) RegisterStream(name string, maxconns uint) Collector {
+	current := &realCollector{}
 	stats.lock.Lock()
 	stats.internal[name] = current
 	stats.streams[name] = &StreamStatistics{
@@ -307,7 +342,7 @@ func (stats *Statistics) RegisterStream(name string, maxconns uint) *CurrentStre
 }
 
 // RemoveStream removes a stream from the map.
-func (stats *Statistics) RemoveStream(name string) {
+func (stats *realStatistics) RemoveStream(name string) {
 	stats.lock.Lock()
 	delete(stats.internal, name)
 	delete(stats.streams, name)
@@ -316,7 +351,7 @@ func (stats *Statistics) RemoveStream(name string) {
 
 // GetStreamStatistics fetches the statistics for a stream.
 // The returned object is a copy does not need to be handled with care.
-func (stats *Statistics) GetStreamStatistics(name string) *StreamStatistics {
+func (stats *realStatistics) GetStreamStatistics(name string) *StreamStatistics {
 	stats.lock.RLock()
 	stream := *stats.streams[name]
 	stats.lock.RUnlock()
@@ -325,7 +360,7 @@ func (stats *Statistics) GetStreamStatistics(name string) *StreamStatistics {
 
 // GetAllStreamStatistics fetches the statistics for all streams.
 // The returned object is a copy does not need to be handled with care.
-func (stats *Statistics) GetAllStreamStatistics() map[string]*StreamStatistics {
+func (stats *realStatistics) GetAllStreamStatistics() map[string]*StreamStatistics {
 	stats.lock.RLock()
 	streams := make(map[string]*StreamStatistics, len(stats.streams))
 	for name, stream := range stats.streams {
@@ -338,9 +373,71 @@ func (stats *Statistics) GetAllStreamStatistics() map[string]*StreamStatistics {
 
 // GetGlobalStatistics fetches the global statistics.
 // The returned object is a copy does not need to be handled with care.
-func (stats *Statistics) GetGlobalStatistics() *StreamStatistics {
+func (stats *realStatistics) GetGlobalStatistics() *StreamStatistics {
 	stats.lock.RLock()
 	global := *stats.global
 	stats.lock.RUnlock()
 	return &global
+}
+
+type dummyStatistics struct {
+}
+
+// NewDummyStatistics creates a placeholder statistics container.
+// It doesn't actually do anything and is just used for debugging.
+func NewDummyStatistics() Statistics {
+	return &dummyStatistics{}
+}
+
+func (stats *dummyStatistics) Start() {
+}
+
+func (stats *dummyStatistics) Stop() {
+}
+
+func (stats *dummyStatistics) RegisterStream(name string, maxconns uint) Collector {
+	return &dummyCollector{}
+}
+
+func (stats *dummyStatistics) RemoveStream(name string) {
+}
+
+func (stats *dummyStatistics) GetStreamStatistics(name string) *StreamStatistics {
+	return &StreamStatistics{}
+}
+
+func (stats *dummyStatistics) GetAllStreamStatistics() map[string]*StreamStatistics {
+	return make(map[string]*StreamStatistics)
+}
+
+func (stats *dummyStatistics) GetGlobalStatistics() *StreamStatistics {
+	return &StreamStatistics{}
+}
+
+type dummyCollector struct {
+}
+
+func (stats *dummyCollector) ConnectionAdded() {
+}
+
+func (stats *dummyCollector) ConnectionRemoved() {
+}
+
+func (stats *dummyCollector) PacketReceived() {
+}
+
+func (stats *dummyCollector) PacketSent() {
+}
+
+func (stats *dummyCollector) PacketDropped() {
+}
+
+func (stats *dummyCollector) SourceConnected() {
+}
+
+func (stats *dummyCollector) SourceDisconnected() {
+}
+
+func (stats *dummyCollector) IsUpstreamConnected() bool {
+	return false
 }
