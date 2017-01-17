@@ -5,6 +5,8 @@
 	"": "Set the connection and network I/O timeout.",
 	"": "0 disables the timeout, i.e. means: wait forever.",
 	"timeout": 0,
+	"": "Set to true to disable stats tracking.",
+	"nostats": false,
 	"": "Size of the input buffer per stream in TS packets (= 188 bytes).",
 	"inputbuffer": 1000,
 	"": "Size of the output buffer per client connection in TS packets.",
