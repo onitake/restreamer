@@ -17,35 +17,31 @@ that can fetch, buffer and distribute [MPEG transport streams](https://en.wikipe
 Thus, it serves as a non-transcoding streaming proxy.
 
 In contrast to other video and audio streaming techniques (such as MPEG-DASH),
-this can not easily be achieved with most HTTP proxy packages.
-At the very least, awareness of the continuous nature of such streams
-and the underlying data structure is required.
+this can not easily be achieved with most HTTP proxies.
+Instead of caching blocks of data, the streaming proxy needs to buffer and
+distribute packets on the fly.
 
 
 Architecture
 ------------
 
-restreamer is written in Go, as a bit of an experiment to get familiar with
-the language. Go offers many primitives and an extensive standard library
-that facilitate the development of a web server. This makes it a first-rate
-choice for such a project.
+restreamer is written in [Go](https://golang.org/).
+Go offers many primitives and an extensive standard library that contains
+most building blocks for a web server. This makes it a first-rate
+choice for such a product.
 
 There are several key components:
-* Client - an implementation of an HTTP client that is capable
-  of fetching data from the upstream server and feeding it into a queue
-* Connection - an abstraction of a downstream client connection
-* Streamer - a connection broker and data dispatcher
-* server - the core program that glues the components together
-* source - simple HTTP file server (for testing, better use ffmpeg)
+* Client - HTTP getter for fetching upstream data
+* Connection - HTTP server that feeds data to clients
+* Streamer - connection broker and data queue
+* Api - web API for service monitoring
+* Statistics - stat collector and tracker
+* restreamer - core program that glues the components together
 
-Additionally, there is a packet source tool that acts as a simple
-web server, serving data from a file to the streaming proxy.
-Note however, that the stream is not rate-limited and will certainly
-overflow and downstream clients. But it can be used to the server's
-robustness and performance.
-
+Additionally, there is a simple web server that serves static files.
+It not suitable for stream testing however.
 For proper testing, it is recommended to use a more sophisticated
-software package instead, such as ffmpeg.
+software package such as ffmpeg.
 
 
 Compilation
@@ -57,33 +53,35 @@ Type
 ```
 make
 ```
-at the command prompt, which should yield bin/server and bin/source .
+at the command prompt, which should yield bin/restreamer .
 
 
 Configuration
 -------------
 
-All configuration is done through server.json .
+All configuration is done through restreamer.json .
 
-See the included example for its structure.
+See restreamer.example.json for a documented example.
 
 
 Testing
 -------
 
-Create a pipe, as configured in the example server.json:
+Using the example config and ffmpeg, a test stream can be set up:
+
+Create a pipe:
 ```
 mkfifo /tmp/pipe.ts
 ```
-Start feeding data into the pipe, in realtime:
+Start feeding data into the pipe (note the -re parameter):
 ```
 ffmpeg -re -i test.ts -c:a copy -c:v copy -y /tmp/pipe.ts
 ```
 Start the proxy:
 ```
-bin/server
+bin/restreamer
 ```
 Start playing:
 ```
-mpv http://localhost:8000/pipe.ts
+cvlc http://localhost:8000/pipe.ts
 ```

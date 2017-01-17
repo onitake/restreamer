@@ -1,12 +1,27 @@
 {
+	"": "Listen on ::1 and 127.0.0.1, port 8000.",
+	"": "You can also use identifiers like :http to listen on all interfaces on a standard service port",
 	"listen": "localhost:8000",
+	"": "Set the connection and network I/O timeout.",
+	"": "0 disables the timeout, i.e. means: wait forever.",
 	"timeout": 0,
+	"": "Size of the input buffer per stream in TS packets (= 188 bytes).",
 	"inputbuffer": 1000,
+	"": "Size of the output buffer per client connection in TS packets.",
 	"outputbuffer": 400,
+	"": "The client connection limit, per stream.",
 	"maxconnections": 100,
+	"": "List of streams:",
 	"streams": [
-		{ "serve": "/stream.ts", "remote": "http://localhost:10000/stream.ts" },
-		{ "serve": "/pipe.ts", "remote": "file:///tmp/pipe.ts" }
+		{
+			"": "Path under which a stream is made available.",
+			"serve": "/stream.ts",
+			"": "Upstream URL, this can be http, https or file.",
+			"remote": "http://localhost:10000/stream.ts"
+		},
+		{
+			"serve": "/pipe.ts",
+			"remote": "file:///tmp/pipe.ts"
+		}
 	]
 }
-
