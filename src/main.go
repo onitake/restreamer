@@ -64,7 +64,7 @@ func main() {
 	if len(os.Args) > 1 {
 		configname = os.Args[1]
 	} else {
-		configname = "server.json"
+		configname = "restreamer.json"
 	}
 	
 	configfile, err := os.Open(configname)
