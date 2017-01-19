@@ -13,17 +13,44 @@
 	"outputbuffer": 400,
 	"": "The client connection limit, per stream.",
 	"maxconnections": 100,
-	"": "List of streams:",
-	"streams": [
+	"": "List of resources; can be streams, static content or APIs.",
+	"resources": [
 		{
-			"": "Path under which a stream is made available.",
+			"": "Type of this resource: stream, static, api",
+			"": "stream = HTTP stream",
+			"": "static = static content from a local file or remote source",
+			"": "api = builtin API",
+			"type": "stream",
+			"": "Path under which a resource is made available.",
 			"serve": "/stream.ts",
 			"": "Upstream URL, this can be http, https or file.",
-			"remote": "http://localhost:10000/stream.ts"
+			"": "If type is API, can be: health (reports system health).",
+			"remote": "http://localhost:10000/stream.ts",
+			"": "Cache time in seconds, use 0 to disable caching.",
+			"": "Only supported for static content.",
+			"cache": 0
 		},
 		{
+			"type": "stream",
 			"serve": "/pipe.ts",
 			"remote": "file:///tmp/pipe.ts"
+		},
+		{
+			"type": "api",
+			"serve": "/health",
+			"remote": "health"
+		},
+		{
+			"type": "static",
+			"serve": "/test",
+			"remote": "file:///tmp/test",
+			"cache": 0
+		},
+		{
+			"type": "static",
+			"serve": "/stats",
+			"remote": "http://localhost:10000/stats",
+			"cache": 60
 		}
 	]
 }

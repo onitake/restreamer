@@ -51,11 +51,15 @@ type Configuration struct {
 	// set to true to disable statistics
 	NoStats bool
 	// the list of streams
-	Streams []struct {
+	Resources []struct {
+		// the resource type
+		Type string
 		// the local URL to serve this stream under
 		Serve string
 		// the upstream URL
 		Remote string
+		// the cache time in seconds
+		Cache int
 	}
 }
 
@@ -91,34 +95,47 @@ func main() {
 	
 	i := 0
 	mux := http.NewServeMux()
-	for _, streamdef := range config.Streams {
-		log.Printf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote)
-		
-		queue := make(chan restreamer.Packet, config.InputBuffer)
-		reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
-		
-		client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, reg)
-		
-		if err == nil {
-			mux.Handle("/check" + streamdef.Serve, restreamer.NewStreamStateApi(client))
-			err = client.Connect()
-		}
-		
-		if err == nil {
-			streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer, reg)
-			mux.Handle(streamdef.Serve, streamer)
-			streamer.Connect()
+	for _, streamdef := range config.Resources {
+		switch streamdef.Type {
+		case "stream":
+			log.Printf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote)
 			
-			log.Printf("Handled connection %d", i)
-			i++
-		} else {
-			log.Print(err)
+			queue := make(chan restreamer.Packet, config.InputBuffer)
+			reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
+			client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, reg)
+			
+			if err == nil {
+				mux.Handle("/check" + streamdef.Serve, restreamer.NewStreamStateApi(client))
+				err = client.Connect()
+			}
+			
+			if err == nil {
+				streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer, reg)
+				mux.Handle(streamdef.Serve, streamer)
+				streamer.Connect()
+				
+				log.Printf("Handled connection %d", i)
+				i++
+			} else {
+				log.Print(err)
+			}
+			
+		case "static":
+			log.Printf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote)
+			
+		case "api":
+			switch streamdef.Remote {
+			case "health":
+				log.Printf("Registering global health API on %s", streamdef.Serve);
+				mux.Handle(streamdef.Serve, restreamer.NewHealthApi(stats))
+			default:
+				log.Printf("Invalid API type: %s", streamdef.Remote);
+			}
+			
+		default:
+			log.Printf("Invalid resource type: %s", streamdef.Type);
 		}
 	}
-	
-	log.Print("Registering global API endpoints");
-	mux.Handle("/health", restreamer.NewHealthApi(stats))
-	mux.Handle("/stats", restreamer.NewStatsApi(stats))
 	
 	if i == 0 {
 		log.Fatal("No streams available")
