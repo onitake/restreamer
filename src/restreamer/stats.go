@@ -126,8 +126,6 @@ func (from *realCollector) invsub(to *realCollector) {
 
 // StreamStatistics is the current state of a single stream
 // or all streams combined.
-// Updates are collected and evaluated periodically.
-// Connected status can be checked by calling Connected().
 type StreamStatistics struct {
 	Connections int64
 	MaxConnections int64
@@ -146,7 +144,7 @@ type StreamStatistics struct {
 	Connected bool
 }
 
-// Statistics holds system and stream status information.
+// Statistics is the access interface for a stat tracker.
 // Streams update their state continuously, but data fields are only updated in periodic intervals.
 // There is also an HTTP/JSON API facility available through the New...Api() methods in api.go.
 type Statistics interface {
