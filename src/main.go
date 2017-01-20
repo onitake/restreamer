@@ -59,7 +59,7 @@ type Configuration struct {
 		// the upstream URL
 		Remote string
 		// the cache time in seconds
-		Cache int
+		Cache uint
 	}
 }
 
@@ -122,6 +122,12 @@ func main() {
 			
 		case "static":
 			log.Printf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote)
+			proxy, err := restreamer.NewProxy(streamdef.Remote, streamdef.Cache, stats)
+			if err != nil {
+				mux.Handle(streamdef.Serve, proxy)
+			} else {
+				log.Print(err)
+			}
 			
 		case "api":
 			switch streamdef.Remote {
