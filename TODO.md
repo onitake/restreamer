@@ -4,10 +4,7 @@ restreamer TODO list
 Priority
 --------
 
-* Finish implementation of static content server/proxy
-  https://developers.google.com/web/fundamentals/performance/optimizing-content-efficiency/http-caching
 * Implement HA, i.e. multiple sources for streams/resources
-* Separate health checks and statistics (metrics need to be defined!)
 * Implement global limits
 * Implement connect/read timeouts for every socket (stream, connection, proxy)
 * Add configuration value defaults
