@@ -36,6 +36,7 @@ There are several key components:
 * Streamer - connection broker and data queue
 * Api - web API for service monitoring
 * Statistics - stat collector and tracker
+* Proxy - static web server and proxy
 * restreamer - core program that glues the components together
 
 Additionally, there is a simple web server that serves static files.

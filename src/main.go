@@ -124,11 +124,11 @@ func main() {
 			
 		case "static":
 			log.Printf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote)
-			proxy, err := restreamer.NewProxy(streamdef.Remote, streamdef.Cache, stats)
+			proxy, err := restreamer.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache, stats)
 			if err != nil {
-				mux.Handle(streamdef.Serve, proxy)
-			} else {
 				log.Print(err)
+			} else {
+				mux.Handle(streamdef.Serve, proxy)
 			}
 			
 		case "api":
