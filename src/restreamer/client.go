@@ -58,6 +58,8 @@ type Client struct {
 	input io.ReadCloser
 	// the I/O timeout
 	Timeout time.Duration
+	// wait time before reconnecting a disconnected upstream
+	Reconnect time.Duration
 	// the packet queue
 	queue chan<- Packet
 	// the stats collector for this stream
@@ -68,9 +70,9 @@ type Client struct {
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
-// >ou need to call Connect() to do that.
-// After a connection has been closed, the client will attempt to reconnect after a short delay.
-func NewClient(uri string, queue chan<- Packet, timeout uint, stats Collector) (*Client, error) {
+// You need to call Connect() to do that.
+// After a connection has been closed, the client will attempt to reconnect after a configurable delay.
+func NewClient(uri string, queue chan<- Packet, timeout uint, reconnect uint, stats Collector) (*Client, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -80,6 +82,7 @@ func NewClient(uri string, queue chan<- Packet, timeout uint, stats Collector) (
 		socket: nil,
 		input: nil,
 		Timeout: time.Duration(timeout) * time.Second,
+		Reconnect: time.Duration(reconnect) * time.Second,
 		queue: queue,
 		stats: stats,
 		running: false,
@@ -181,8 +184,11 @@ func (client *Client) pull() {
 	log.Printf("Socket for stream %s closed\n", client.Url)
 	client.Close()
 	
-	// reconnect after a while
-	// TODO make this configurable
-	time.Sleep(10 * time.Second)
-	go client.Connect()
+	// reconnect after a while, if enabled
+	if client.Reconnect != 0 {
+		time.Sleep(client.Reconnect)
+		go client.Connect()
+	} else {
+		log.Print("Reconnecting disabled. Stream will stay offline.\n");
+	}
 }

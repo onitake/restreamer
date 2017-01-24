@@ -34,6 +34,8 @@ type Configuration struct {
 	// the connection timeout
 	// (both input and output)
 	Timeout uint
+	// the reconnect delay
+	Reconnect uint
 	// the maximum number of packets
 	// on the input buffer
 	InputBuffer uint
@@ -102,7 +104,7 @@ func main() {
 			
 			queue := make(chan restreamer.Packet, config.InputBuffer)
 			reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
-			client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, reg)
+			client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, config.Reconnect, reg)
 			
 			if err == nil {
 				mux.Handle("/check" + streamdef.Serve, restreamer.NewStreamStateApi(client))
