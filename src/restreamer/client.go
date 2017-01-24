@@ -59,7 +59,7 @@ type Client struct {
 	// the I/O timeout
 	Timeout time.Duration
 	// wait time before reconnecting a disconnected upstream
-	Reconnect time.Duration
+	Wait time.Duration
 	// the packet queue
 	queue chan<- Packet
 	// the stats collector for this stream
@@ -82,15 +82,48 @@ func NewClient(uri string, queue chan<- Packet, timeout uint, reconnect uint, st
 		socket: nil,
 		input: nil,
 		Timeout: time.Duration(timeout) * time.Second,
-		Reconnect: time.Duration(reconnect) * time.Second,
+		Wait: time.Duration(reconnect) * time.Second,
 		queue: queue,
 		stats: stats,
 		running: false,
 	}, nil
 }
 
-// Connect connects the socket, sends the HTTP request and spawns the streaming thread.
-func (client *Client) Connect() error {
+// Connect spawns the connection loop.
+func (client *Client) Connect() {
+	go client.loop()
+}
+
+// loop tries to connect and loops until successful.
+// If client.Wait is 0, it only tries once.
+func (client *Client) loop() {
+	first := true
+	
+	for first || client.Wait != 0 {
+		// sleep if this is not the first attempt
+		if !first {
+			time.Sleep(client.Wait)
+		} else {
+			// there is only one first attempt
+			first = false
+		}
+		
+		// and connect
+		err := client.start()
+		if err != nil {
+			log.Print(err)
+		}
+		
+		if client.Wait != 0 {
+			log.Printf("Retrying after %0.0f seconds.\n", client.Wait.Seconds());
+		} else {
+			log.Print("Reconnecting disabled. Stream will stay offline.\n");
+		}
+	}
+}
+
+// start connects the socket, sends the HTTP request and starts streaming.
+func (client *Client) start() error {
 	if client.input == nil {
 		if client.Url.Scheme == "file" {
 			log.Printf("Opening %s\n", client.Url.Path)
@@ -111,9 +144,11 @@ func (client *Client) Connect() error {
 			client.socket = response
 			client.input = response.Body
 		}
+		
 		client.running = true
 		log.Printf("Starting to pull from %s\n", client.Url)
-		go client.pull()
+		client.pull()
+		
 		return nil
 	}
 	return ErrAlreadyConnected
@@ -183,12 +218,4 @@ func (client *Client) pull() {
 	
 	log.Printf("Socket for stream %s closed\n", client.Url)
 	client.Close()
-	
-	// reconnect after a while, if enabled
-	if client.Reconnect != 0 {
-		time.Sleep(client.Reconnect)
-		go client.Connect()
-	} else {
-		log.Print("Reconnecting disabled. Stream will stay offline.\n");
-	}
 }
