@@ -24,14 +24,23 @@
 			"": "static = static content from a local file or remote source",
 			"": "api = builtin API",
 			"type": "stream",
+			"": "API endpoint, only used if type is api:",
+			"": "health - reports system health).",
+			"": "check - reports the status of a stream. remote contains the serve path of the stream.",
+			"api": "",
 			"": "Path under which a resource is made available.",
 			"serve": "/stream.ts",
 			"": "Upstream URL, this can be http, https or file.",
-			"": "If type is API, can be: health (reports system health).",
 			"remote": "http://localhost:10000/stream.ts",
 			"": "Cache time in seconds, use 0 to disable caching.",
 			"": "Only supported for static content.",
 			"cache": 0
+		},
+		{
+			"type": "api",
+			"api": "check",
+			"serve": "/check/stream.ts",
+			"remote": "/stream.ts"
 		},
 		{
 			"type": "stream",

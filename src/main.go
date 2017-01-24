@@ -56,9 +56,11 @@ type Configuration struct {
 	Resources []struct {
 		// the resource type
 		Type string
+		// the API type
+		Api string
 		// the local URL to serve this stream under
 		Serve string
-		// the upstream URL
+		// the upstream URL or API argument
 		Remote string
 		// the cache time in seconds
 		Cache uint
@@ -95,6 +97,8 @@ func main() {
 		stats = restreamer.NewStatistics()
 	}
 	
+	clients := make(map[string]*restreamer.Client)
+	
 	i := 0
 	mux := http.NewServeMux()
 	for _, streamdef := range config.Resources {
@@ -107,11 +111,12 @@ func main() {
 			client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, config.Reconnect, reg)
 			
 			if err == nil {
-				mux.Handle("/check" + streamdef.Serve, restreamer.NewStreamStateApi(client))
-				err = client.Connect()
+				client.Connect()
 			}
 			
 			if err == nil {
+				clients[streamdef.Serve] = client
+				
 				streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer, reg)
 				mux.Handle(streamdef.Serve, streamer)
 				streamer.Connect()
@@ -132,12 +137,20 @@ func main() {
 			}
 			
 		case "api":
-			switch streamdef.Remote {
+			switch streamdef.Api {
 			case "health":
 				log.Printf("Registering global health API on %s", streamdef.Serve);
 				mux.Handle(streamdef.Serve, restreamer.NewHealthApi(stats))
+			case "check":
+				log.Printf("Registering stream check API on %s", streamdef.Serve);
+				client := clients[streamdef.Remote]
+				if client != nil {
+					mux.Handle(streamdef.Serve, restreamer.NewStreamStateApi(client))
+				} else {
+					log.Printf("Error, stream not found: %s", streamdef.Remote);
+				}
 			default:
-				log.Printf("Invalid API type: %s", streamdef.Remote);
+				log.Printf("Invalid API type: %s", streamdef.Api);
 			}
 			
 		default:
