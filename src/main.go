@@ -141,6 +141,9 @@ func main() {
 			case "health":
 				log.Printf("Registering global health API on %s", streamdef.Serve);
 				mux.Handle(streamdef.Serve, restreamer.NewHealthApi(stats))
+			case "statistics":
+				log.Printf("Registering global statistics API on %s", streamdef.Serve);
+				mux.Handle(streamdef.Serve, restreamer.NewStatisticsApi(stats))
 			case "check":
 				log.Printf("Registering stream check API on %s", streamdef.Serve);
 				client := clients[streamdef.Remote]

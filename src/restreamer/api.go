@@ -18,7 +18,6 @@ package restreamer
 
 import (
 	"log"
-	"time"
 	"net/http"
 	"encoding/json"
 )
@@ -46,6 +45,51 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		Viewer int `json:"viewer"`
 		Limit int `json:"limit"`
 		Bandwidth int `json:"bandwidth"`
+	}
+	if global.Connections < global.MaxConnections {
+		stats.Status = "ok"
+	} else {
+		stats.Status = "full"
+	}
+	stats.Viewer = int(global.Connections)
+	stats.Limit = int(global.MaxConnections)
+	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
+	
+	writer.Header().Add("Content-Type", "application/json")
+	response, err := json.Marshal(&stats)
+	if err == nil {
+		writer.WriteHeader(http.StatusOK);
+		writer.Write(response)
+	} else {
+		writer.WriteHeader(http.StatusInternalServerError);
+		writer.Write([]byte("500 internal server error"))
+		log.Print(err)
+	}
+}
+
+
+// statisticsApi encapsulates a system status object and
+// provides an HTTP/JSON handler for reporting total system statistics.
+type statisticsApi struct {
+	stats Statistics
+}
+
+// NewStatisticsApi creates a new statistics API object,
+// serving data from a system Statistics object.
+func NewStatisticsApi(stats Statistics) http.Handler {
+	return &statisticsApi{
+		stats: stats,
+	}
+}
+
+// ServeHTTP is the http handler method.
+// It sends back information about system health.
+func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	global := api.stats.GetGlobalStatistics()
+	var stats struct {
+		Status string `json:"status"`
+		Connections int `json:"connections"`
+		MaxConnections int `json:"max_connections"`
 		TotalPacketsReceived uint64 `json:"total_packets_received"`
 		TotalPacketsSent uint64 `json:"total_packets_sent"`
 		TotalPacketsDropped uint64 `json:"total_packets_dropped"`
@@ -64,10 +108,8 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	} else {
 		stats.Status = "full"
 	}
-	stats.Viewer = int(global.Connections)
-	stats.Limit = int(global.MaxConnections)
-	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
-	
+	stats.Connections = int(global.Connections)
+	stats.MaxConnections = int(global.MaxConnections)
 	stats.TotalPacketsReceived = global.TotalPacketsReceived
 	stats.TotalPacketsSent = global.TotalPacketsSent
 	stats.TotalPacketsDropped = global.TotalPacketsDropped
@@ -83,48 +125,6 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	
 	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
-	if err == nil {
-		writer.WriteHeader(http.StatusOK);
-		writer.Write(response)
-	} else {
-		writer.WriteHeader(http.StatusInternalServerError);
-		writer.Write([]byte("500 internal server error"))
-		log.Print(err)
-	}
-}
-
-// statsApi encapsulates a system status object and
-// provides an HTTP/JSON handler for reporting system statistics.
-type statsApi struct {
-	stats Statistics
-}
-
-// NewStatsApi creates a new health API object,
-// serving data from a system Statistics object.
-func NewStatsApi(stats Statistics) http.Handler {
-	return &statsApi{
-		stats: stats,
-	}
-}
-
-// ServeHTTP is the http handler method.
-// It sends back system statistics.
-func (api *statsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	writer.Header().Add("Content-Type", "application/json")
-	response, err := json.Marshal(map[string]interface{}{
-		"lastUpdate": time.Now().Unix(),
-		"total": map[string]interface{}{
-			"counter": 0,
-			"free": 1000,
-		},
-		"servers": []interface{}{
-			map[string]interface{}{
-				"counter": 0,
-				"name": "streaming-test.local",
-				"free": 1000,
-			},
-		},
-	})
 	if err == nil {
 		writer.WriteHeader(http.StatusOK);
 		writer.Write(response)
