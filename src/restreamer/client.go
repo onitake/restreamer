@@ -22,6 +22,7 @@ import (
 	"log"
 	"time"
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
 )
@@ -31,6 +32,9 @@ const (
 )
 
 var (
+	// ErrInvalidProtocol is thrown when an invalid protocol was specified.
+	// See the docs and example config for a list of supported protocols.
+	ErrInvalidProtocol = errors.New("restreamer: unsupported protocol")
 	// ErrNoConnection is thrown when trying to read
 	// from a stream that is not connected
 	ErrNoConnection = errors.New("restreamer: socket not connected")
@@ -125,14 +129,19 @@ func (client *Client) loop() {
 // start connects the socket, sends the HTTP request and starts streaming.
 func (client *Client) start() error {
 	if client.input == nil {
-		if client.Url.Scheme == "file" {
+		switch client.Url.Scheme {
+		// handled by os.Open
+		case "file":
 			log.Printf("Opening %s\n", client.Url.Path)
 			file, err := os.Open(client.Url.Path)
 			if err != nil {
 				return err
 			}
 			client.input = file
-		} else {
+		// both handled by http.Client
+		case "http":
+			fallthrough
+		case "https":
 			log.Printf("Connecting to %s\n", client.Url)
 			getter := &http.Client {
 				Timeout: client.Timeout,
@@ -143,6 +152,20 @@ func (client *Client) start() error {
 			}
 			client.socket = response
 			client.input = response.Body
+		// handled by 
+		case "tcp":
+			addr, err := net.ResolveTCPAddr("tcp", client.Url.Host)
+			if err != nil {
+				return err
+			}
+			log.Printf("Connecting TCP socket to %s:%d\n", addr.IP, addr.Port)
+			conn, err := net.DialTCP("tcp", nil, addr)
+			if err != nil {
+				return err
+			}
+			client.input = conn
+		default:
+			return ErrInvalidProtocol
 		}
 		
 		client.running = true
@@ -169,7 +192,7 @@ func (client *Client) StatusCode() int {
 	if client.socket != nil {
 		return client.socket.StatusCode
 	}
-	// always return OK when our "socket" is an open file
+	// other protocols don't have status codes, so just return 200 if connected
 	if client.input != nil {
 		return http.StatusOK
 	}
