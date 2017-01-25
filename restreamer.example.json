@@ -14,7 +14,7 @@
 	"inputbuffer": 1000,
 	"": "Size of the output buffer per client connection in TS packets.",
 	"outputbuffer": 400,
-	"": "The client connection limit, per stream.",
+	"": "The global client connection limit.",
 	"maxconnections": 100,
 	"": "List of resources; can be streams, static content or APIs.",
 	"resources": [

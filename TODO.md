@@ -5,7 +5,6 @@ Priority
 --------
 
 * Implement HA, i.e. multiple sources for streams/resources
-* Implement global limits
 * Implement connect/read timeouts for every socket (stream, connection, proxy)
 * Add configuration value defaults
 

@@ -19,15 +19,15 @@ package main
 import (
 	"os"
 	"log"
+	"sync"
 	"net/http"
 	"encoding/json"
 	"restreamer"
 )
 
-// configuration file structure
-// these should be in a JSON dictionary
-// in the configuration file
-// note that the keys should be lower case
+// Configuration is a representation of the configurable settings.
+// These are normally read from a JSON file and deserialized by
+// the builtin marshaler.
 type Configuration struct {
 	// the interface to listen on
 	Listen string
@@ -47,8 +47,7 @@ type Configuration struct {
 	// you should adjust the value according
 	// to the amount of RAM available
 	OutputBuffer uint
-	// the maximum number of concurrent connections
-	// per stream URL
+	// the maximum total number of concurrent connections
 	MaxConnections uint
 	// set to true to disable statistics
 	NoStats bool
@@ -64,6 +63,63 @@ type Configuration struct {
 		Remote string
 		// the cache time in seconds
 		Cache uint
+	}
+}
+
+// accessController implements a connection broker that limits
+// the maximum number of concurrent connections.
+type accessController struct {
+	// maxconnections is a global limit on the number of connections.
+	maxconnections uint
+	// lock to protect the connection counter
+	lock sync.Mutex
+	// connections contains the number of active connections.
+	// must be accessed atomically.
+	connections uint
+}
+
+// newAccessController creates a connection broker object that
+// handles access control according to the number of connected clients.
+func newAccessController(maxconnections uint) *accessController {
+	return &accessController{
+		maxconnections: maxconnections,
+	}
+}
+
+// Accept is the access control handler.
+func (control *accessController) Accept(remoteaddr string, id interface{}) bool {
+	accept := false
+	// protect concurrent access
+	control.lock.Lock()
+	if control.connections < control.maxconnections {
+		// and increase the counter
+		control.connections++
+		accept = true
+	}
+	control.lock.Unlock()
+	// print some info
+	if accept {
+		log.Printf("Accepted connection from %s @%p, active=%u, max=%u\n", remoteaddr, id, control.connections, control.maxconnections)
+	} else {
+		log.Printf("Denied connection from %s @%p, active=%u, max=%u\n", remoteaddr, id, control.connections, control.maxconnections)
+	}
+	// return the result
+	return accept
+}
+
+func (control *accessController) Release(id interface{}) {
+	remove := false
+	// protect concurrent access
+	control.lock.Lock()
+	if control.connections > 0 {
+		// and decrease the counter
+		control.connections--
+	}
+	control.lock.Unlock()
+	if remove {
+		log.Printf("Removed connection @%p\n", id)
+	} else {
+		log.Printf("Error, no connection to remove @%p\n", id)
 	}
 }
 
@@ -94,8 +150,10 @@ func main() {
 	if config.NoStats {
 		stats = restreamer.NewDummyStatistics()
 	} else {
-		stats = restreamer.NewStatistics()
+		stats = restreamer.NewStatistics(config.MaxConnections)
 	}
+	
+	controller := newAccessController(config.MaxConnections)
 	
 	clients := make(map[string]*restreamer.Client)
 	
@@ -107,7 +165,7 @@ func main() {
 			log.Printf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote)
 			
 			queue := make(chan restreamer.Packet, config.InputBuffer)
-			reg := stats.RegisterStream(streamdef.Serve, config.MaxConnections)
+			reg := stats.RegisterStream(streamdef.Serve)
 			client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, config.Reconnect, reg)
 			
 			if err == nil {
@@ -117,7 +175,7 @@ func main() {
 			if err == nil {
 				clients[streamdef.Serve] = client
 				
-				streamer := restreamer.NewStreamer(queue, config.MaxConnections, config.OutputBuffer, reg)
+				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller, reg)
 				mux.Handle(streamdef.Serve, streamer)
 				streamer.Connect()
 				

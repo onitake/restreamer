@@ -35,6 +35,19 @@ var (
 	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
 
+// ConnectionBroker represents a policy handler for new connections.
+// It is used to determine if new connections can be accepted,
+// based on arbitrary rules.
+type ConnectionBroker interface {
+	// Accept will be called on each incoming connection,
+	// with the remote client address and an internal identifier passed as arguments.
+	// The identifier must be unique and is usually the Streamer object that called Accept().
+	Accept(remoteaddr string, id interface{}) bool
+	// Release will be called each time a client disconnects.
+	// The id argument has the same properties as in the Accept method.
+	Release(id interface{})
+}
+
 // Streamer implements a TS packet multiplier,
 // distributing received packets on the input queue to the output queues.
 // It also handles and manages HTTP connections when added to an HTTP server.
@@ -54,8 +67,8 @@ type Streamer struct {
 	// Better just send something to the shutdown channel.
 	// TODO make this atomic
 	running bool
-	// maxconnections is the limit on the number of connections
-	maxconnections int
+	// broker is a global connection broker
+	broker ConnectionBroker
 	// queueSize defines the maximum number of packets to queue per per connection
 	queueSize int
 	// the stats collector for this stream
@@ -63,17 +76,17 @@ type Streamer struct {
 }
 
 // NewStreamer creates a new packet streamer.
-// listenon: the listen address:port tuple - use ":http" or "" to listen on port 80 on all interfaces
-// queue: an input packet queue
-// maxconn: the maximum number of connections to accept concurrently
-// qsize: the length of each connection's queue (in packets)
-func NewStreamer(queue <-chan Packet, maxconn uint, qsize uint, stats Collector) (*Streamer) {
+// queue is an input packet queue.
+// qsize is the length of each connection's queue (in packets).
+// broker handles policy enforcement
+// stats is a statistics collector object.
+func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker, stats Collector) (*Streamer) {
 	streamer := &Streamer{
 		input: queue,
 		connections: make(map[*Connection]bool),
 		shutdown: make(chan bool),
 		running: false,
-		maxconnections: int(maxconn),
+		broker: broker,
 		queueSize: int(qsize),
 		stats: stats,
 	}
@@ -144,20 +157,21 @@ func (streamer *Streamer) stream() {
 // ServeHTTP handles an incoming connection.
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	var conn *Connection
+	var conn *Connection = nil
 	
-	// structural change, exclusive lock
-	streamer.lock.Lock()
-	log.Printf("Got a connection from %s, number of active connections is %d, max number of connections is %d\n", request.RemoteAddr, len(streamer.connections), streamer.maxconnections)
-	// check if we still have free connections first
-	if (len(streamer.connections) < streamer.maxconnections) {
+	// check if the connection can be accepted
+	if streamer.broker.Accept(request.RemoteAddr, streamer) {
+		// structural change, exclusive lock
+		streamer.lock.Lock()
+		// instantiate
 		conn = NewConnection(writer, streamer.queueSize)
 		streamer.connections[conn] = true
+		// and release
+		streamer.lock.Unlock()
 	} else {
 		// no error return, so just log
 		log.Print(ErrPoolFull)
 	}
-	streamer.lock.Unlock()
 	
 	if conn != nil {
 		// connection will be handled, report
@@ -174,5 +188,8 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		
 		// and report
 		streamer.stats.ConnectionRemoved()
+		
+		// also notify the broker
+		streamer.broker.Release(streamer)
 	}
 }

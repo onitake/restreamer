@@ -153,8 +153,8 @@ type Statistics interface {
 	// Stop stops the updater thread.
 	Stop()
 	// RegisterStream adds a new stream to the map.
-	// The name will be used as the lookup key, and maxconns is the maximum number of allowed connections.
-	RegisterStream(name string, maxconns uint) Collector
+	// The name will be used as the lookup key.
+	RegisterStream(name string) Collector
 	// RemoveStream removes a stream from the map.
 	RemoveStream(name string)
 	// GetStreamStatistics fetches the statistics for a stream.
@@ -184,12 +184,14 @@ type realStatistics struct {
 // statistics object. You should not write to the individual fields directly,
 // instead access them using the Add...() methods.
 // Snapshots of the aggregated statistics can then be means of the Get...() methods.
-func NewStatistics() Statistics {
+func NewStatistics(maxconns uint) Statistics {
 	stats := &realStatistics{
 		shutdown: make(chan bool),
 		internal: make(map[string]*realCollector),
 		streams: make(map[string]*StreamStatistics),
-		global: &StreamStatistics{},
+		global: &StreamStatistics{
+			MaxConnections: int64(maxconns),
+		},
 	}
 	return stats
 }
@@ -201,7 +203,6 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 	
 	// reset the global counters
 	stats.global.Connections = 0
-	stats.global.MaxConnections = 0
 	stats.global.TotalPacketsReceived = 0
 	stats.global.TotalPacketsSent = 0
 	stats.global.TotalPacketsDropped = 0
@@ -238,7 +239,6 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 		
 		// update the global counters as well
 		stats.global.Connections += stream.Connections
-		stats.global.MaxConnections += stream.MaxConnections
 		stats.global.TotalPacketsReceived += stream.TotalPacketsReceived
 		stats.global.TotalPacketsSent += stream.TotalPacketsSent
 		stats.global.TotalPacketsDropped += stream.TotalPacketsDropped
@@ -327,14 +327,12 @@ func (stats *realStatistics) Stop() {
 }
 
 // RegisterStream adds a new stream to the map.
-// The name will be used as the lookup key, and maxconns is the maximum number of allowed connections.
-func (stats *realStatistics) RegisterStream(name string, maxconns uint) Collector {
+// The name will be used as the lookup key.
+func (stats *realStatistics) RegisterStream(name string) Collector {
 	current := &realCollector{}
 	stats.lock.Lock()
 	stats.internal[name] = current
-	stats.streams[name] = &StreamStatistics{
-		MaxConnections: int64(maxconns),
-	}
+	stats.streams[name] = &StreamStatistics{}
 	stats.lock.Unlock()
 	return current
 }
@@ -393,7 +391,7 @@ func (stats *dummyStatistics) Start() {
 func (stats *dummyStatistics) Stop() {
 }
 
-func (stats *dummyStatistics) RegisterStream(name string, maxconns uint) Collector {
+func (stats *dummyStatistics) RegisterStream(name string) Collector {
 	return &dummyCollector{}
 }
 
