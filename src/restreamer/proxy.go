@@ -39,6 +39,7 @@ const (
 )
 
 var (
+	// headerList is a list of HTTP headers that are allowed to be sent through the proxy.
 	headerList = []string{
 		"Content-Type",
 	}
