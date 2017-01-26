@@ -67,7 +67,7 @@ calculated as follows:
 
 ```
 mpegts_packet_size = 188
-max_buffer_memory = mpegts_packet_size * (input_buffer_size + max_connections * output_buffer_size)
+max_buffer_memory = mpegts_packet_size * (number_of_streams * input_buffer_size + max_connections * output_buffer_size)
 ```
 
 
