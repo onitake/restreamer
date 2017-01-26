@@ -99,9 +99,9 @@ func (control *accessController) Accept(remoteaddr string, id interface{}) bool 
 	control.lock.Unlock()
 	// print some info
 	if accept {
-		log.Printf("Accepted connection from %s @%p, active=%u, max=%u\n", remoteaddr, id, control.connections, control.maxconnections)
+		log.Printf("Accepted connection from %s @%p, active=%d, max=%d\n", remoteaddr, id, control.connections, control.maxconnections)
 	} else {
-		log.Printf("Denied connection from %s @%p, active=%u, max=%u\n", remoteaddr, id, control.connections, control.maxconnections)
+		log.Printf("Denied connection from %s @%p, active=%d, max=%d\n", remoteaddr, id, control.connections, control.maxconnections)
 	}
 	// return the result
 	return accept
@@ -114,6 +114,7 @@ func (control *accessController) Release(id interface{}) {
 	if control.connections > 0 {
 		// and decrease the counter
 		control.connections--
+		remove = true
 	}
 	control.lock.Unlock()
 	if remove {
