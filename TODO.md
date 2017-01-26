@@ -18,7 +18,9 @@ Important
 Nice2have
 ---------
 
+* Queue fill rate statistics for more fine-grained debugging
 * Add additional configuration variables where appropriate
 * Add additional APIs where appropriate (ex. more sophisticated stats)
 * Finalize code docs
 * Prefill client connection queues
+* Support for push streams (UDP/RTP/TCP/...)
