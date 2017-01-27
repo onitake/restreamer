@@ -2,7 +2,7 @@
 
 HTTP transport stream proxy
 
-Copyright © 2016-2017 Gregor Riepl
+Copyright © 2016-2017 Gregor Riepl;
 All rights reserved.
 
 Please see the LICENSE file for details on permitted use of this software.
@@ -12,22 +12,18 @@ Please see the LICENSE file for details on permitted use of this software.
 
 restreamer is a proof-of-concept implementation of a streaming proxy
 that can fetch, buffer and distribute [MPEG transport streams](https://en.wikipedia.org/wiki/MPEG-TS).
-Thus, it serves as a non-transcoding streaming proxy.
+It serves as a non-transcoding streaming proxy for legacy HbbTV applications.
 
-In contrast to other video and audio streaming techniques (such as MPEG-DASH),
-this can not easily be achieved with most HTTP proxies.
-Instead of caching blocks of data, the streaming proxy needs to buffer and
-distribute packets on the fly.
+Data sources can be local files, remote HTTP servers or raw TCP streams.
 
 
 ## Architecture
 
-restreamer is written in [Go](https://golang.org/).
-Go offers many primitives and an extensive standard library that contains
-most building blocks for a web server. This makes it a first-rate
-choice for such a product.
+restreamer is written in [Go](https://golang.org/), a very versatile
+programming language, and suited perfectly for the development of
+network services.
 
-There are several key components:
+These are the key components:
 * Client - HTTP getter for fetching upstream data
 * Connection - HTTP server that feeds data to clients
 * Streamer - connection broker and data queue
@@ -36,34 +32,29 @@ There are several key components:
 * Proxy - static web server and proxy
 * restreamer - core program that glues the components together
 
-Additionally, there is a simple web server that serves static files.
-It not suitable for stream testing however.
-For proper testing, it is recommended to use a more sophisticated
-software package such as ffmpeg.
-
 
 ## Compilation
 
-To compile restreamer, the accompanying Makefile can be used.
-You need GNU make to build it, however.
-Type
-```
-make
-```
-at the command prompt, which should yield bin/restreamer .
+Compiling restreamer is very easy if you have GNU make installed.
+Just run `make` to build `bin/restreamer`.
+
+It is also possible to add the source code repository to your GOPATH
+and build restreamer manually.
 
 
 ## Configuration
 
-All configuration is done through restreamer.json .
+All configuration is done through a configuration file named `restreamer.json`.
 
 See restreamer.example.json for a documented example.
 
 The input and output buffer sizes should be adapted to the expected
-stream bitrates, to allow for a certain amount of resilience.
+stream bitrates and account for unstable or slow internet connections.
 
-Memory usage is primarily tied to these values, and can be (roughly)
-calculated as follows:
+It is also important to keep the bandwidth of the network interfaces
+in mind, so the connection limit should be set accordingly.
+
+Memory usage is also tied to these values, and can be roughly calculated as follows:
 
 ```
 mpegts_packet_size = 188
