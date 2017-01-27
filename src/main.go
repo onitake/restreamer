@@ -30,15 +30,15 @@ import (
 // the builtin marshaler.
 type Configuration struct {
 	// the interface to listen on
-	Listen string
+	Listen string `json:"listen"`
 	// the connection timeout
 	// (both input and output)
-	Timeout uint
+	Timeout uint `json:"timeout"`
 	// the reconnect delay
-	Reconnect uint
+	Reconnect uint `json:"reconnect"`
 	// the maximum number of packets
 	// on the input buffer
-	InputBuffer uint
+	InputBuffer uint `json:"inputbuffer"`
 	// the size of the output buffer
 	// per connection
 	// note that each connection will
@@ -46,24 +46,24 @@ type Configuration struct {
 	// when the queue is full, so
 	// you should adjust the value according
 	// to the amount of RAM available
-	OutputBuffer uint
+	OutputBuffer uint `json:"outputbuffer"`
 	// the maximum total number of concurrent connections
-	MaxConnections uint
+	MaxConnections uint `json:"maxconnections"`
 	// set to true to disable statistics
-	NoStats bool
+	NoStats bool `json:"nostats"`
 	// the list of streams
 	Resources []struct {
 		// the resource type
-		Type string
+		Type string `json:"type"`
 		// the API type
-		Api string
+		Api string `json:"api"`
 		// the local URL to serve this stream under
-		Serve string
+		Serve string `json:"serve"`
 		// the upstream URL or API argument
-		Remote string
+		Remote string `json:"remote"`
 		// the cache time in seconds
-		Cache uint
-	}
+		Cache uint `json:"cache"`
+	} `json:"resources"`
 }
 
 // accessController implements a connection broker that limits
