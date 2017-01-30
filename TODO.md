@@ -6,7 +6,7 @@ Priority
 
 * Implement HA, i.e. multiple sources for streams/resources
 * Implement connect/read timeouts for every socket (stream, connection, proxy)
-* Add configuration value defaults
+* Implement disconnect/deny on upstream connection loss
 
 Important
 ---------
@@ -14,6 +14,7 @@ Important
 * Check concurrent usage of variables and add atomics/locks where appropriate
 * Implement load balancing features for HA
 * Standardized connection log (JSON?)
+* Add configuration value defaults
 
 Nice2have
 ---------
