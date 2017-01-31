@@ -19,110 +19,9 @@ package main
 import (
 	"os"
 	"log"
-	"sync"
 	"net/http"
-	"encoding/json"
 	"restreamer"
 )
-
-// Configuration is a representation of the configurable settings.
-// These are normally read from a JSON file and deserialized by
-// the builtin marshaler.
-type Configuration struct {
-	// the interface to listen on
-	Listen string `json:"listen"`
-	// the connection timeout
-	// (both input and output)
-	Timeout uint `json:"timeout"`
-	// the reconnect delay
-	Reconnect uint `json:"reconnect"`
-	// the maximum number of packets
-	// on the input buffer
-	InputBuffer uint `json:"inputbuffer"`
-	// the size of the output buffer
-	// per connection
-	// note that each connection will
-	// eat at least OutputBuffer * 192 bytes
-	// when the queue is full, so
-	// you should adjust the value according
-	// to the amount of RAM available
-	OutputBuffer uint `json:"outputbuffer"`
-	// the maximum total number of concurrent connections
-	MaxConnections uint `json:"maxconnections"`
-	// set to true to disable statistics
-	NoStats bool `json:"nostats"`
-	// the list of streams
-	Resources []struct {
-		// the resource type
-		Type string `json:"type"`
-		// the API type
-		Api string `json:"api"`
-		// the local URL to serve this stream under
-		Serve string `json:"serve"`
-		// the upstream URL or API argument
-		Remote string `json:"remote"`
-		// the cache time in seconds
-		Cache uint `json:"cache"`
-	} `json:"resources"`
-}
-
-// accessController implements a connection broker that limits
-// the maximum number of concurrent connections.
-type accessController struct {
-	// maxconnections is a global limit on the number of connections.
-	maxconnections uint
-	// lock to protect the connection counter
-	lock sync.Mutex
-	// connections contains the number of active connections.
-	// must be accessed atomically.
-	connections uint
-}
-
-// newAccessController creates a connection broker object that
-// handles access control according to the number of connected clients.
-func newAccessController(maxconnections uint) *accessController {
-	return &accessController{
-		maxconnections: maxconnections,
-	}
-}
-
-// Accept is the access control handler.
-func (control *accessController) Accept(remoteaddr string, id interface{}) bool {
-	accept := false
-	// protect concurrent access
-	control.lock.Lock()
-	if control.connections < control.maxconnections {
-		// and increase the counter
-		control.connections++
-		accept = true
-	}
-	control.lock.Unlock()
-	// print some info
-	if accept {
-		log.Printf("Accepted connection from %s @%p, active=%d, max=%d\n", remoteaddr, id, control.connections, control.maxconnections)
-	} else {
-		log.Printf("Denied connection from %s @%p, active=%d, max=%d\n", remoteaddr, id, control.connections, control.maxconnections)
-	}
-	// return the result
-	return accept
-}
-
-func (control *accessController) Release(id interface{}) {
-	remove := false
-	// protect concurrent access
-	control.lock.Lock()
-	if control.connections > 0 {
-		// and decrease the counter
-		control.connections--
-		remove = true
-	}
-	control.lock.Unlock()
-	if remove {
-		log.Printf("Removed connection @%p\n", id)
-	} else {
-		log.Printf("Error, no connection to remove @%p\n", id)
-	}
-}
 
 func main() {
 	var configname string
@@ -132,17 +31,10 @@ func main() {
 		configname = "restreamer.json"
 	}
 	
-	configfile, err := os.Open(configname)
-	if err != nil {
-		log.Fatal("Can't read configuration from server.json: ", err)
-	}
-	decoder := json.NewDecoder(configfile)
-	config := Configuration{}
-	err = decoder.Decode(&config)
+	config, err := restreamer.LoadConfiguration(configname)
 	if err != nil {
 		log.Fatal("Error parsing configuration: ", err)
 	}
-	configfile.Close()
 
 	log.Printf("Listen = %s", config.Listen)
 	log.Printf("Timeout = %d", config.Timeout)
@@ -154,7 +46,7 @@ func main() {
 		stats = restreamer.NewStatistics(config.MaxConnections)
 	}
 	
-	controller := newAccessController(config.MaxConnections)
+	controller := restreamer.NewAccessController(config.MaxConnections)
 	
 	clients := make(map[string]*restreamer.Client)
 	
