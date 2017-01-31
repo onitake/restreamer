@@ -65,7 +65,15 @@ type Configuration struct {
 // DefaultConfiguration creates and returns a configuration object
 // with default values.
 func DefaultConfiguration() Configuration {
-	return Configuration{}
+	return Configuration{
+		Listen: "localhost:http",
+		Timeout: 0,
+		Reconnect: 10,
+		InputBuffer: 1000,
+		OutputBuffer: 400,
+		MaxConnections: 1,
+		NoStats: false,
+	}
 }
 
 // LoadConfiguration loads a configuration in JSON format from "filename".
