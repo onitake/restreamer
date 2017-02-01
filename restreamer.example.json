@@ -35,6 +35,10 @@
 			"": "file must specify the URL in host-compatible format.",
 			"": "For tcp, a port is mandatory. Literal IPv6 addresses must be enclosed in []",
 			"remote": "http://localhost:10000/stream.ts",
+			"": "Instead of a single remote URL, a list of URLs can be specified with the remotes option.",
+			"": "The same rules as for remote apply.",
+			"": "If both are specified, remote is added to remotes.",
+			"remotes": [ ],
 			"": "Cache time in seconds, use 0 to disable caching.",
 			"": "Only supported for static content.",
 			"cache": 0

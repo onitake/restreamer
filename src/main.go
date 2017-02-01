@@ -59,7 +59,7 @@ func main() {
 			
 			queue := make(chan restreamer.Packet, config.InputBuffer)
 			reg := stats.RegisterStream(streamdef.Serve)
-			client, err := restreamer.NewClient(streamdef.Remote, queue, config.Timeout, config.Reconnect, reg)
+			client, err := restreamer.NewClient(streamdef.Remotes, queue, config.Timeout, config.Reconnect, reg)
 			
 			if err == nil {
 				client.Connect()

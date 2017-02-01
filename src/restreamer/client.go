@@ -50,12 +50,14 @@ var (
 	// ErrQueueFull is thrown when trying to process
 	// data while none is available
 	ErrQueueEmpty = errors.New("restreamer: queue empty")
+	// ErrNoUrl is thrown when the list of upstream URLs was empty
+	ErrNoUrl = errors.New("restreamer: no upstream URL")
 )
 
-// Client implements a streaming HTTP client
+// Client implements a streaming HTTP client with failover support.
 type Client struct {
-	// the URL to GET
-	Url *url.URL
+	// the URLs to GET (either of them)
+	Urls []*url.URL
 	// the response, including the body reader
 	socket *http.Response
 	// the input stream (socket)
@@ -76,13 +78,20 @@ type Client struct {
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
 // You need to call Connect() to do that.
 // After a connection has been closed, the client will attempt to reconnect after a configurable delay.
-func NewClient(uri string, queue chan<- Packet, timeout uint, reconnect uint, stats Collector) (*Client, error) {
-	parsed, err := url.Parse(uri)
-	if err != nil {
-		return nil, err
+func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint, stats Collector) (*Client, error) {
+	if len(uris) < 1 {
+		return nil, ErrNoUrl
+	}
+	urls := make([]*url.URL, len(uris))
+	for i, uri := range uris {
+		parsed, err := url.Parse(uri)
+		if err != nil {
+			return nil, err
+		}
+		urls[i] = parsed
 	}
 	return &Client {
-		Url: parsed,
+		Urls: urls,
 		socket: nil,
 		input: nil,
 		Timeout: time.Duration(timeout) * time.Second,
@@ -112,10 +121,17 @@ func (client *Client) loop() {
 			first = false
 		}
 		
-		// and connect
-		err := client.start()
-		if err != nil {
-			log.Print(err)
+		// and try each upstream, in order
+		// TODO use random order
+		for _, url := range client.Urls {
+			err := client.start(url)
+			if err == nil {
+				// connection handled, out
+				break
+			} else {
+				// not handled, print and try next
+				log.Printf("Got error on stream %s: %s\n", url, err)
+			}
 		}
 		
 		if client.Wait != 0 {
@@ -127,13 +143,13 @@ func (client *Client) loop() {
 }
 
 // start connects the socket, sends the HTTP request and starts streaming.
-func (client *Client) start() error {
+func (client *Client) start(url *url.URL) error {
 	if client.input == nil {
-		switch client.Url.Scheme {
+		switch url.Scheme {
 		// handled by os.Open
 		case "file":
-			log.Printf("Opening %s\n", client.Url.Path)
-			file, err := os.Open(client.Url.Path)
+			log.Printf("Opening %s\n", url.Path)
+			file, err := os.Open(url.Path)
 			if err != nil {
 				return err
 			}
@@ -142,11 +158,11 @@ func (client *Client) start() error {
 		case "http":
 			fallthrough
 		case "https":
-			log.Printf("Connecting to %s\n", client.Url)
+			log.Printf("Connecting to %s\n", url)
 			getter := &http.Client {
 				Timeout: client.Timeout,
 			}
-			response, err := getter.Get(client.Url.String())
+			response, err := getter.Get(url.String())
 			if err != nil {
 				return err
 			}
@@ -154,7 +170,7 @@ func (client *Client) start() error {
 			client.input = response.Body
 		// handled by 
 		case "tcp":
-			addr, err := net.ResolveTCPAddr("tcp", client.Url.Host)
+			addr, err := net.ResolveTCPAddr("tcp", url.Host)
 			if err != nil {
 				return err
 			}
@@ -168,11 +184,13 @@ func (client *Client) start() error {
 			return ErrInvalidProtocol
 		}
 		
+		// start streaming
 		client.running = true
-		log.Printf("Starting to pull from %s\n", client.Url)
-		client.pull()
+		log.Printf("Starting to pull stream %s\n", url)
+		err := client.pull()
+		log.Printf("Socket for stream %s closed\n", url)
 		
-		return nil
+		return err
 	}
 	return ErrAlreadyConnected
 }
@@ -210,17 +228,17 @@ func (client *Client) Connected() bool {
 }
 
 // pull streams data from the socket into the queue.
-func (client *Client) pull() {
-	log.Printf("Reading stream from %s\n", client.Url)
+func (client *Client) pull() error {
+	var err error
 	
 	// we're connected now
 	client.stats.SourceConnected()
 	
+	var packet Packet
 	for client.running {
-		packet, err := ReadPacket(client.input)
+		packet, err = ReadPacket(client.input)
 		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
-			log.Printf("Got error on stream %s: %s\n", client.Url, err)
 			client.running = false
 		} else {
 			if packet != nil {
@@ -238,7 +256,7 @@ func (client *Client) pull() {
 	
 	// and the connection is gone
 	client.stats.SourceDisconnected()
-	
-	log.Printf("Socket for stream %s closed\n", client.Url)
 	client.Close()
+	
+	return err
 }

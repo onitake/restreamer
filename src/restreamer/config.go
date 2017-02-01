@@ -55,8 +55,11 @@ type Configuration struct {
 		Api string `json:"api"`
 		// the local URL to serve this stream under
 		Serve string `json:"serve"`
-		// the upstream URL or API argument
+		// a single upstream URL or API argument
+		// will be added to Remotes during parsing
 		Remote string `json:"remote"`
+		// the upstream URLs
+		Remotes []string `json:"remotes"`
 		// the cache time in seconds
 		Cache uint `json:"cache"`
 	} `json:"resources"`
@@ -79,11 +82,24 @@ func DefaultConfiguration() Configuration {
 // LoadConfiguration loads a configuration in JSON format from "filename".
 func LoadConfiguration(filename string) (Configuration, error) {
 	config := DefaultConfiguration()
+	
 	fd, err := os.Open(filename)
 	if err == nil {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(&config)
 		fd.Close()
 	}
+	
+	for i := range config.Resources {
+		// add remote to remotes list, if given
+		if len(config.Resources[i].Remote) > 0 {
+			length := len(config.Resources[i].Remotes)
+			remotes := make([]string, length + 1)
+			copy(remotes, config.Resources[i].Remotes)
+			remotes[length] = config.Resources[i].Remote
+			config.Resources[i].Remotes = remotes
+		}
+	}
+	
 	return config, err
 }
