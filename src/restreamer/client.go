@@ -27,10 +27,6 @@ import (
 	"net/url"
 )
 
-const (
-	DefaultTimeout time.Duration = 10 * time.Second
-)
-
 var (
 	// ErrInvalidProtocol is thrown when an invalid protocol was specified.
 	// See the docs and example config for a list of supported protocols.
@@ -44,12 +40,6 @@ var (
 	// ErrInvalidResponse is thrown when an unsupported
 	// HTTP response code was received
 	ErrInvalidResponse = errors.New("restreamer: unsupported response code")
-	// ErrQueueFull is thrown when more data is available
-	// than the input queue can handle
-	ErrQueueFull = errors.New("restreamer: queue full")
-	// ErrQueueFull is thrown when trying to process
-	// data while none is available
-	ErrQueueEmpty = errors.New("restreamer: queue empty")
 	// ErrNoUrl is thrown when the list of upstream URLs was empty
 	ErrNoUrl = errors.New("restreamer: no upstream URL")
 )
