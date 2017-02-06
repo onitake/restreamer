@@ -4,7 +4,6 @@ restreamer TODO list
 Priority
 --------
 
-* Implement HA, i.e. multiple sources for streams/resources
 * Implement connect/read timeouts for every socket (stream, connection, proxy)
 * Implement disconnect/deny on upstream connection loss
 
@@ -14,6 +13,7 @@ Important
 * Check concurrent usage of variables and add atomics/locks where appropriate
 * Implement load balancing features for HA
 * Standardized connection log (JSON?)
+* Support "soft" limits, i.e. allow more connection when already "full"
 
 Nice2have
 ---------
