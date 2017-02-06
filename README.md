@@ -39,7 +39,7 @@ Compiling restreamer is very easy if you have GNU make installed.
 Just run `make` to build `bin/restreamer`.
 
 It is also possible to add the source code repository to your GOPATH
-and build restreamer manually.
+and build restreamer using `go build`.
 
 
 ## Configuration
@@ -49,17 +49,22 @@ All configuration is done through a configuration file named `restreamer.json`.
 See restreamer.example.json for a documented example.
 
 The input and output buffer sizes should be adapted to the expected
-stream bitrates and account for unstable or slow internet connections.
+stream bitrates and must account for unstable or slow client-side internet connections.
 
 It is also important to keep the bandwidth of the network interfaces
 in mind, so the connection limit should be set accordingly.
 
-Memory usage is also tied to these values, and can be roughly calculated as follows:
+Buffer memory usage is equally important, and can be roughly calculated as follows:
 
 ```
 mpegts_packet_size = 188
 max_buffer_memory = mpegts_packet_size * (number_of_streams * input_buffer_size + max_connections * output_buffer_size)
 ```
+
+It is possible to specify multiple upstream URLs per stream.
+These will be tested in a round-robin fashion, with the first successful
+one being used. If a connection is terminated, all URLs will be
+tried again after a delay. If the delay is 0, the stream will stay offline.
 
 
 ## Testing
@@ -85,7 +90,7 @@ Start playing:
 cvlc http://localhost:8000/pipe.ts
 ```
 
-### Memory Usage
+### Memory/CPU/Network Usage
 
 To test behaviour under heavy network load, it is recommended to run
 multiple concurrent HTTP connections that only read data occasionally.
