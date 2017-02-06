@@ -95,8 +95,8 @@ func LoadConfiguration(filename string) (Configuration, error) {
 		if len(config.Resources[i].Remote) > 0 {
 			length := len(config.Resources[i].Remotes)
 			remotes := make([]string, length + 1)
-			copy(remotes, config.Resources[i].Remotes)
-			remotes[length] = config.Resources[i].Remote
+			remotes[0] = config.Resources[i].Remote
+			copy(remotes[1:], config.Resources[i].Remotes)
 			config.Resources[i].Remotes = remotes
 		}
 	}

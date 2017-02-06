@@ -37,7 +37,7 @@
 			"remote": "http://localhost:10000/stream.ts",
 			"": "Instead of a single remote URL, a list of URLs can be specified with the remotes option.",
 			"": "The same rules as for remote apply.",
-			"": "If both are specified, remote is added to remotes.",
+			"": "If both are specified, both are used.",
 			"remotes": [ ],
 			"": "Cache time in seconds, use 0 to disable caching.",
 			"": "Only supported for static content.",
