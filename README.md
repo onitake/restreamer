@@ -12,9 +12,16 @@ Please see the LICENSE file for details on permitted use of this software.
 
 restreamer is a proof-of-concept implementation of a streaming proxy
 that can fetch, buffer and distribute [MPEG transport streams](https://en.wikipedia.org/wiki/MPEG-TS).
+
 It serves as a non-transcoding streaming proxy for legacy HbbTV applications.
 
 Data sources can be local files, remote HTTP servers or raw TCP streams.
+
+The proxy is stateless: Streams are transported in realtime
+and cached resources are only kept in memory.
+This makes restreamer perfectly suited for a multi-tiered architecture,
+that can be easily deployed on containers and expanded or shrunk as
+load demands.
 
 
 ## Architecture
@@ -65,6 +72,16 @@ It is possible to specify multiple upstream URLs per stream.
 These will be tested in a round-robin fashion, with the first successful
 one being used. If a connection is terminated, all URLs will be
 tried again after a delay. If the delay is 0, the stream will stay offline.
+
+
+## Logging
+
+restreamer does not implement any logging of its own.
+Connect/disconnect messages and other system activity is printed to standard
+output, where it can be collected into the syslog or journal.
+
+If more sophisticated logs are required, they need to be implemented
+separately, or through a frontend proxy (such as nginx).
 
 
 ## Testing
