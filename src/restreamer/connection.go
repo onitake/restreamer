@@ -18,13 +18,13 @@ package restreamer
 
 import (
 	"log"
-	//"time"
+	"time"
 	"net/http"
 )
 
-// a single active connection
+// Connection is a single active client connection
 type Connection struct {
-	// per-connection packet queue
+	// Queue is the per-connection packet queue
 	Queue chan Packet
 	// internal communication channel
 	// for signalling connection shutdown
@@ -36,9 +36,8 @@ type Connection struct {
 	writer http.ResponseWriter
 }
 
-// creates a new connection object.
-// note that HTTP is not handled here, only data is transmitted.
-// call Serve to start streaming
+// NewConnection creates a new connection object.
+// To start sending data to a client, call Serve().
 func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 	conn := &Connection{
 		Queue: make(chan Packet, qsize),
@@ -49,17 +48,21 @@ func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 	return conn
 }
 
-// closes a connection
+// Close shuts down the connection
 func (conn *Connection) Close() error {
 	conn.shutdown<- true
 	return nil
 }
 
-// serves a connection,
-// continuously streaming packets from the queue
+// Serve starts serving data to a client,
+// continuously feeding packets from the queue.
 func (conn *Connection) Serve() {
 	// set the content type (important)
 	conn.writer.Header().Set("Content-Type", "video/mpeg")
+	// a stream is always current
+	conn.writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+	// other headers to comply with the specs
+	conn.writer.Header().Set("Accept-Range", "none")
 	// use Add and Set to set more headers here
 	// chunked mode should be on by default
 	conn.writer.WriteHeader(http.StatusOK)
