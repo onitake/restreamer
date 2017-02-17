@@ -24,10 +24,10 @@
 			"": "static = static content from a local file or remote source",
 			"": "api = builtin API",
 			"type": "stream",
-			"": "API endpoint, only used if type is api:",
-			"": "health - reports system health.",
-			"": "statistics - reports detailed system statistics.",
-			"": "check - reports the status of a stream. remote contains the serve path of the stream.",
+			"": "API endpoint, only used if type is api.",
+			"": "health = reports system health.",
+			"": "statistics = reports detailed system statistics.",
+			"": "check = reports the status of a stream. remote contains the serve path of the stream.",
 			"api": "",
 			"": "Path under which a resource is made available.",
 			"serve": "/stream.ts",
@@ -56,14 +56,13 @@
 		},
 		{
 			"type": "api",
-			"serve": "/health",
-			"remote": "health"
+			"api": "health",
+			"serve": "/health"
 		},
 		{
 			"type": "static",
 			"serve": "/test",
-			"remote": "file:///tmp/test",
-			"cache": 0
+			"remote": "file:///tmp/test"
 		},
 		{
 			"type": "static",
