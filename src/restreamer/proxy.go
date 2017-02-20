@@ -237,7 +237,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		}
 	
 		if err != nil {
-			log.Print(err)
+			log.Printf("Error fetching resource: %s", err)
 		}
 		
 		// copy headers here
@@ -272,7 +272,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		getter, header, status, length, err := Get(proxy.url, proxy.timeout)
 		
 		if err != nil {
-			log.Print(err)
+			log.Printf("Error connecting to upstream: %s", err)
 		}
 		
 		// write the header
@@ -293,14 +293,16 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		eof := false
 		for !eof {
 			bytes, err := getter.Read(buffer)
-			//log.Printf("Got %d bytes\n", bytes)
+			log.Printf("Got %d bytes, error %s", bytes, err)
 			if bytes > 0 {
 				bytes, err = writer.Write(buffer[:bytes])
-				//log.Printf("Wrote %d bytes\n", bytes)
+				log.Printf("Wrote %d bytes, error %s", bytes, err)
+			} else {
+				log.Printf("No data received, should we exit here?")
 			}
 			if err != nil {
 				if err != io.EOF {
-					log.Print(err)
+					log.Printf("Error sending data to client: %s", err)
 				}
 				eof = true
 			}
