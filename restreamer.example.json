@@ -16,6 +16,8 @@
 	"outputbuffer": 400,
 	"": "The global client connection limit.",
 	"maxconnections": 100,
+	"": "The JSON access log file name. If this option is empty, access logs are disabled.",
+	"log": "",
 	"": "List of resources; can be streams, static content or APIs.",
 	"resources": [
 		{

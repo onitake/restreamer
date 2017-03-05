@@ -69,6 +69,8 @@ type Proxy struct {
 	header http.Header
 	// the cached data
 	data []byte
+	// a json logger
+	logger JsonLogger
 }
 
 // NewProxy constructs a new HTTP proxy.
@@ -94,7 +96,13 @@ func NewProxy(uri string, timeout uint, cache uint, stats Statistics) (*Proxy, e
 		// otherwise, add a "dirty" flag that tells when the resource needs to be fetched.
 		last: time.Unix(0, 0),
 		header: make(http.Header),
+		logger: &DummyLogger{},
 	}, nil
+}
+
+// Assigns a logger
+func (proxy *Proxy) SetLogger(logger JsonLogger) {
+	proxy.logger = logger
 }
 
 // Get opens the remote or local resource specified by the URL and returns a reader, 

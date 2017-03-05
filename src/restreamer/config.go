@@ -47,6 +47,8 @@ type Configuration struct {
 	MaxConnections uint `json:"maxconnections"`
 	// set to true to disable statistics
 	NoStats bool `json:"nostats"`
+	// access log file name
+	Log string `json:"log"`
 	// the list of streams
 	Resources []struct {
 		// the resource type

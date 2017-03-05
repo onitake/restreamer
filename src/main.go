@@ -48,6 +48,13 @@ func main() {
 	
 	controller := restreamer.NewAccessController(config.MaxConnections)
 	
+	var logger restreamer.JsonLogger
+	if config.Log == "" {
+		logger = &restreamer.DummyLogger{}
+	} else {
+		logger = restreamer.NewFileLogger(config.Log, true)
+	}
+	
 	clients := make(map[string]*restreamer.Client)
 	
 	i := 0
@@ -62,6 +69,7 @@ func main() {
 			client, err := restreamer.NewClient(streamdef.Remotes, queue, config.Timeout, config.Reconnect, reg)
 			
 			if err == nil {
+				client.SetLogger(logger)
 				client.Connect()
 			}
 			
@@ -69,6 +77,7 @@ func main() {
 				clients[streamdef.Serve] = client
 				
 				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller, reg)
+				client.SetLogger(logger)
 				mux.Handle(streamdef.Serve, streamer)
 				streamer.Connect()
 				
@@ -84,6 +93,7 @@ func main() {
 			if err != nil {
 				log.Print(err)
 			} else {
+				proxy.SetLogger(logger)
 				mux.Handle(streamdef.Serve, proxy)
 			}
 			

@@ -73,6 +73,8 @@ type Streamer struct {
 	queueSize int
 	// the stats collector for this stream
 	stats Collector
+	// a json logger
+	logger JsonLogger
 }
 
 // NewStreamer creates a new packet streamer.
@@ -89,8 +91,14 @@ func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker, stats
 		broker: broker,
 		queueSize: int(qsize),
 		stats: stats,
+		logger: &DummyLogger{},
 	}
 	return streamer
+}
+
+// Assigns a logger
+func (streamer *Streamer) SetLogger(logger JsonLogger) {
+	streamer.logger = logger
 }
 
 // Close shuts the streamer and all incoming connections down.

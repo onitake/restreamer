@@ -63,6 +63,8 @@ type Client struct {
 	// true while the client is streaming into the queue
 	// TODO make this atomic
 	running bool
+	// a json logger
+	logger JsonLogger
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -89,7 +91,13 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint,
 		queue: queue,
 		stats: stats,
 		running: false,
+		logger: &DummyLogger{},
 	}, nil
+}
+
+// Assigns a logger
+func (client *Client) SetLogger(logger JsonLogger) {
+	client.logger = logger
 }
 
 // Connect spawns the connection loop.
