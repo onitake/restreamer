@@ -82,7 +82,7 @@ type Streamer struct {
 // qsize is the length of each connection's queue (in packets).
 // broker handles policy enforcement
 // stats is a statistics collector object.
-func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker, stats Collector) (*Streamer) {
+func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker) (*Streamer) {
 	streamer := &Streamer{
 		input: queue,
 		connections: make(map[*Connection]bool),
@@ -90,7 +90,7 @@ func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker, stats
 		running: false,
 		broker: broker,
 		queueSize: int(qsize),
-		stats: stats,
+		stats: &DummyCollector{},
 		logger: &DummyLogger{},
 	}
 	return streamer
@@ -99,6 +99,11 @@ func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker, stats
 // Assigns a logger
 func (streamer *Streamer) SetLogger(logger JsonLogger) {
 	streamer.logger = logger
+}
+
+// Assigns a stats collector
+func (streamer *Streamer) SetCollector(stats Collector) {
+	streamer.stats = stats
 }
 
 // Close shuts the streamer and all incoming connections down.

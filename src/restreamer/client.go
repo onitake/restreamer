@@ -58,11 +58,11 @@ type Client struct {
 	Wait time.Duration
 	// the packet queue
 	queue chan<- Packet
-	// the stats collector for this stream
-	stats Collector
 	// true while the client is streaming into the queue
 	// TODO make this atomic
 	running bool
+	// the stats collector for this client
+	stats Collector
 	// a json logger
 	logger JsonLogger
 }
@@ -70,7 +70,7 @@ type Client struct {
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
 // You need to call Connect() to do that.
 // After a connection has been closed, the client will attempt to reconnect after a configurable delay.
-func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint, stats Collector) (*Client, error) {
+func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint) (*Client, error) {
 	if len(uris) < 1 {
 		return nil, ErrNoUrl
 	}
@@ -89,8 +89,8 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint,
 		Timeout: time.Duration(timeout) * time.Second,
 		Wait: time.Duration(reconnect) * time.Second,
 		queue: queue,
-		stats: stats,
 		running: false,
+		stats: &DummyCollector{},
 		logger: &DummyLogger{},
 	}, nil
 }
@@ -98,6 +98,11 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint,
 // Assigns a logger
 func (client *Client) SetLogger(logger JsonLogger) {
 	client.logger = logger
+}
+
+// Assigns a stats collector
+func (client *Client) SetCollector(stats Collector) {
+	client.stats = stats
 }
 
 // Connect spawns the connection loop.

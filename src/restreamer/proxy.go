@@ -69,6 +69,8 @@ type Proxy struct {
 	header http.Header
 	// the cached data
 	data []byte
+	// the global stats collector
+	stats Statistics
 	// a json logger
 	logger JsonLogger
 }
@@ -79,7 +81,7 @@ type Proxy struct {
 // number of seconds. If it is zero, the resource will be fetched from upstream
 // every time it is requested.
 // timeout sets the upstream HTTP connection timeout.
-func NewProxy(uri string, timeout uint, cache uint, stats Statistics) (*Proxy, error) {
+func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -96,6 +98,7 @@ func NewProxy(uri string, timeout uint, cache uint, stats Statistics) (*Proxy, e
 		// otherwise, add a "dirty" flag that tells when the resource needs to be fetched.
 		last: time.Unix(0, 0),
 		header: make(http.Header),
+		stats: &DummyStatistics{},
 		logger: &DummyLogger{},
 	}, nil
 }
@@ -103,6 +106,11 @@ func NewProxy(uri string, timeout uint, cache uint, stats Statistics) (*Proxy, e
 // Assigns a logger
 func (proxy *Proxy) SetLogger(logger JsonLogger) {
 	proxy.logger = logger
+}
+
+// Assigns a stats collector
+func (proxy *Proxy) SetStatistics(stats Statistics) {
+	proxy.stats = stats
 }
 
 // Get opens the remote or local resource specified by the URL and returns a reader, 

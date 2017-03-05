@@ -376,64 +376,60 @@ func (stats *realStatistics) GetGlobalStatistics() *StreamStatistics {
 	return &global
 }
 
-type dummyStatistics struct {
+// DummyStatistics is placeholder for a real stats handler.
+type DummyStatistics struct {
 }
 
-// NewDummyStatistics creates a placeholder statistics container.
-// It doesn't actually do anything and is just used for debugging.
-func NewDummyStatistics() Statistics {
-	return &dummyStatistics{}
+func (stats *DummyStatistics) Start() {
 }
 
-func (stats *dummyStatistics) Start() {
+func (stats *DummyStatistics) Stop() {
 }
 
-func (stats *dummyStatistics) Stop() {
+func (stats *DummyStatistics) RegisterStream(name string) Collector {
+	return &DummyCollector{}
 }
 
-func (stats *dummyStatistics) RegisterStream(name string) Collector {
-	return &dummyCollector{}
+func (stats *DummyStatistics) RemoveStream(name string) {
 }
 
-func (stats *dummyStatistics) RemoveStream(name string) {
-}
-
-func (stats *dummyStatistics) GetStreamStatistics(name string) *StreamStatistics {
+func (stats *DummyStatistics) GetStreamStatistics(name string) *StreamStatistics {
 	return &StreamStatistics{}
 }
 
-func (stats *dummyStatistics) GetAllStreamStatistics() map[string]*StreamStatistics {
+func (stats *DummyStatistics) GetAllStreamStatistics() map[string]*StreamStatistics {
 	return make(map[string]*StreamStatistics)
 }
 
-func (stats *dummyStatistics) GetGlobalStatistics() *StreamStatistics {
+func (stats *DummyStatistics) GetGlobalStatistics() *StreamStatistics {
 	return &StreamStatistics{}
 }
 
-type dummyCollector struct {
+// DummyCollector is placeholder for a real stats collector.
+type DummyCollector struct {
 }
 
-func (stats *dummyCollector) ConnectionAdded() {
+func (stats *DummyCollector) ConnectionAdded() {
 }
 
-func (stats *dummyCollector) ConnectionRemoved() {
+func (stats *DummyCollector) ConnectionRemoved() {
 }
 
-func (stats *dummyCollector) PacketReceived() {
+func (stats *DummyCollector) PacketReceived() {
 }
 
-func (stats *dummyCollector) PacketSent() {
+func (stats *DummyCollector) PacketSent() {
 }
 
-func (stats *dummyCollector) PacketDropped() {
+func (stats *DummyCollector) PacketDropped() {
 }
 
-func (stats *dummyCollector) SourceConnected() {
+func (stats *DummyCollector) SourceConnected() {
 }
 
-func (stats *dummyCollector) SourceDisconnected() {
+func (stats *DummyCollector) SourceDisconnected() {
 }
 
-func (stats *dummyCollector) IsUpstreamConnected() bool {
+func (stats *DummyCollector) IsUpstreamConnected() bool {
 	return false
 }

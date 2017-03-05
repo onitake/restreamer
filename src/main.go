@@ -41,7 +41,7 @@ func main() {
 	
 	var stats restreamer.Statistics
 	if config.NoStats {
-		stats = restreamer.NewDummyStatistics()
+		stats = &restreamer.DummyStatistics{}
 	} else {
 		stats = restreamer.NewStatistics(config.MaxConnections)
 	}
@@ -66,9 +66,10 @@ func main() {
 			
 			queue := make(chan restreamer.Packet, config.InputBuffer)
 			reg := stats.RegisterStream(streamdef.Serve)
-			client, err := restreamer.NewClient(streamdef.Remotes, queue, config.Timeout, config.Reconnect, reg)
-			
+
+			client, err := restreamer.NewClient(streamdef.Remotes, queue, config.Timeout, config.Reconnect)
 			if err == nil {
+				client.SetCollector(reg)
 				client.SetLogger(logger)
 				client.Connect()
 			}
@@ -76,7 +77,8 @@ func main() {
 			if err == nil {
 				clients[streamdef.Serve] = client
 				
-				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller, reg)
+				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller)
+				streamer.SetCollector(reg)
 				client.SetLogger(logger)
 				mux.Handle(streamdef.Serve, streamer)
 				streamer.Connect()
@@ -89,10 +91,11 @@ func main() {
 			
 		case "static":
 			log.Printf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote)
-			proxy, err := restreamer.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache, stats)
+			proxy, err := restreamer.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache)
 			if err != nil {
 				log.Print(err)
 			} else {
+				proxy.SetStatistics(stats)
 				proxy.SetLogger(logger)
 				mux.Handle(streamdef.Serve, proxy)
 			}
