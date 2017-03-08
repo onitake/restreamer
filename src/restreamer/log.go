@@ -37,6 +37,15 @@ var (
 )
 
 // JsonLogger is an interface for loggers that can generate JSON-formatted logs.
+//
+// It is recommended that logs follow some general guidelines, like adding
+// a reference to the module that generated them, or a flag to differentiate
+// various kinds of log messages.
+//
+// Examples:
+// { "module": "client", "type": "connect", "stream": "http://test.url/" }
+// { "module": "connection", "type": "connect", "source": "1.2.3.4:49999", "url": "/stream" }
+// { "module": "connection", "type": "disconnect", "source": "1.2.3.4:49999", "url": "/stream", "duration": 61, "bytes": 12087832 }
 type JsonLogger interface {
 	// Writes one or multiple date structures to the log represented by this logger.
 	// Each argument is processed through json.Marshal and generates one line in the log.
@@ -46,7 +55,7 @@ type JsonLogger interface {
 	Log(json ...interface{})
 }
 
-// DummyLogger is logger placeholder that doesn't actually log anything.
+// DummyLogger is a logger placeholder that doesn't actually log anything.
 type DummyLogger struct {
 }
 
