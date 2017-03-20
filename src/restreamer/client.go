@@ -44,6 +44,25 @@ var (
 	ErrNoUrl = errors.New("restreamer: no upstream URL")
 )
 
+// ConnectCloser is an interface for objects that support a Connect() and Close() method.
+// Most suitable for self-managed classes that have an 'offline' and 'online' state.
+type ConnectCloser interface {
+	// support the Closer interface
+	io.Closer
+	// and the Connect() method
+	Connect() error
+}
+
+// DummyConnectCloser is a no-action implementation of the ConnectCloser interface.
+type DummyConnectCloser struct {
+}
+func (*DummyConnectCloser) Close() error {
+	return nil
+}
+func (*DummyConnectCloser) Connect() error {
+	return nil
+}
+
 // Client implements a streaming HTTP client with failover support.
 type Client struct {
 	// the URLs to GET (either of them)
@@ -65,6 +84,8 @@ type Client struct {
 	stats Collector
 	// a json logger
 	logger JsonLogger
+	// a downstream object that can handle connect/disconnect notifications
+	listener ConnectCloser
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -92,6 +113,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 		running: false,
 		stats: &DummyCollector{},
 		logger: &DummyLogger{},
+		listener: &DummyConnectCloser{},
 	}, nil
 }
 
@@ -105,9 +127,49 @@ func (client *Client) SetCollector(stats Collector) {
 	client.stats = stats
 }
 
+// SetStateListener adds a listener that will be notified when the client
+// connection is closed or reconnected.
+//
+// Only one listener is supported.
+func (client *Client) SetStateListener(listener ConnectCloser) {
+	client.listener = listener
+}
+
+// Closes the connection.
+func (client *Client) Close() error {
+	if client.input != nil {
+		err := client.input.Close()
+		client.input = nil
+		return err
+	}
+	return ErrNoConnection
+}
+
 // Connect spawns the connection loop.
 func (client *Client) Connect() {
 	go client.loop()
+}
+
+// StatusCode returns the HTTP status code, or 0 if not connected.
+func (client *Client) StatusCode() int {
+	if client.socket != nil {
+		return client.socket.StatusCode
+	}
+	// other protocols don't have status codes, so just return 200 if connected
+	if client.input != nil {
+		return http.StatusOK
+	}
+	return 0
+}
+
+// Status returns the HTTP status message, or the empty string if not connected.
+func (client *Client) Status() string {
+	return http.StatusText(client.StatusCode())
+}
+
+// Connected returns true if the socket is connected.
+func (client *Client) Connected() bool {
+	return client.running
 }
 
 // loop tries to connect and loops until successful.
@@ -187,47 +249,21 @@ func (client *Client) start(url *url.URL) error {
 			return ErrInvalidProtocol
 		}
 		
+		// we're connected now
+		client.listener.Connect()
+		
 		// start streaming
 		client.running = true
 		log.Printf("Starting to pull stream %s\n", url)
 		err := client.pull()
 		log.Printf("Socket for stream %s closed\n", url)
 		
+		// and that's it
+		client.listener.Close()
+		
 		return err
 	}
 	return ErrAlreadyConnected
-}
-
-// Close closes the connection.
-func (client *Client) Close() error {
-	if client.input != nil {
-		err := client.input.Close()
-		client.input = nil
-		return err
-	}
-	return ErrNoConnection
-}
-
-// StatusCode returns the HTTP status code, or 0 if not connected.
-func (client *Client) StatusCode() int {
-	if client.socket != nil {
-		return client.socket.StatusCode
-	}
-	// other protocols don't have status codes, so just return 200 if connected
-	if client.input != nil {
-		return http.StatusOK
-	}
-	return 0
-}
-
-// Status returns the HTTP status message, or the empty string if not connected.
-func (client *Client) Status() string {
-	return http.StatusText(client.StatusCode())
-}
-
-// Connected returns true if the socket is connected.
-func (client *Client) Connected() bool {
-	return client.running
 }
 
 // pull streams data from the socket into the queue.
@@ -259,6 +295,7 @@ func (client *Client) pull() error {
 	
 	// and the connection is gone
 	client.stats.SourceDisconnected()
+	
 	client.Close()
 	
 	return err

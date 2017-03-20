@@ -80,8 +80,8 @@ func main() {
 				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller)
 				streamer.SetCollector(reg)
 				streamer.SetLogger(logger)
+				client.SetStateListener(streamer)
 				mux.Handle(streamdef.Serve, streamer)
-				streamer.Connect()
 				
 				log.Printf("Handled connection %d", i)
 				i++

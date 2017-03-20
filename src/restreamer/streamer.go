@@ -25,47 +25,35 @@ import (
 )
 
 var (
-	// ErrAlreadyrunning is thrown when trying to listen on
-	// an active streamer twice.
-	ErrAlreadyrunning = errors.New("restreamer: service is already active")
-	// ErrSlowRead is logged (not thrown) when a client can not
-	// handle the bandwidth
+	// ErrAlreadyRunning is thrown when trying to connect a stream that is already online.
+	ErrAlreadyRunning = errors.New("restreamer: service is already active")
+	// ErrNotRunning is thrown trying to shut down a stopped stream.
+	ErrNotRunning = errors.New("restreamer: service is not running")
+	// ErrOffline is thrown when receiving a connection while the stream is offline
+	ErrOffline = errors.New("restreamer: refusing connection on an offline stream")
+	// ErrSlowRead is logged (not thrown) when a client can not handle the bandwidth.
 	ErrSlowRead = errors.New("restreamer: send buffer overrun, increase client bandwidth")
 	// ErrPoolFull is logged when the connection pool is full.
 	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
 
-// ConnectionBroker represents a policy handler for new connections.
-// It is used to determine if new connections can be accepted,
-// based on arbitrary rules.
-type ConnectionBroker interface {
-	// Accept will be called on each incoming connection,
-	// with the remote client address and an internal identifier passed as arguments.
-	// The identifier must be unique and is usually the Streamer object that called Accept().
-	Accept(remoteaddr string, id interface{}) bool
-	// Release will be called each time a client disconnects.
-	// The id argument has the same properties as in the Accept method.
-	Release(id interface{})
-}
-
 // Streamer implements a TS packet multiplier,
 // distributing received packets on the input queue to the output queues.
 // It also handles and manages HTTP connections when added to an HTTP server.
 type Streamer struct {
-	// input is the input queue, serving packets
+	// input is the input queue, accepting packets
 	input <-chan Packet
-	// lock is the outgoing queue pool lock
+	// lock is the outgoing connection pool lock
 	lock sync.RWMutex
 	// connections is the outgoing connection pool
 	connections map[*Connection]bool
-	// shutdown is an internal communication channel
-	// for signalling global shutdown
+	// The shutdown notification channel.
+	// Send true to close all downstream connections and stop the multiplier.
 	shutdown chan bool
 	// running is the global running state flag;
 	// setting it to false causes a shutdown on the
 	// the next queue run - but you should not do this.
-	// Better just send something to the shutdown channel.
-	// TODO make this atomic
+	// Better just use the shutdown channel.
 	running bool
 	// broker is a global connection broker
 	broker ConnectionBroker
@@ -75,6 +63,18 @@ type Streamer struct {
 	stats Collector
 	// a json logger
 	logger JsonLogger
+}
+
+// ConnectionBroker represents a policy handler for new connections.
+// It is used to determine if new connections can be accepted,
+// based on arbitrary rules.
+type ConnectionBroker interface {
+	// Accept will be called on each incoming connection,
+	// with the remote client address and the streamer that wants to accept the connection.
+	Accept(remoteaddr string, streamer *Streamer) bool
+	// Release will be called each time a client disconnects.
+	// The streamer argument corresponds to a streamer that has previously called Accept().
+	Release(streamer *Streamer)
 }
 
 // NewStreamer creates a new packet streamer.
@@ -106,27 +106,42 @@ func (streamer *Streamer) SetCollector(stats Collector) {
 	streamer.stats = stats
 }
 
-// Close shuts the streamer and all incoming connections down.
+// Shuts down the streamer and all incoming connections.
+// The stream is restartable, you may call Connect() again later.
+//
+// Most effects of the shutdown are immediate, but it may take a moment until
+// all downstream connections are closed.
+// Calling Connect() right after Close() returns should be safe, however.
 func (streamer *Streamer) Close() error {
-	// signal shutdown
-	streamer.shutdown<- true
-	// structural change, exclusive lock
-	streamer.lock.Lock()
-	for conn, _ := range streamer.connections {
-		conn.Close()
+	if (streamer.running) {
+		// prevent further connections
+		streamer.running = false
+		// signal shutdown
+		streamer.shutdown<- true
+		
+		// acquire the exclusive lock
+		streamer.lock.Lock()
+		// clean up
+		for conn, _ := range streamer.connections {
+			conn.Close()
+		}
+		// reset the connection pool
+		streamer.connections = make(map[*Connection]bool)
+		streamer.lock.Unlock()
+		
+		return nil
 	}
-	streamer.lock.Unlock()
-	return nil
+	return ErrNotRunning
 }
 
-// Connect starts serving and streaming.
+// Start serving and streaming.
 func (streamer *Streamer) Connect() error {
 	if (!streamer.running) {
 		streamer.running = true
 		go streamer.stream()
 		return nil
 	}
-	return ErrAlreadyrunning
+	return ErrAlreadyRunning
 }
 
 // stream is the internal stream multiplier loop.
@@ -134,7 +149,9 @@ func (streamer *Streamer) Connect() error {
 // Will be called asynchronously from Connect()
 func (streamer *Streamer) stream() {
 	log.Printf("Starting streaming")
-	for streamer.running {
+	// local run flag to avoid race conditions
+	running := true
+	for running && streamer.running {
 		select {
 			case packet := <-streamer.input:
 				// got a packet, distribute
@@ -160,8 +177,8 @@ func (streamer *Streamer) stream() {
 				}
 				streamer.lock.RUnlock()
 			case <-streamer.shutdown:
-				// and shut down
-				streamer.running = false
+				// stop no matter what the global state is
+				running = false
 		}
 	}
 	log.Printf("Ending streaming")
@@ -172,20 +189,24 @@ func (streamer *Streamer) stream() {
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var conn *Connection = nil
 	
-	// check if the connection can be accepted
-	if streamer.broker.Accept(request.RemoteAddr, streamer) {
-		// structural change, exclusive lock
-		streamer.lock.Lock()
-		// instantiate
-		conn = NewConnection(writer, streamer.queueSize)
-		streamer.connections[conn] = true
-		// and release
-		streamer.lock.Unlock()
+	// prevent race conditions first
+	if streamer.running {
+		// check if the connection can be accepted
+		if streamer.broker.Accept(request.RemoteAddr, streamer) {
+			// structural change, exclusive lock
+			streamer.lock.Lock()
+			// instantiate
+			conn = NewConnection(writer, streamer.queueSize)
+			streamer.connections[conn] = true
+			// and release
+			streamer.lock.Unlock()
+		} else {
+			log.Printf("Refusing connection from %s, pool is full", request.RemoteAddr)
+		}
 	} else {
-		// no error return, so just log
-		log.Print(ErrPoolFull)
+		log.Printf("Refusing connection from %s, stream is offline", request.RemoteAddr)
 	}
-	
+		
 	if conn != nil {
 		// connection will be handled, report
 		streamer.stats.ConnectionAdded()
@@ -204,5 +225,10 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		
 		// also notify the broker
 		streamer.broker.Release(streamer)
+	} else {
+		// Return a suitable error
+		// TODO This should be 503 or 504, but client support seems to be poor
+		// and the standards mandate nothing. Bummer.
+		ServeStreamError(writer, http.StatusNotFound)
 	}
 }
