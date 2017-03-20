@@ -41,7 +41,7 @@ func NewAccessController(maxconnections uint) *AccessController {
 	}
 }
 
-func (control *AccessController) Accept(remoteaddr string, id interface{}) bool {
+func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) bool {
 	accept := false
 	// protect concurrent access
 	control.lock.Lock()
@@ -53,15 +53,15 @@ func (control *AccessController) Accept(remoteaddr string, id interface{}) bool 
 	control.lock.Unlock()
 	// print some info
 	if accept {
-		log.Printf("Accepted connection from %s @%p, active=%d, max=%d\n", remoteaddr, id, control.connections, control.maxconnections)
+		log.Printf("Accepted connection from %s @%p, active=%d, max=%d\n", remoteaddr, streamer, control.connections, control.maxconnections)
 	} else {
-		log.Printf("Denied connection from %s @%p, active=%d, max=%d\n", remoteaddr, id, control.connections, control.maxconnections)
+		log.Printf("Denied connection from %s @%p, active=%d, max=%d\n", remoteaddr, streamer, control.connections, control.maxconnections)
 	}
 	// return the result
 	return accept
 }
 
-func (control *AccessController) Release(id interface{}) {
+func (control *AccessController) Release(streamer *Streamer) {
 	remove := false
 	// protect concurrent access
 	control.lock.Lock()
@@ -72,8 +72,8 @@ func (control *AccessController) Release(id interface{}) {
 	}
 	control.lock.Unlock()
 	if remove {
-		log.Printf("Removed connection @%p\n", id)
+		log.Printf("Removed connection @%p\n", streamer)
 	} else {
-		log.Printf("Error, no connection to remove @%p\n", id)
+		log.Printf("Error, no connection to remove @%p\n", streamer)
 	}
 }
