@@ -102,3 +102,15 @@ func (conn *Connection) Serve() {
 		}
 	}
 }
+
+// Return an appropriate error response to the client.
+func ServeStreamError(writer http.ResponseWriter, status int) {
+	// set the content type (important)
+	writer.Header().Set("Content-Type", "video/mpeg")
+	// a stream is always current
+	writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
+	// other headers to comply with the specs
+	writer.Header().Set("Accept-Range", "none")
+	// ...and the application-supplied status code
+	writer.WriteHeader(http.StatusNotFound)
+}
