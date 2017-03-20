@@ -22,12 +22,15 @@ import (
 	"net/http"
 )
 
-// Connection is a single active client connection
+// Connection is a single active client connection.
+//
+// This is meant to be called directly from a ServeHTTP handler.
+// No separate thread is created.
 type Connection struct {
 	// Queue is the per-connection packet queue
 	Queue chan Packet
-	// internal communication channel
-	// for signalling connection shutdown
+	// Shutdown notification channel.
+	// Send true to close the connection and stop the handler.
 	shutdown chan bool
 	// internal flag
 	// true while the connection is up
@@ -48,14 +51,15 @@ func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 	return conn
 }
 
-// Close shuts down the connection
+// Close shuts the streamer and all incoming connections down.
+// This action is asynchronous.
 func (conn *Connection) Close() error {
+	// signal shutdown
 	conn.shutdown<- true
 	return nil
 }
 
-// Serve starts serving data to a client,
-// continuously feeding packets from the queue.
+// Serve starts serving data to a client, continuously feeding packets from the queue.
 func (conn *Connection) Serve() {
 	// set the content type (important)
 	conn.writer.Header().Set("Content-Type", "video/mpeg")
@@ -66,7 +70,7 @@ func (conn *Connection) Serve() {
 	// use Add and Set to set more headers here
 	// chunked mode should be on by default
 	conn.writer.WriteHeader(http.StatusOK)
-	log.Printf("Sent header\n")
+	log.Printf("Sent header")
 	
 	// see if can get notified about connection closure
 	notifier, ok := conn.writer.(http.CloseNotifier)
@@ -83,17 +87,17 @@ func (conn *Connection) Serve() {
 				// send the packet out
 				_, err := conn.writer.Write(packet)
 				if err != nil {
-					log.Printf("Client connection closed\n")
+					log.Printf("Client connection closed")
 					conn.running = false
 				}
 				//log.Printf("Wrote packet of %d bytes\n", bytes)
 			case <-notifier.CloseNotify():
 				// connection closed while we were waiting for more data
-				log.Printf("Client connection closed (while waiting)\n")
+				log.Printf("Client connection closed (while waiting)")
 				conn.running = false
 			case <-conn.shutdown:
 				// and shut down
-				log.Printf("Shutting down client connection\n")
+				log.Printf("Shutting down client connection")
 				conn.running = false
 		}
 	}
