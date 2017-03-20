@@ -16,6 +16,7 @@ that can fetch, buffer and distribute [MPEG transport streams](https://en.wikipe
 It serves as a non-transcoding streaming proxy for legacy HbbTV applications.
 
 Data sources can be local files, remote HTTP servers or raw TCP streams.
+Unix domain sockets are also supported.
 
 The proxy is stateless: Streams are transported in realtime
 and cached resources are only kept in memory.

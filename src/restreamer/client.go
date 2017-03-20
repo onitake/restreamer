@@ -244,13 +244,28 @@ func (client *Client) start(url *url.URL) error {
 			}
 			client.socket = response
 			client.input = response.Body
-		// handled by 
+		// handled directly by net.Dialer
 		case "tcp":
 			log.Printf("Connecting TCP socket to %s\n", url.Host)
 			dialer := &net.Dialer {
 				Timeout: client.Timeout,
 			}
-			conn, err := dialer.Dial("tcp", url.Host)
+			conn, err := dialer.Dial(url.Scheme, url.Host)
+			if err != nil {
+				return err
+			}
+			client.input = conn
+		// handled by net.Dialer too, but different URL semantics
+		case "unix":
+			fallthrough
+		case "unixgram":
+			fallthrough
+		case "unixpacket":
+			log.Printf("Connecting domain socket to %s\n", url.Path)
+			dialer := &net.Dialer {
+				Timeout: client.Timeout,
+			}
+			conn, err := dialer.Dial(url.Scheme, url.Path)
 			if err != nil {
 				return err
 			}

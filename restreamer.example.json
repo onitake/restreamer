@@ -33,9 +33,10 @@
 			"api": "",
 			"": "Path under which a resource is made available.",
 			"serve": "/stream.ts",
-			"": "Upstream URL, this can be http, https, file or tcp.",
+			"": "Upstream URL, this can be http, https, file, tcp, unix, unixgram or unixpacket.",
 			"": "file must specify the URL in host-compatible format.",
 			"": "For tcp, a port is mandatory. Literal IPv6 addresses must be enclosed in []",
+			"": "unix will autodetect the type of domain socket, but you can also be explicit with unixgram and unixpacket.",
 			"remote": "http://localhost:10000/stream.ts",
 			"": "Instead of a single remote URL, a list of URLs can be specified with the remotes option.",
 			"": "The same rules as for remote apply.",
@@ -54,7 +55,8 @@
 		{
 			"type": "stream",
 			"serve": "/pipe.ts",
-			"remote": "file:///tmp/pipe.ts"
+			"remote": "file:///tmp/pipe.ts",
+			"remotes": [ "unix:///tmp/pipe2.ts" ]
 		},
 		{
 			"type": "api",
