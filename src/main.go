@@ -79,7 +79,7 @@ func main() {
 				
 				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller)
 				streamer.SetCollector(reg)
-				client.SetLogger(logger)
+				streamer.SetLogger(logger)
 				mux.Handle(streamdef.Serve, streamer)
 				streamer.Connect()
 				
