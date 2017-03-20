@@ -73,7 +73,9 @@ type Client struct {
 	input io.ReadCloser
 	// the I/O timeout
 	Timeout time.Duration
-	// wait time before reconnecting a disconnected upstream
+	// Wait time before reconnecting a disconnected upstream.
+	// This is a deadline: If a connection (or connection attempt) takes longer
+	// than this duration, a reconnection is attempted immediately.
 	Wait time.Duration
 	// the packet queue
 	queue chan<- Packet
@@ -177,10 +179,19 @@ func (client *Client) Connected() bool {
 func (client *Client) loop() {
 	first := true
 	
+	// deadline to avoid a busy loop, but still allow an immediate reconnect on loss
+	deadline := time.Now().Add(client.Wait)
+	
 	for first || client.Wait != 0 {
 		// sleep if this is not the first attempt
 		if !first {
-			time.Sleep(client.Wait)
+			// sleep only if the deadline has not been reached yet
+			now := time.Now()
+			if now.Before(deadline) {
+				time.Sleep(deadline.Sub(now))
+			}
+			// update the deadline
+			deadline = time.Now().Add(client.Wait)
 		} else {
 			// there is only one first attempt
 			first = false
