@@ -246,12 +246,11 @@ func (client *Client) start(url *url.URL) error {
 			client.input = response.Body
 		// handled by 
 		case "tcp":
-			addr, err := net.ResolveTCPAddr("tcp", url.Host)
-			if err != nil {
-				return err
+			log.Printf("Connecting TCP socket to %s\n", url.Host)
+			dialer := &net.Dialer {
+				Timeout: client.Timeout,
 			}
-			log.Printf("Connecting TCP socket to %s:%d\n", addr.IP, addr.Port)
-			conn, err := net.DialTCP("tcp", nil, addr)
+			conn, err := dialer.Dial("tcp", url.Host)
 			if err != nil {
 				return err
 			}
