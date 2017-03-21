@@ -188,7 +188,9 @@ func (client *Client) loop() {
 			// sleep only if the deadline has not been reached yet
 			now := time.Now()
 			if now.Before(deadline) {
-				time.Sleep(deadline.Sub(now))
+				wait := deadline.Sub(now)
+				log.Printf("Retrying after %0.0f seconds.\n", wait.Seconds());
+				time.Sleep(wait)
 			}
 			// update the deadline
 			deadline = time.Now().Add(client.Wait)
@@ -210,9 +212,7 @@ func (client *Client) loop() {
 			}
 		}
 		
-		if client.Wait != 0 {
-			log.Printf("Retrying after %0.0f seconds.\n", client.Wait.Seconds());
-		} else {
+		if client.Wait == 0 {
 			log.Print("Reconnecting disabled. Stream will stay offline.\n");
 		}
 	}
