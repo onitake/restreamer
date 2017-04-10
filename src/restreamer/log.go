@@ -47,7 +47,7 @@ var (
 // { "module": "connection", "type": "connect", "source": "1.2.3.4:49999", "url": "/stream" }
 // { "module": "connection", "type": "disconnect", "source": "1.2.3.4:49999", "url": "/stream", "duration": 61, "bytes": 12087832 }
 type JsonLogger interface {
-	// Writes one or multiple date structures to the log represented by this logger.
+	// Log writes one or multiple date structures to the log represented by this logger.
 	// Each argument is processed through json.Marshal and generates one line in the log.
 	//
 	// Log lines are prefixed with a time stamp in RFC3339 format, like this:
@@ -59,6 +59,8 @@ type JsonLogger interface {
 type DummyLogger struct {
 }
 
+// Log does nothing.
+// Just a placeholder for a real big boy logger.
 func (*DummyLogger) Log(json ...interface{}) {
 }
 
@@ -87,7 +89,7 @@ type FileLogger struct {
 // Signals are only fully supported on POSIX systems, so no SIGUSR1 is sent
 // when running on Microsoft Windows, for example. The signal handler is
 // still installed, but it is never notified.
-func NewFileLogger(logfile string, sigusr bool) *FileLogger {
+func NewLogger(logfile string, sigusr bool) *FileLogger {
 	// create logger instance
 	logger := &FileLogger{
 		signals: make(chan os.Signal, signalQueueLength),
