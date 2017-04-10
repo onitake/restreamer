@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"math/rand"
 )
 
 var (
@@ -183,13 +184,19 @@ func (client *Client) Connected() bool {
 func (client *Client) loop() {
 	first := true
 	
+	// connect order randomizer
+	randomizer := rand.New(rand.NewSource(time.Now().Unix()))
+
 	// deadline to avoid a busy loop, but still allow an immediate reconnect on loss
 	deadline := time.Now().Add(client.Wait)
 	
 	for first || client.Wait != 0 {
-		// sleep if this is not the first attempt
-		if !first {
-			// sleep only if the deadline has not been reached yet
+		if first {
+			// there is only one first attempt
+			first = false
+		} else {
+			// sleep if this is not the first attempt,
+			// but sleep only if the deadline has not been reached yet
 			now := time.Now()
 			if now.Before(deadline) {
 				wait := deadline.Sub(now)
@@ -198,22 +205,17 @@ func (client *Client) loop() {
 			}
 			// update the deadline
 			deadline = time.Now().Add(client.Wait)
-		} else {
-			// there is only one first attempt
-			first = false
 		}
 		
-		// and try each upstream, in order
-		// TODO use random order
-		for _, url := range client.Urls {
-			err := client.start(url)
-			if err == nil {
-				// connection handled, out
-				break
-			} else {
-				// not handled, print and try next
-				log.Printf("Got error on stream %s: %s\n", url, err)
-			}
+		// pick a random server
+		next := randomizer.Intn(len(client.Urls))
+		url := client.Urls[next]
+		
+		// connect
+		err := client.start(url)
+		if err != nil {
+			// not handled, log
+			log.Printf("Got error on stream %s: %s\n", url, err)
 		}
 		
 		if client.Wait == 0 {
