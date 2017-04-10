@@ -52,7 +52,11 @@ func main() {
 	if config.Log == "" {
 		logger = &restreamer.DummyLogger{}
 	} else {
-		logger = restreamer.NewFileLogger(config.Log, true)
+		var err error
+		logger, err = restreamer.NewLogger(config.Log, true)
+		if err != nil {
+			log.Fatal("Error opening log: ", err)
+		}
 	}
 	
 	clients := make(map[string]*restreamer.Client)

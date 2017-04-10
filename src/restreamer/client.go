@@ -65,6 +65,23 @@ func (*DummyConnectCloser) Connect() error {
 }
 
 // Client implements a streaming HTTP client with failover support.
+//
+// Logging specification:
+// {
+//   "time": 1234 | unix timestamp in UTCS,
+//   "module": "client",
+//   "event": "" | error or upstream-connect or upstream-disconnect or upstream-loss or upstream-timeout or upstream-offline or client-connect or client-disconnect,
+//   when event=error:
+//     "error": "error-name"
+//     "error-specific key": "error-specific data"
+//   when event=retry:
+//     "retry: "99999" | seconds until retry
+//   when event=upstream-*:
+//     "url": "http://upstream/url" | upstream stream URL,
+//   when event=client-*:
+//     "client": "1.2.3.4:12" | client ip:port,
+// }
+	
 type Client struct {
 	// a generic HTTP client
 	getter *http.Client
@@ -108,7 +125,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 		}
 		urls[i] = parsed
 	}
-	return &Client {
+	client := Client {
 		getter: &http.Client{},
 		Urls: urls,
 		socket: nil,
@@ -120,7 +137,8 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 		stats: &DummyCollector{},
 		logger: &DummyLogger{},
 		listener: &DummyConnectCloser{},
-	}, nil
+	}
+	return &client, nil
 }
 
 // SetLogger assigns a logger.
@@ -200,6 +218,13 @@ func (client *Client) loop() {
 			now := time.Now()
 			if now.Before(deadline) {
 				wait := deadline.Sub(now)
+				// first attempt, let's see if it works!
+				client.logger.Log(map[string]interface{}{
+					"time": time.Now().Unix(),
+					"module": "client",
+					"event": "retry",
+					"retry": wait.Seconds(),
+				})
 				log.Printf("Retrying after %0.0f seconds.\n", wait.Seconds());
 				time.Sleep(wait)
 			}
@@ -212,13 +237,33 @@ func (client *Client) loop() {
 		url := client.Urls[next]
 		
 		// connect
+		client.logger.Log(map[string]interface{}{
+			"time": time.Now().Unix(),
+			"module": "client",
+			"event": "upstream-connect",
+			"url": url.String(),
+		})
 		err := client.start(url)
 		if err != nil {
 			// not handled, log
+			client.logger.Log(map[string]interface{}{
+				"time": time.Now().Unix(),
+				"module": "client",
+				"event": "error",
+				"error": "stream-connect-error",
+				"url": url.String(),
+				"message": err.Error(),
+			})
 			log.Printf("Got error on stream %s: %s\n", url, err)
 		}
 		
 		if client.Wait == 0 {
+			client.logger.Log(map[string]interface{}{
+				"time": time.Now().Unix(),
+				"module": "client",
+				"event": "upstream-offline",
+				"url": url.String(),
+			})
 			log.Print("Reconnecting disabled. Stream will stay offline.\n");
 		}
 	}

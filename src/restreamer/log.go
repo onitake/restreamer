@@ -47,11 +47,14 @@ var (
 // { "module": "connection", "type": "connect", "source": "1.2.3.4:49999", "url": "/stream" }
 // { "module": "connection", "type": "disconnect", "source": "1.2.3.4:49999", "url": "/stream", "duration": 61, "bytes": 12087832 }
 type JsonLogger interface {
-	// Log writes one or multiple date structures to the log represented by this logger.
+	// Log writes one or multiple data structures to the log represented by this logger.
 	// Each argument is processed through json.Marshal and generates one line in the log.
 	//
 	// Log lines are prefixed with a time stamp in RFC3339 format, like this:
 	// [2006-01-02T15:04:05Z07:00] <JSON>
+	//
+	// Example usage:
+	//   logger.Log(map[string]string{ "key": "value" }, map[string]string{ "key": "value2" })
 	Log(json ...interface{})
 }
 
@@ -60,8 +63,29 @@ type DummyLogger struct {
 }
 
 // Log does nothing.
+//
 // Just a placeholder for a real big boy logger.
 func (*DummyLogger) Log(json ...interface{}) {
+}
+
+// ConsoleLogger is a simple logger that prints to stdout
+type ConsoleLogger struct {
+}
+
+// Log writes a log line to stdout.
+//
+// Your best bet if you don't want/need a full-blown file logging queue with
+// reopening or a central logging server.
+func (*ConsoleLogger) Log(lines ...interface{}) {
+	for _, line := range lines {
+		data, err := json.Marshal(line)
+		if err == nil {
+			now := time.Now().Format(timeFormat)
+			log.Printf("%s%s\n", now, data)
+		} else {
+			log.Printf("Cannot encode log line %s", line)
+		}
+	}
 }
 
 // A FileLogger allows writing JSON-formatted log lines to a file.
@@ -89,7 +113,7 @@ type FileLogger struct {
 // Signals are only fully supported on POSIX systems, so no SIGUSR1 is sent
 // when running on Microsoft Windows, for example. The signal handler is
 // still installed, but it is never notified.
-func NewLogger(logfile string, sigusr bool) *FileLogger {
+func NewLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	// create logger instance
 	logger := &FileLogger{
 		signals: make(chan os.Signal, signalQueueLength),
@@ -98,26 +122,27 @@ func NewLogger(logfile string, sigusr bool) *FileLogger {
 	}
 	
 	// open the log for the first time
-	logger.signals<- syscall.SIGUSR1
+	err := logger.reopenLog()
+	if err != nil {
+		return nil, err
+	}
 	
 	// install signal handler and start listening thread
 	signal.Notify(logger.signals, syscall.SIGUSR1)
 	go logger.handle()
 	
-	return logger
+	return logger, nil
 }
 
 func (logger *FileLogger) Log(json ...interface{}) {
-	if logger.log != nil {
-		// send these down the queue
-		for line := range json {
-			select {
-				case logger.messages<- line:
-					// ok
-				default:
-					log.Printf("Log queue is full, message dropped!")
-					logger.drops++
-			}
+	// send these down the queue
+	for _, line := range json {
+		select {
+			case logger.messages<- line:
+				// ok
+			default:
+				log.Printf("Log queue is full, message dropped!")
+				logger.drops++
 		}
 	}
 }
@@ -127,28 +152,32 @@ func (logger *FileLogger) writeLog(line interface{}) {
 	// only log if the output is open
 	if logger.log != nil {
 		data, err := json.Marshal(line)
-		if err != nil {
+		if err == nil {
 			now := time.Now().Format(timeFormat)
 			logger.log.Write([]byte(now))
 			logger.log.Write(data)
+			logger.log.Write([]byte("\n"))
 			logger.lines++
 		} else {
-			log.Printf("Cannot encode log line!")
+			log.Printf("Cannot encode log line %s", line)
 			logger.errors++
 		}
 	} else {
-		log.Printf("Output is closed!")
+		log.Printf("Output is closed, dropping line %s", line)
 		logger.errors++
 	}
 }
 
 // Closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
+	log.Printf("Closing log")
 	logger.signals<- syscall.SIGHUP
 }
 
 // Closes the log and stops/removes the signal handler
 func (logger *FileLogger) closeLog() error {
+	log.Printf("Really closing log")
+	
 	// uninstall the singal handler
 	signal.Stop(logger.signals)
 	// signal stop
@@ -163,6 +192,8 @@ func (logger *FileLogger) closeLog() error {
 
 // (Re-)opens the log file.
 func (logger *FileLogger) reopenLog() error {
+	log.Printf("Reopening log")
+	
 	var err error = nil
 	
 	if logger.log != nil {
@@ -170,7 +201,7 @@ func (logger *FileLogger) reopenLog() error {
 		err = logger.log.Close()
 		logger.log = nil
 	}
-	if err != nil {
+	if err == nil {
 		logger.log, err = os.OpenFile(logger.name, os.O_WRONLY | os.O_APPEND | os.O_CREATE, os.FileMode(0666))
 	}
 	
@@ -190,13 +221,17 @@ func (logger *FileLogger) handle() {
 					case syscall.SIGUSR1:
 						// reopen the log file
 						err := logger.reopenLog()
-						// if this fails, print a message to the standard log
-						log.Printf("Error reopening log: %s", err)
+						if err != nil {
+							// if this fails, print a message to the standard log
+							log.Printf("Error reopening log: %s", err)
+						}
 					case syscall.SIGHUP:
 						// reopen the log file
 						err := logger.closeLog()
-						// if this fails, print a message to the standard log
-						log.Printf("Error reopening log: %s", err)
+						if err != nil {
+							// if this fails, print a message to the standard log
+							log.Printf("Error reopening log: %s", err)
+						}
 					case os.Interrupt:
 						// shutdown requested
 						running = false
