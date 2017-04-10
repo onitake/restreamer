@@ -119,12 +119,12 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 	}, nil
 }
 
-// Assigns a logger
+// SetLogger assigns a logger.
 func (client *Client) SetLogger(logger JsonLogger) {
 	client.logger = logger
 }
 
-// Assigns a stats collector
+// SetCollector assigns a stats collector.
 func (client *Client) SetCollector(stats Collector) {
 	client.stats = stats
 }
@@ -137,7 +137,8 @@ func (client *Client) SetStateListener(listener ConnectCloser) {
 	client.listener = listener
 }
 
-// Closes the connection.
+// Close closes the active outgoing connection.
+// The connection is kept running, so a new connection may be established right away.
 func (client *Client) Close() error {
 	if client.input != nil {
 		err := client.input.Close()

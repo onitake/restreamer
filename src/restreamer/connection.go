@@ -51,7 +51,7 @@ func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 	return conn
 }
 
-// Close shuts the streamer and all incoming connections down.
+// Close shuts down the streamer and all incoming connections.
 // This action is asynchronous.
 func (conn *Connection) Close() error {
 	// signal shutdown
@@ -103,7 +103,7 @@ func (conn *Connection) Serve() {
 	}
 }
 
-// Return an appropriate error response to the client.
+// ServeStreamError returns an appropriate error response to the client.
 func ServeStreamError(writer http.ResponseWriter, status int) {
 	// set the content type (important)
 	writer.Header().Set("Content-Type", "video/mpeg")

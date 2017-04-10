@@ -41,6 +41,8 @@ func NewAccessController(maxconnections uint) *AccessController {
 	}
 }
 
+// Accept accepts an incoming connection when the maximum number of open connections
+// has not been reached yet.
 func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) bool {
 	accept := false
 	// protect concurrent access
@@ -61,6 +63,7 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 	return accept
 }
 
+// Release decrements the open connections count.
 func (control *AccessController) Release(streamer *Streamer) {
 	remove := false
 	// protect concurrent access

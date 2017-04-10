@@ -47,7 +47,7 @@ type Streamer struct {
 	lock sync.RWMutex
 	// connections is the outgoing connection pool
 	connections map[*Connection]bool
-	// The shutdown notification channel.
+	// shutdown is the shutdown notification channel.
 	// Send true to close all downstream connections and stop the multiplier.
 	shutdown chan bool
 	// running is the global running state flag;
@@ -59,9 +59,9 @@ type Streamer struct {
 	broker ConnectionBroker
 	// queueSize defines the maximum number of packets to queue per per connection
 	queueSize int
-	// the stats collector for this stream
+	// stats is the statistics collector for this stream
 	stats Collector
-	// a json logger
+	// logger is a json logger
 	logger JsonLogger
 }
 
@@ -96,17 +96,17 @@ func NewStreamer(queue <-chan Packet, qsize uint, broker ConnectionBroker) (*Str
 	return streamer
 }
 
-// Assigns a logger
+// SetLogger assigns a logger
 func (streamer *Streamer) SetLogger(logger JsonLogger) {
 	streamer.logger = logger
 }
 
-// Assigns a stats collector
+// SetCollector assigns a stats collector
 func (streamer *Streamer) SetCollector(stats Collector) {
 	streamer.stats = stats
 }
 
-// Shuts down the streamer and all incoming connections.
+// Close shuts down the streamer and all incoming connections.
 // The stream is restartable, you may call Connect() again later.
 //
 // Most effects of the shutdown are immediate, but it may take a moment until
@@ -134,7 +134,7 @@ func (streamer *Streamer) Close() error {
 	return ErrNotRunning
 }
 
-// Start serving and streaming.
+// Connect starts serving and streaming.
 func (streamer *Streamer) Connect() error {
 	if (!streamer.running) {
 		streamer.running = true
@@ -184,7 +184,7 @@ func (streamer *Streamer) stream() {
 	log.Printf("Ending streaming")
 }
 
-// ServeHTTP handles an incoming connection.
+// ServeHTTP handles an incoming HTTP connection.
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var conn *Connection = nil

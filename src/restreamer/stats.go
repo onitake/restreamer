@@ -30,10 +30,13 @@ type Collector interface {
 	// ConnectionRemoved notifies that a downstream client disconnected.
 	ConnectionRemoved()
 	// PacketReceived notifies that a packet was received.
+	// TODO pass the endpoint here
 	PacketReceived()
 	// PacketReceived notifies that a packet was sent.
+	// TODO pass the endpoint here
 	PacketSent()
 	// PacketReceived notifies that a packet was dropped.
+	// TODO pass the endpoint here
 	PacketDropped()
 	// SourceConnected notifies that upstream is live.
 	SourceConnected()

@@ -163,5 +163,3 @@ func (stat *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.
 		writer.Write([]byte("404 not found"))
 	}
 }
-
- 
