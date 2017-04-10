@@ -65,6 +65,8 @@ func (*DummyConnectCloser) Connect() error {
 
 // Client implements a streaming HTTP client with failover support.
 type Client struct {
+	// a generic HTTP client
+	getter *http.Client
 	// the URLs to GET (either of them)
 	Urls []*url.URL
 	// the response, including the body reader
@@ -106,6 +108,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 		urls[i] = parsed
 	}
 	return &Client {
+		getter: &http.Client{},
 		Urls: urls,
 		socket: nil,
 		input: nil,
@@ -236,10 +239,11 @@ func (client *Client) start(url *url.URL) error {
 			fallthrough
 		case "https":
 			log.Printf("Connecting to %s\n", url)
-			getter := &http.Client {
-				Timeout: client.Timeout,
+			request, err := http.NewRequest("GET", url.String(), nil)
+			if err != nil {
+				return err
 			}
-			response, err := getter.Get(url.String())
+			response, err := client.getter.Do(request)
 			if err != nil {
 				return err
 			}
