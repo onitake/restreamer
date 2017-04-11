@@ -102,7 +102,7 @@ type Client struct {
 	// the URLs to GET (either of them)
 	Urls []*url.URL
 	// the response, including the body reader
-	socket *http.Response
+	response *http.Response
 	// the input stream (socket)
 	input io.ReadCloser
 	// the I/O timeout
@@ -142,7 +142,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 	client := Client {
 		getter: &http.Client{},
 		Urls: urls,
-		socket: nil,
+		response: nil,
 		input: nil,
 		Timeout: time.Duration(timeout) * time.Second,
 		Wait: time.Duration(reconnect) * time.Second,
@@ -196,8 +196,8 @@ func (client *Client) Connect() {
 
 // StatusCode returns the HTTP status code, or 0 if not connected.
 func (client *Client) StatusCode() int {
-	if client.socket != nil {
-		return client.socket.StatusCode
+	if client.response != nil {
+		return client.response.StatusCode
 	}
 	// other protocols don't have status codes, so just return 200 if connected
 	if client.input != nil {
@@ -312,7 +312,7 @@ func (client *Client) start(url *url.URL) error {
 			if err != nil {
 				return err
 			}
-			client.socket = response
+			client.response = response
 			client.input = response.Body
 		// handled directly by net.Dialer
 		case "tcp":
