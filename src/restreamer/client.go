@@ -365,7 +365,7 @@ func (client *Client) start(url *url.URL) error {
 		// start streaming
 		client.running = true
 		log.Printf("Starting to pull stream %s\n", url)
-		err := client.pull()
+		err := client.pull(url)
 		log.Printf("Socket for stream %s closed\n", url)
 		
 		return err
@@ -374,7 +374,7 @@ func (client *Client) start(url *url.URL) error {
 }
 
 // pull streams data from the socket into the queue.
-func (client *Client) pull() error {
+func (client *Client) pull(url *url.URL) error {
 	var err error
 	// will be set as soon as the first packet has been received
 	// necessary, because we only report connections as online that actually send data.
