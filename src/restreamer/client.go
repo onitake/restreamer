@@ -382,7 +382,18 @@ func (client *Client) pull(url *url.URL) error {
 	
 	var packet Packet
 	for client.running {
+		// somewhat hacky read timeout:
+		// close the connection when the timer fires.
+		timer := time.AfterFunc(client.Timeout, func() {
+			log.Printf("Read timeout exceeded, closing connection\n")
+			client.input.Close()
+		})
+		// read a packet
 		packet, err = ReadPacket(client.input)
+		// we got a packet, stop the timer (and drain it)
+		if !timer.Stop() {
+			<-timer.C
+		}
 		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
 			client.running = false
