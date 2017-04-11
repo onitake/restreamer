@@ -97,6 +97,8 @@ func (*DummyConnectCloser) Connect() error {
 // }
 	
 type Client struct {
+	// a network dialer for TCP, UDP and HTTP
+	connector *net.Dialer
 	// a generic HTTP client
 	getter *http.Client
 	// the URLs to GET (either of them)
@@ -142,13 +144,29 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 	if count < 1 {
 		return nil, ErrNoUrl
 	}
+	toduration := time.Duration(timeout) * time.Second
+	dialer := &net.Dialer{
+		Timeout: toduration,
+		KeepAlive: 0,
+		DualStack: true,
+	}
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: dialer.DialContext,
+		DisableKeepAlives: true,
+		TLSHandshakeTimeout: toduration,
+		ResponseHeaderTimeout: toduration,
+		ExpectContinueTimeout: toduration,
 	}
 	client := Client {
-		getter: &http.Client{},
+		connector: dialer,
+		getter: &http.Client{
+			Transport: transport,
+		},
 		Urls: urls,
 		response: nil,
 		input: nil,
-		Timeout: time.Duration(timeout) * time.Second,
+		Timeout: toduration,
 		Wait: time.Duration(reconnect) * time.Second,
 		queue: queue,
 		running: false,
@@ -320,10 +338,7 @@ func (client *Client) start(url *url.URL) error {
 		// handled directly by net.Dialer
 		case "tcp":
 			log.Printf("Connecting TCP socket to %s\n", url.Host)
-			dialer := &net.Dialer {
-				Timeout: client.Timeout,
-			}
-			conn, err := dialer.Dial(url.Scheme, url.Host)
+			conn, err := client.connector.Dial(url.Scheme, url.Host)
 			if err != nil {
 				return err
 			}
