@@ -36,11 +36,18 @@ var (
 	timeFormat string = "[" + time.RFC3339 + "] "
 )
 
-// JsonLogger is an interface for loggers that can generate JSON-formatted logs.
+// Dict is a generic string:any dictionary type, for more convenience
+// when creating structured logs.
+type Dict map[string]interface{}
+
+// JsonLogger is an interface for loggers that can generate JSON-formatted logs
+// from structured data.
 //
 // It is recommended that logs follow some general guidelines, like adding
 // a reference to the module that generated them, or a flag to differentiate
 // various kinds of log messages.
+//
+// See ModuleLogger for an easy way to do this.
 //
 // Examples:
 // { "module": "client", "type": "connect", "stream": "http://test.url/" }
@@ -50,12 +57,41 @@ type JsonLogger interface {
 	// Log writes one or multiple data structures to the log represented by this logger.
 	// Each argument is processed through json.Marshal and generates one line in the log.
 	//
-	// Log lines are prefixed with a time stamp in RFC3339 format, like this:
-	// [2006-01-02T15:04:05Z07:00] <JSON>
-	//
 	// Example usage:
 	//   logger.Log(map[string]string{ "key": "value" }, map[string]string{ "key": "value2" })
-	Log(json ...interface{})
+	Log(lines ...interface{})
+}
+
+// ModuleLogger encapsulates default values for a JSON log.
+//
+// This simplifies log calls greatly.
+//
+// Each log line will contain the key 'time' with the current UNIX timestamp
+// in addition to any default values in the Defaults dictionary.
+// The logged data itself is encapsulated inside the 'log' key.
+//
+// It is highly recommended to add at least a 'module' key to the defaults,
+// so the logging module can be identified.
+type ModuleLogger struct {
+	// Logger is the backing logger to send log lines to.
+	Logger JsonLogger
+	// Defaults is a dictionary containing default keys.
+	// It is highly recommended to add any immutable data here,
+	// in particular the key 'module' with a unique name for the module sending the log.
+	Defaults map[string]interface{}
+}
+
+// Log adds predefined values to each log line and writes it to the encapsulated log.
+func (logger *ModuleLogger) Log(lines ...interface{}) {
+	for _, line := range lines {
+		processed := make(map[string]interface{})
+		for key, value := range logger.Defaults {
+			processed[key] = value
+		}
+		processed["time"] = time.Now().Unix()
+		processed["log"] = line
+		logger.Logger.Log(processed)
+	}
 }
 
 // DummyLogger is a logger placeholder that doesn't actually log anything.
@@ -65,10 +101,13 @@ type DummyLogger struct {
 // Log does nothing.
 //
 // Just a placeholder for a real big boy logger.
-func (*DummyLogger) Log(json ...interface{}) {
+func (*DummyLogger) Log(lines ...interface{}) {
 }
 
-// ConsoleLogger is a simple logger that prints to stdout
+// ConsoleLogger is a simple logger that prints to stdout.
+//
+// Log lines are prefixed with a time stamp in RFC3339 format, like this:
+// [2006-01-02T15:04:05Z07:00] <JSON>
 type ConsoleLogger struct {
 }
 
@@ -88,7 +127,10 @@ func (*ConsoleLogger) Log(lines ...interface{}) {
 	}
 }
 
-// A FileLogger allows writing JSON-formatted log lines to a file.
+// A FileLogger writes JSON-formatted log lines to a file.
+//
+// Log lines are prefixed with a time stamp in RFC3339 format, like this:
+// [2006-01-02T15:04:05Z07:00] <JSON>
 type FileLogger struct {
 	// notification channel
 	// also used for system signals
@@ -134,9 +176,9 @@ func NewLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	return logger, nil
 }
 
-func (logger *FileLogger) Log(json ...interface{}) {
+func (logger *FileLogger) Log(lines ...interface{}) {
 	// send these down the queue
-	for _, line := range json {
+	for _, line := range lines {
 		select {
 			case logger.messages<- line:
 				// ok

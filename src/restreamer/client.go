@@ -28,6 +28,20 @@ import (
 	"math/rand"
 )
 
+const (
+	eventClientDebug = "debug"
+	eventClientError = "error"
+	eventClientRetry = "retry"
+	eventClientConnecting = "connecting"
+	eventClientConnectionLoss = "loss"
+	eventClientConnectTimeout = "timeout"
+	eventClientOffline = "offline"
+	eventClientStarted = "started"
+	eventClientStopped = "stopped"
+	//
+	errorClientConnect = "connect"
+)
+
 var (
 	// ErrInvalidProtocol is thrown when an invalid protocol was specified.
 	// See the docs and example config for a list of supported protocols.
@@ -42,7 +56,7 @@ var (
 	// HTTP response code was received
 	ErrInvalidResponse = errors.New("restreamer: unsupported response code")
 	// ErrNoUrl is thrown when the list of upstream URLs was empty
-	ErrNoUrl = errors.New("restreamer: no upstream URL")
+	ErrNoUrl = errors.New("restreamer: no parseable upstream URL")
 )
 
 // ConnectCloser is an interface for objects that support a Connect() and Close() method.
@@ -70,7 +84,7 @@ func (*DummyConnectCloser) Connect() error {
 // {
 //   "time": 1234 | unix timestamp in UTCS,
 //   "module": "client",
-//   "event": "" | error or upstream-connect or upstream-disconnect or upstream-loss or upstream-timeout or upstream-offline or client-connect or client-disconnect,
+//   "event": "" | error or upstream-connect or upstream-disconnect or upstream-loss or upstream-timeout or upstream-offline or client-streaming or client-stopped,
 //   when event=error:
 //     "error": "error-name"
 //     "error-specific key": "error-specific data"
@@ -143,7 +157,12 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 
 // SetLogger assigns a logger.
 func (client *Client) SetLogger(logger JsonLogger) {
-	client.logger = logger
+	client.logger = &ModuleLogger{
+		Logger: logger,
+		Defaults: map[string]interface{} {
+			"module": "client",
+		},
+	}
 }
 
 // SetCollector assigns a stats collector.
@@ -219,10 +238,8 @@ func (client *Client) loop() {
 			if now.Before(deadline) {
 				wait := deadline.Sub(now)
 				// first attempt, let's see if it works!
-				client.logger.Log(map[string]interface{}{
-					"time": time.Now().Unix(),
-					"module": "client",
-					"event": "retry",
+				client.logger.Log(Dict{
+					"event": eventClientRetry,
 					"retry": wait.Seconds(),
 				})
 				log.Printf("Retrying after %0.0f seconds.\n", wait.Seconds());
@@ -237,20 +254,16 @@ func (client *Client) loop() {
 		url := client.Urls[next]
 		
 		// connect
-		client.logger.Log(map[string]interface{}{
-			"time": time.Now().Unix(),
-			"module": "client",
-			"event": "upstream-connect",
+		client.logger.Log(Dict{
+			"event": eventClientConnecting,
 			"url": url.String(),
 		})
 		err := client.start(url)
 		if err != nil {
 			// not handled, log
-			client.logger.Log(map[string]interface{}{
-				"time": time.Now().Unix(),
-				"module": "client",
-				"event": "error",
-				"error": "stream-connect-error",
+			client.logger.Log(Dict{
+				"event": eventClientError,
+				"error": errorClientConnect,
 				"url": url.String(),
 				"message": err.Error(),
 			})
@@ -258,10 +271,8 @@ func (client *Client) loop() {
 		}
 		
 		if client.Wait == 0 {
-			client.logger.Log(map[string]interface{}{
-				"time": time.Now().Unix(),
-				"module": "client",
-				"event": "upstream-offline",
+			client.logger.Log(Dict{
+				"event": eventClientOffline,
 				"url": url.String(),
 			})
 			log.Print("Reconnecting disabled. Stream will stay offline.\n");
@@ -271,6 +282,13 @@ func (client *Client) loop() {
 
 // start connects the socket, sends the HTTP request and starts streaming.
 func (client *Client) start(url *url.URL) error {
+	/*client.logger.Log(Dict{
+		"event": eventClientDebug,
+		"debug": Dict{
+			"timeout": client.Timeout,
+		},
+		"url": url.String(),
+	})*/
 	if client.input == nil {
 		switch url.Scheme {
 		// handled by os.Open
@@ -346,9 +364,9 @@ func (client *Client) start(url *url.URL) error {
 // pull streams data from the socket into the queue.
 func (client *Client) pull() error {
 	var err error
-	
-	// we're connected now
-	client.stats.SourceConnected()
+	// will be set as soon as the first packet has been received
+	// necessary, because we only report connections as online that actually send data.
+	connected := false
 	
 	var packet Packet
 	for client.running {
@@ -358,6 +376,17 @@ func (client *Client) pull() error {
 			client.running = false
 		} else {
 			if packet != nil {
+				// report connection up
+				if !connected {
+					client.listener.Connect()
+					client.stats.SourceConnected()
+					client.logger.Log(Dict{
+						"event": eventClientStarted,
+						"url": url.String(),
+					})
+					connected = true
+				}
+				
 				// report the packet
 				client.stats.PacketReceived()
 				
@@ -371,7 +400,14 @@ func (client *Client) pull() error {
 	}
 	
 	// and the connection is gone
-	client.stats.SourceDisconnected()
+	if connected {
+		client.listener.Close()
+		client.stats.SourceDisconnected()
+		client.logger.Log(Dict{
+			"event": eventClientStopped,
+			"url": url.String(),
+		})
+	}
 	
 	client.Close()
 	
