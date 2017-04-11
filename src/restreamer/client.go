@@ -373,6 +373,11 @@ func (client *Client) start(url *url.URL) error {
 		err := client.pull(url)
 		log.Printf("Socket for stream %s closed\n", url)
 		
+		// cleanup
+		client.Close()
+		client.input = nil
+		client.response = nil
+		
 		return err
 	}
 	return ErrAlreadyConnected
@@ -437,10 +442,6 @@ func (client *Client) pull(url *url.URL) error {
 			"url": url.String(),
 		})
 	}
-	
-	client.Close()
-	client.input = nil
-	client.response = nil
 	
 	return err
 }
