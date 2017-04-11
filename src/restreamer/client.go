@@ -183,7 +183,6 @@ func (client *Client) SetStateListener(listener ConnectCloser) {
 func (client *Client) Close() error {
 	if client.input != nil {
 		err := client.input.Close()
-		client.input = nil
 		return err
 	}
 	return ErrNoConnection
@@ -344,17 +343,11 @@ func (client *Client) start(url *url.URL) error {
 			return ErrInvalidProtocol
 		}
 		
-		// we're connected now
-		client.listener.Connect()
-		
 		// start streaming
 		client.running = true
 		log.Printf("Starting to pull stream %s\n", url)
 		err := client.pull()
 		log.Printf("Socket for stream %s closed\n", url)
-		
-		// and that's it
-		client.listener.Close()
 		
 		return err
 	}
@@ -410,6 +403,8 @@ func (client *Client) pull() error {
 	}
 	
 	client.Close()
+	client.input = nil
+	client.response = nil
 	
 	return err
 }
