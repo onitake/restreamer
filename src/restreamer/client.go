@@ -128,16 +128,20 @@ type Client struct {
 // You need to call Connect() to do that.
 // After a connection has been closed, the client will attempt to reconnect after a configurable delay.
 func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint) (*Client, error) {
-	if len(uris) < 1 {
+	urls := make([]*url.URL, len(uris))
+	count := 0
+	for _, uri := range uris {
+		parsed, err := url.Parse(uri)
+		if err == nil {
+			urls[count] = parsed
+			count++
+		} else {
+			log.Printf("Error parsing URL %s: %s", uri, err)
+		}
+	}
+	if count < 1 {
 		return nil, ErrNoUrl
 	}
-	urls := make([]*url.URL, len(uris))
-	for i, uri := range uris {
-		parsed, err := url.Parse(uri)
-		if err != nil {
-			return nil, err
-		}
-		urls[i] = parsed
 	}
 	client := Client {
 		getter: &http.Client{},
