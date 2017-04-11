@@ -22,23 +22,20 @@ import (
 )
 
 const (
-	// TS packet size
+	// PacketSize is the TS packet size (188 bytes)
 	PacketSize = 188
-	// TS packet synchronization byte
+	// SyncByte is the byte value of the TS synchronization code (0x47)
 	SyncByte = 0x47
 )
 
-// one TS packet
-// 188 bytes long
-// starts with 0x47
-// 4 bytes of padding
-// yes, this is a type alias to a byte array slice,
-// makes everything a bit easier
+// Packet is an alias to a byte slice and represents one TS packet.
+// It is 188 bytes long and starts with 0x47.
 type Packet []byte
 
-// reads data from the input stream,
+// ReadPacket reads data from the input stream,
 // scans for the sync byte and returns one packet from that point on.
-// if a sync byte can't be found among the first 188 bytes,
+//
+// If a sync byte can't be found among the first 188 bytes,
 // no packets are returned
 func ReadPacket(reader io.Reader) (Packet, error) {
 	garbage := make(Packet, PacketSize)

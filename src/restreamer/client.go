@@ -200,8 +200,10 @@ func (client *Client) SetStateListener(listener ConnectCloser) {
 	client.listener = listener
 }
 
-// Close closes the active outgoing connection.
-// The connection is kept running, so a new connection may be established right away.
+// Close closes the active upstream connection.
+//
+// This will cause the streaming thread to fail and try to reestablish
+// a connection (unless reconnects are disabled).
 func (client *Client) Close() error {
 	if client.input != nil {
 		err := client.input.Close()
@@ -211,6 +213,8 @@ func (client *Client) Close() error {
 }
 
 // Connect spawns the connection loop.
+//
+// Do not call this method multiple times!
 func (client *Client) Connect() {
 	go client.loop()
 }
@@ -350,6 +354,7 @@ func (client *Client) start(url *url.URL) error {
 			fallthrough
 		case "unixpacket":
 			log.Printf("Connecting domain socket to %s\n", url.Path)
+			
 			dialer := &net.Dialer {
 				Timeout: client.Timeout,
 			}
@@ -375,6 +380,7 @@ func (client *Client) start(url *url.URL) error {
 
 // pull streams data from the socket into the queue.
 func (client *Client) pull(url *url.URL) error {
+	// declare here so we can send back individual errors
 	var err error
 	// will be set as soon as the first packet has been received
 	// necessary, because we only report connections as online that actually send data.
