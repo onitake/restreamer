@@ -163,7 +163,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint,
 	}
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
-		DialContext: dialer.DialContext,
+		Dial: dialer.Dial,
 		DisableKeepAlives: true,
 		TLSHandshakeTimeout: toduration,
 		ResponseHeaderTimeout: toduration,
