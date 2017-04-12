@@ -33,6 +33,8 @@ type Configuration struct {
 	// the reconnect delay
 	Reconnect uint `json:"reconnect"`
 	// the maximum number of packets
+	// ReadTimeout is the upstream read timeout
+	ReadTimeout uint `json:"readtimeout"`
 	// on the input buffer
 	InputBuffer uint `json:"inputbuffer"`
 	// the size of the output buffer

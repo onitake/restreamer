@@ -113,6 +113,8 @@ type Client struct {
 	// This is a deadline: If a connection (or connection attempt) takes longer
 	// than this duration, a reconnection is attempted immediately.
 	Wait time.Duration
+	// ReadTimeout is the timeout for individual packet reads
+	ReadTimeout time.Duration
 	// the packet queue
 	queue chan<- Packet
 	// true while the client is streaming into the queue
@@ -129,7 +131,7 @@ type Client struct {
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
 // You need to call Connect() to do that.
 // After a connection has been closed, the client will attempt to reconnect after a configurable delay.
-func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint) (*Client, error) {
+func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint, readtimeout uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -166,8 +168,8 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 		urls: urls,
 		response: nil,
 		input: nil,
-		Timeout: toduration,
 		Wait: time.Duration(reconnect) * time.Second,
+		ReadTimeout: time.Duration(readtimeout) * time.Second,
 		queue: queue,
 		running: false,
 		stats: &DummyCollector{},
@@ -354,11 +356,7 @@ func (client *Client) start(url *url.URL) error {
 			fallthrough
 		case "unixpacket":
 			log.Printf("Connecting domain socket to %s\n", url.Path)
-			
-			dialer := &net.Dialer {
-				Timeout: client.Timeout,
-			}
-			conn, err := dialer.Dial(url.Scheme, url.Path)
+			conn, err := client.connector.Dial(url.Scheme, url.Path)
 			if err != nil {
 				return err
 			}
@@ -396,8 +394,8 @@ func (client *Client) pull(url *url.URL) error {
 		// somewhat hacky read timeout:
 		// close the connection when the timer fires.
 		var timer *time.Timer
-		if client.Timeout > 0 {
-			timer = time.AfterFunc(client.Timeout, func() {
+		if client.ReadTimeout > 0 {
+			timer = time.AfterFunc(client.ReadTimeout, func() {
 				log.Printf("Read timeout exceeded, closing connection\n")
 				client.input.Close()
 			})
