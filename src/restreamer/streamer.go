@@ -181,6 +181,11 @@ func (streamer *Streamer) stream() {
 				running = false
 		}
 	}
+	// drain the shutdown channel
+	select {
+		case <-streamer.shutdown:
+		default:
+	}
 	log.Printf("Ending streaming")
 }
 

@@ -101,6 +101,12 @@ func (conn *Connection) Serve() {
 				conn.running = false
 		}
 	}
+	
+	// drain the shutdown channel
+	select {
+		case <-streamer.shutdown:
+		default:
+	}
 }
 
 // ServeStreamError returns an appropriate error response to the client.
