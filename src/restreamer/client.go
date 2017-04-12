@@ -102,7 +102,7 @@ type Client struct {
 	// a generic HTTP client
 	getter *http.Client
 	// the URLs to GET (either of them)
-	Urls []*url.URL
+	urls []*url.URL
 	// the response, including the body reader
 	response *http.Response
 	// the input stream (socket)
@@ -163,7 +163,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint)
 		getter: &http.Client{
 			Transport: transport,
 		},
-		Urls: urls,
+		urls: urls,
 		response: nil,
 		input: nil,
 		Timeout: toduration,
@@ -275,8 +275,8 @@ func (client *Client) loop() {
 		}
 		
 		// pick a random server
-		next := randomizer.Intn(len(client.Urls))
-		url := client.Urls[next]
+		next := randomizer.Intn(len(client.urls))
+		url := client.urls[next]
 		
 		// connect
 		client.logger.Log(Dict{
