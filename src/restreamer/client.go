@@ -107,9 +107,7 @@ type Client struct {
 	response *http.Response
 	// the input stream (socket)
 	input io.ReadCloser
-	// the I/O timeout
-	Timeout time.Duration
-	// Wait time before reconnecting a disconnected upstream.
+	// Wait is the time before reconnecting a disconnected upstream.
 	// This is a deadline: If a connection (or connection attempt) takes longer
 	// than this duration, a reconnection is attempted immediately.
 	Wait time.Duration
@@ -130,7 +128,17 @@ type Client struct {
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
 // You need to call Connect() to do that.
-// After a connection has been closed, the client will attempt to reconnect after a configurable delay.
+//
+// After a connection has been closed, the client will attempt to reconnect after a
+// configurable delay. This delay is cumulative; if a connection has been up for longer,
+// a reconnect will be attempted immediately.
+//
+// Arguments:
+//   uris: a list of upstream URIs, used in random order
+//   queue: the outgoing packet queue
+//   timeout: the connect timeout
+//   reconnect: the minimal reconnect delay
+//   readtimeout: the read timeout
 func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint, readtimeout uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
@@ -146,6 +154,7 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint,
 	if count < 1 {
 		return nil, ErrNoUrl
 	}
+	// this timeout is only used for establishing connections
 	toduration := time.Duration(timeout) * time.Second
 	dialer := &net.Dialer{
 		Timeout: toduration,

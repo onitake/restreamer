@@ -25,19 +25,19 @@ import (
 // These are normally read from a JSON file and deserialized by
 // the builtin marshaler.
 type Configuration struct {
-	// the interface to listen on
+	// Listen is the interface to listen on
 	Listen string `json:"listen"`
-	// the connection timeout
+	// Timeout is the connection timeout
 	// (both input and output)
 	Timeout uint `json:"timeout"`
-	// the reconnect delay
+	// Reconnect is the reconnect delay
 	Reconnect uint `json:"reconnect"`
-	// the maximum number of packets
 	// ReadTimeout is the upstream read timeout
 	ReadTimeout uint `json:"readtimeout"`
+	// InputBuffer is the maximum number of packets
 	// on the input buffer
 	InputBuffer uint `json:"inputbuffer"`
-	// the size of the output buffer
+	// OutputBuffer is the size of the output buffer
 	// per connection
 	// note that each connection will
 	// eat at least OutputBuffer * 192 bytes
@@ -45,26 +45,26 @@ type Configuration struct {
 	// you should adjust the value according
 	// to the amount of RAM available
 	OutputBuffer uint `json:"outputbuffer"`
-	// the maximum total number of concurrent connections
+	// MaxConnections is the maximum total number of concurrent connections
 	MaxConnections uint `json:"maxconnections"`
-	// set to true to disable statistics
+	// NoStats set to true to disable statistics
 	NoStats bool `json:"nostats"`
-	// access log file name
+	// Log is access log file name
 	Log string `json:"log"`
-	// the list of streams
+	// Resources is the list of streams
 	Resources []struct {
-		// the resource type
+		// Type is the resource type
 		Type string `json:"type"`
-		// the API type
+		// Api is the API type
 		Api string `json:"api"`
-		// the local URL to serve this stream under
+		// Serve is the local URL to serve this stream under
 		Serve string `json:"serve"`
-		// a single upstream URL or API argument
+		// Remote is a single upstream URL or API argument
 		// will be added to Remotes during parsing
 		Remote string `json:"remote"`
-		// the upstream URLs
+		// Remotes is the upstream URLs
 		Remotes []string `json:"remotes"`
-		// the cache time in seconds
+		// Cache the cache time in seconds
 		Cache uint `json:"cache"`
 	} `json:"resources"`
 }
