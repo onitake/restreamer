@@ -104,7 +104,7 @@ func (conn *Connection) Serve() {
 	
 	// drain the shutdown channel
 	select {
-		case <-streamer.shutdown:
+		case <-conn.shutdown:
 		default:
 	}
 }
