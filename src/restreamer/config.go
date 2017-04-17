@@ -51,6 +51,9 @@ type Configuration struct {
 	NoStats bool `json:"nostats"`
 	// Log is access log file name
 	Log string `json:"log"`
+	// Profile determines if profiling should be enabled.
+	// Set to true to turn on the pprof web server.
+	Profile bool `json:"profile"`
 	// Resources is the list of streams
 	Resources []struct {
 		// Type is the resource type
