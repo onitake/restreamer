@@ -23,7 +23,10 @@ import (
 	"restreamer"
 )
 import _ "net/http/pprof"
-import "runtime/debug"
+import (
+	"runtime"
+	"runtime/debug"
+)
 
 func main() {
 	var configname string
@@ -67,6 +70,8 @@ func main() {
 			log.Fatal(err)
 		}
 		pprof.WriteHeapProfile(profile)*/
+		// Enable block profiling (granularity: 100 ms)
+		runtime.SetBlockProfileRate(100000000)
 		// Register URL to force reclaiming memory
 		http.HandleFunc("/reclaim", func (http.ResponseWriter, *http.Request) {
 			log.Printf("Reclaiming memory")
