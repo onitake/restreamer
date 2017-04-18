@@ -1,10 +1,9 @@
 export GOPATH=$(shell pwd)
 #export GODEBUG=gctrace=1
 
-all: bin/restreamer
+.PHONY: all clean run
 
-run: bin/restreamer
-	bin/restreamer
+all: bin/restreamer
 
 clean:
 	rm -f bin/* pkg/*
