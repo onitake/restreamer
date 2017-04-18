@@ -9,8 +9,8 @@ run: bin/restreamer
 clean:
 	rm -f bin/* pkg/*
 
-bin/restreamer: src/main.go pkg/librestreamer.a
-	go build -o $@ src/main.go
+bin/restreamer: src/main.go src/profile.go pkg/librestreamer.a
+	go build -o $@ src/main.go src/profile.go
 
 bin/source: src/source.go
 	go build -o $@ $^

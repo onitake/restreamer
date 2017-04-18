@@ -22,11 +22,6 @@ import (
 	"net/http"
 	"restreamer"
 )
-import _ "net/http/pprof"
-import (
-	"runtime"
-	"runtime/debug"
-)
 
 func main() {
 	var configname string
@@ -43,6 +38,10 @@ func main() {
 
 	log.Printf("Listen = %s", config.Listen)
 	log.Printf("Timeout = %d", config.Timeout)
+	
+	if config.Profile {
+		EnableProfiling()
+	}
 	
 	var stats restreamer.Statistics
 	if config.NoStats {
@@ -62,25 +61,6 @@ func main() {
 		if err != nil {
 			log.Fatal("Error opening log: ", err)
 		}
-	}
-	
-	if config.Profile {
-		/*profile, err := os.Create("server.prof")
-		if err != nil {
-			log.Fatal(err)
-		}
-		pprof.WriteHeapProfile(profile)*/
-		// Enable block profiling (granularity: 100 ms)
-		runtime.SetBlockProfileRate(100000000)
-		// Register URL to force reclaiming memory
-		http.HandleFunc("/reclaim", func (http.ResponseWriter, *http.Request) {
-			log.Printf("Reclaiming memory")
-			debug.FreeOSMemory()
-		})
-		go func() {
-			// Start profiling web server
-			log.Println(http.ListenAndServe(":6060", nil))
-		}()
 	}
 	
 	clients := make(map[string]*restreamer.Client)

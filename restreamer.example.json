@@ -17,7 +17,7 @@
 	"": "Set to true to disable stats tracking.",
 	"nostats": false,
 	"": "Set to true to enable profiling.",
-	"profile": true,
+	"profile": false,
 	"": "Size of the input buffer per stream in TS packets (= 188 bytes).",
 	"inputbuffer": 1000,
 	"": "Size of the output buffer per client connection in TS packets.",
