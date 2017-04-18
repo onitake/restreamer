@@ -37,16 +37,23 @@ type Connection struct {
 	running bool
 	// the destination socket
 	writer http.ResponseWriter
+	// needed for flushing
+	flusher http.Flusher
 }
 
 // NewConnection creates a new connection object.
 // To start sending data to a client, call Serve().
 func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
+	flusher, ok := destination.(http.Flusher)
+	if !ok {
+		log.Printf("ResponseWriter is not flushable!")
+	}
 	conn := &Connection{
 		Queue: make(chan Packet, qsize),
 		shutdown: make(chan bool),
 		running: true,
 		writer: destination,
+		flusher: flusher,
 	}
 	return conn
 }
@@ -70,6 +77,9 @@ func (conn *Connection) Serve() {
 	// use Add and Set to set more headers here
 	// chunked mode should be on by default
 	conn.writer.WriteHeader(http.StatusOK)
+	if conn.flusher != nil {
+		conn.flusher.Flush()
+	}
 	log.Printf("Sent header")
 	
 	// see if can get notified about connection closure
@@ -86,7 +96,11 @@ func (conn *Connection) Serve() {
 				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				// send the packet out
 				_, err := conn.writer.Write(packet)
-				if err != nil {
+				if err == nil {
+					if conn.flusher != nil {
+						conn.flusher.Flush()
+					}
+				} else {
 					log.Printf("Client connection closed")
 					conn.running = false
 				}
