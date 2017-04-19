@@ -19,9 +19,24 @@ package main
 import (
 	"os"
 	"log"
+	"time"
 	"net/http"
+	"math/rand"
 	"restreamer"
 )
+
+// Shuffle shuffles a slice using Knuth's version of the Fisher-Yates algorithm.
+func ShuffleStrings(rnd *rand.Rand, list []string) []string {
+	N := len(list)
+	ret := make([]string, N)
+	copy(ret, list)
+	for i := 0; i < N; i++ {
+		// choose index uniformly in [i, N-1]
+		r := i + rnd.Intn(N - i)
+		ret[r], ret[i] = ret[i], ret[r]
+	}
+	return ret
+}
 
 func main() {
 	var configname string
@@ -63,6 +78,8 @@ func main() {
 		}
 	}
 	
+	rnd := rand.New(rand.NewSource(time.Now().Unix()))
+	
 	clients := make(map[string]*restreamer.Client)
 	
 	i := 0
@@ -74,8 +91,12 @@ func main() {
 			
 			queue := make(chan restreamer.Packet, config.InputBuffer)
 			reg := stats.RegisterStream(streamdef.Serve)
-
-			client, err := restreamer.NewClient(streamdef.Remotes, queue, config.Timeout, config.Reconnect, config.ReadTimeout)
+			
+			// shuffle the list here, not later
+			// should gives a bit more randomness
+			remotes := ShuffleStrings(rnd, streamdef.Remotes)
+			
+			client, err := restreamer.NewClient(remotes, queue, config.Timeout, config.Reconnect, config.ReadTimeout)
 			if err == nil {
 				client.SetCollector(reg)
 				client.SetLogger(logger)

@@ -25,7 +25,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"math/rand"
 )
 
 const (
@@ -95,7 +94,6 @@ func (*DummyConnectCloser) Connect() error {
 //   when event=client-*:
 //     "client": "1.2.3.4:12" | client ip:port,
 // }
-	
 type Client struct {
 	// a network dialer for TCP, UDP and HTTP
 	connector *net.Dialer
@@ -257,11 +255,10 @@ func (client *Client) Connected() bool {
 func (client *Client) loop() {
 	first := true
 	
-	// connect order randomizer
-	randomizer := rand.New(rand.NewSource(time.Now().Unix()))
-
 	// deadline to avoid a busy loop, but still allow an immediate reconnect on loss
 	deadline := time.Now().Add(client.Wait)
+	
+	next := 0
 	
 	for first || client.Wait != 0 {
 		if first {
@@ -285,9 +282,9 @@ func (client *Client) loop() {
 			deadline = time.Now().Add(client.Wait)
 		}
 		
-		// pick a random server
-		next := randomizer.Intn(len(client.urls))
+		// pick the next server
 		url := client.urls[next]
+		next = (next + 1) % len(client.urls)
 		
 		// connect
 		client.logger.Log(Dict{
