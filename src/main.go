@@ -89,27 +89,22 @@ func main() {
 		case "stream":
 			log.Printf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote)
 			
-			queue := make(chan restreamer.Packet, config.InputBuffer)
 			reg := stats.RegisterStream(streamdef.Serve)
 			
+			streamer := restreamer.NewStreamer(config.OutputBuffer, controller)
+			streamer.SetCollector(reg)
+			streamer.SetLogger(logger)
+			
 			// shuffle the list here, not later
-			// should gives a bit more randomness
+			// should give a bit more randomness
 			remotes := ShuffleStrings(rnd, streamdef.Remotes)
 			
-			client, err := restreamer.NewClient(remotes, queue, config.Timeout, config.Reconnect, config.ReadTimeout)
+			client, err := restreamer.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
 			if err == nil {
 				client.SetCollector(reg)
 				client.SetLogger(logger)
 				client.Connect()
-			}
-			
-			if err == nil {
 				clients[streamdef.Serve] = client
-				
-				streamer := restreamer.NewStreamer(queue, config.OutputBuffer, controller)
-				streamer.SetCollector(reg)
-				streamer.SetLogger(logger)
-				client.SetStateListener(streamer)
 				mux.Handle(streamdef.Serve, streamer)
 				
 				log.Printf("Handled connection %d", i)

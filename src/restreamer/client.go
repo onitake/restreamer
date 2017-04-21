@@ -111,17 +111,19 @@ type Client struct {
 	Wait time.Duration
 	// ReadTimeout is the timeout for individual packet reads
 	ReadTimeout time.Duration
-	// the packet queue
-	queue chan<- Packet
+	// streamer is attached packet distributor
+	streamer *Streamer
 	// true while the client is streaming into the queue
 	// TODO make this atomic
-	running bool
+	running AtomicBool
 	// the stats collector for this client
 	stats Collector
 	// a json logger
 	logger JsonLogger
 	// a downstream object that can handle connect/disconnect notifications
 	listener ConnectCloser
+	// the size of the input queue
+	queueSize uint
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -137,7 +139,8 @@ type Client struct {
 //   timeout: the connect timeout
 //   reconnect: the minimal reconnect delay
 //   readtimeout: the read timeout
-func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint, readtimeout uint) (*Client, error) {
+//   qsize: the input queue size
+func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -177,11 +180,12 @@ func NewClient(uris []string, queue chan<- Packet, timeout uint, reconnect uint,
 		input: nil,
 		Wait: time.Duration(reconnect) * time.Second,
 		ReadTimeout: time.Duration(readtimeout) * time.Second,
-		queue: queue,
-		running: false,
+		streamer: streamer,
+		running: AtomicFalse,
 		stats: &DummyCollector{},
 		logger: &DummyLogger{},
 		listener: &DummyConnectCloser{},
+		queueSize: qsize,
 	}
 	return &client, nil
 }
@@ -247,7 +251,7 @@ func (client *Client) Status() string {
 
 // Connected returns true if the socket is connected.
 func (client *Client) Connected() bool {
-	return client.running
+	return LoadBool(&client.running)
 }
 
 // loop tries to connect and loops until successful.
@@ -372,7 +376,7 @@ func (client *Client) start(url *url.URL) error {
 		}
 		
 		// start streaming
-		client.running = true
+		StoreBool(&client.running, true)
 		log.Printf("Starting to pull stream %s\n", url)
 		err := client.pull(url)
 		log.Printf("Socket for stream %s closed\n", url)
@@ -391,12 +395,12 @@ func (client *Client) start(url *url.URL) error {
 func (client *Client) pull(url *url.URL) error {
 	// declare here so we can send back individual errors
 	var err error
-	// will be set as soon as the first packet has been received
-	// necessary, because we only report connections as online that actually send data.
-	connected := false
-	
+	// the packet queue will be allocated and connected to the streamer as soon as the first packet has been received
+	var queue chan Packet
+	// save a few bytes
 	var packet Packet
-	for client.running {
+	
+	for LoadBool(&client.running) {
 		// somewhat hacky read timeout:
 		// close the connection when the timer fires.
 		var timer *time.Timer
@@ -407,25 +411,32 @@ func (client *Client) pull(url *url.URL) error {
 			})
 		}
 		// read a packet
+		//log.Printf("Reading a packet from %p\n", client.input)
 		packet, err = ReadPacket(client.input)
-		// we got a packet, stop the timer (and drain it)
+		// we got a packet, stop the timer and drain it
 		if timer != nil && !timer.Stop() {
-			<-timer.C
+			log.Printf("Stopping timer on %s\n", url)
+			select {
+				case <-timer.C:
+				default:
+			}
+			log.Printf("Stopped timer on %s\n", url)
 		}
 		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
-			client.running = false
+			StoreBool(&client.running, false)
 		} else {
 			if packet != nil {
 				// report connection up
-				if !connected {
+				if queue == nil {
 					client.listener.Connect()
 					client.stats.SourceConnected()
 					client.logger.Log(Dict{
 						"event": eventClientStarted,
 						"url": url.String(),
 					})
-					connected = true
+					queue = make(chan Packet, client.queueSize)
+					go client.streamer.Stream(queue)
 				}
 				
 				// report the packet
@@ -433,7 +444,7 @@ func (client *Client) pull(url *url.URL) error {
 				
 				//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				//log.Printf("Got a packet (length %d)\n", len(packet))
-				client.queue<- packet
+				queue<- packet
 			} else {
 				log.Printf("No packet received\n")
 			}
@@ -441,8 +452,9 @@ func (client *Client) pull(url *url.URL) error {
 	}
 	
 	// and the connection is gone
-	if connected {
-		client.listener.Close()
+	if queue != nil {
+		log.Printf("Killing queue on %s\n", url)
+		close(queue)
 		client.stats.SourceDisconnected()
 		client.logger.Log(Dict{
 			"event": eventClientStopped,

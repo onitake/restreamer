@@ -37,6 +37,16 @@ var (
 	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
 
+// ConnectionRequest encapsulates a request that new connection be added or removed.
+type ConnectionRequest struct {
+	// Address is the remote client address
+	Address string
+	// Remove is true if the connection should be added, false if it should be removed
+	Remove bool
+	// Connection is the connection object
+	Connection *Connection
+}
+
 // Streamer implements a TS packet multiplier,
 // distributing received packets on the input queue to the output queues.
 // It also handles and manages HTTP connections when added to an HTTP server.
@@ -46,21 +56,20 @@ type Streamer struct {
 	input <-chan Packet
 	// lock is the outgoing connection pool lock
 	lock sync.Mutex
-	// connections is the outgoing connection pool
-	connections map[*Connection]bool
 	// broker is a global connection broker
 	broker ConnectionBroker
 	// queueSize defines the maximum number of packets to queue per outgoing connection
 	queueSize int
-	// running reflects the state of the stream: if true, incoming connections
-	// are accepted but it's not possible to relaunch.
-	// If false, incoming connections are blocked, and Stream() needs to be
-	// called to start streaming.
-	running bool
+	// running reflects the state of the stream: if true, the Stream thread is running and
+	// incoming connections are allowed.
+	// If false, incoming connections are blocked.
+	running AtomicBool
 	// stats is the statistics collector for this stream
 	stats Collector
 	// logger is a json logger
 	logger JsonLogger
+	// request is an unbuffered queue for requests to add or remove a connection
+	request chan ConnectionRequest
 }
 
 // ConnectionBroker represents a policy handler for new connections.
@@ -82,13 +91,12 @@ type ConnectionBroker interface {
 // stats is a statistics collector object.
 func NewStreamer(qsize uint, broker ConnectionBroker) (*Streamer) {
 	streamer := &Streamer{
-		input: queue,
-		connections: make(map[*Connection]bool),
 		broker: broker,
 		queueSize: int(qsize),
-		running: false,
+		running: AtomicFalse,
 		stats: &DummyCollector{},
 		logger: &DummyLogger{},
+		request: make(chan ConnectionRequest),
 	}
 	return streamer
 }
@@ -118,13 +126,12 @@ func (streamer *Streamer) SetCollector(stats Collector) {
 // go streamer.Stream(queue)
 func (streamer *Streamer) Stream(queue <-chan Packet) error {
 	// interlock and check for availability first
-	streamer.lock.Lock()
-	if streamer.running {
-		streamer.lock.Unlock()
+	if !CompareAndSwapBool(&streamer.running, false, true) {
 		return ErrAlreadyRunning
 	}
-	streamer.running = true
-	streamer.lock.Unlock()
+	
+	// create the local outgoing connection pool
+	pool := make(map[*Connection]bool)
 	
 	log.Printf("Starting streaming")
 	
@@ -132,14 +139,13 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 	running := true
 	for running {
 		select {
-			case packet, err := <-queue:
-				if err == nil {
+			case packet, ok := <-queue:
+				if ok {
 					// got a packet, distribute
 					//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+					//log.Printf("Got packet (length %d)\n", len(packet))
 					
-					// protect access to the connection pool
-					streamer.lock.Lock()
-					for conn, _ := range streamer.connections {
+					for conn, _ := range pool {
 						select {
 							case conn.Queue<- packet:
 								// packet distributed, done
@@ -155,29 +161,33 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 								streamer.stats.PacketDropped()
 						}
 					}
-					streamer.lock.Unlock()
 				} else {
 					// channel closed, exit
 					running = false
 					// and stop everything
-					streamer.lock.Lock()
-					streamer.running = false
-					streamer.lock.Unlock()
+					StoreBool(&streamer.running, false)
+				}
+			case request := <-streamer.request:
+				if request.Remove {
+					log.Printf("Removing client %s from pool\n", request.Address)
+					delete(pool, request.Connection)
+				} else {
+					log.Printf("Adding client %s to pool\n", request.Address)
+					pool[request.Connection] = true
 				}
 		}
 	}
 	
-	// wait for competitors before cleaning up the pool
-	streamer.lock.Lock()
 	// clean up
-	for conn, _ := range streamer.connections {
+	for _ = range queue {
+		// drain any leftovers
+	}
+	for conn, _ := range pool {
 		conn.Close()
 	}
-	// reset the connection pool
-	streamer.connections = make(map[*Connection]bool)
-	streamer.lock.Unlock()
 	
 	log.Printf("Ending streaming")
+	return nil
 }
 
 // ServeHTTP handles an incoming HTTP connection.
@@ -186,16 +196,14 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	var conn *Connection = nil
 	
 	// prevent race conditions first
-	if streamer.running {
+	if LoadBool(&streamer.running) {
 		// check if the connection can be accepted
 		if streamer.broker.Accept(request.RemoteAddr, streamer) {
-			// structural change, exclusive lock
-			streamer.lock.Lock()
-			// instantiate
 			conn = NewConnection(writer, streamer.queueSize)
-			streamer.connections[conn] = true
-			// and release
-			streamer.lock.Unlock()
+			streamer.request<- ConnectionRequest{
+				Address: request.RemoteAddr,
+				Connection: conn,
+			}
 		} else {
 			log.Printf("Refusing connection from %s, pool is full", request.RemoteAddr)
 		}
@@ -211,9 +219,11 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		conn.Serve()
 		
 		// done, remove the stale connection
-		streamer.lock.Lock()
-		delete(streamer.connections, conn)
-		streamer.lock.Unlock()
+		streamer.request<- ConnectionRequest{
+			Remove: true,
+			Address: request.RemoteAddr,
+			Connection: conn,
+		}
 		log.Printf("Connection from %s closed\n", request.RemoteAddr);
 		
 		// and report
