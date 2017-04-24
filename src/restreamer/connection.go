@@ -43,12 +43,6 @@ const (
 type Connection struct {
 	// Queue is the per-connection packet queue
 	Queue chan Packet
-	// Shutdown notification channel.
-	// Send true to close the connection and stop the handler.
-	shutdown chan bool
-	// internal flag
-	// true while the connection is up
-	running bool
 	// the destination socket
 	writer http.ResponseWriter
 	// needed for flushing
@@ -77,8 +71,6 @@ func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 	}
 	conn := &Connection{
 		Queue: make(chan Packet, qsize),
-		shutdown: make(chan bool),
-		running: true,
 		writer: destination,
 		flusher: flusher,
 		logger: logger,
@@ -86,12 +78,9 @@ func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 	return conn
 }
 
-// Close shuts down the streamer and all incoming connections.
-// This action is asynchronous.
-func (conn *Connection) Close() error {
-	// signal shutdown
-	conn.shutdown<- true
-	return nil
+// SetLogger assigns a logger
+func (conn *Connection) SetLogger(logger JsonLogger) {
+	conn.logger.Logger = logger
 }
 
 // Serve starts serving data to a client, continuously feeding packets from the queue.
@@ -124,34 +113,48 @@ func (conn *Connection) Serve() {
 	}
 	
 	// start reading packets
-	for conn.running {
+	running := true
+	for running {
 		select {
-			case packet := <-conn.Queue:
-				// packet received, log
-				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-				// send the packet out
-				_, err := conn.writer.Write(packet)
-				if err == nil {
-					if conn.flusher != nil {
-						conn.flusher.Flush()
+			case packet, ok := <-conn.Queue:
+				if ok {
+					// packet received, log
+					//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+					// send the packet out
+					_, err := conn.writer.Write(packet)
+					if err == nil {
+						if conn.flusher != nil {
+							conn.flusher.Flush()
+						}
+					} else {
+						conn.logger.Log(Dict{
+							"event": eventConnectionClosed,
+							"message": "Downstream connection closed",
+						})
+						running = false
 					}
+					//log.Printf("Wrote packet of %d bytes\n", bytes)
 				} else {
-					conn.running = false
+					// channel closed, exit
+					conn.logger.Log(Dict{
+						"event": eventConnectionShutdown,
+						"message": "Shutting down client connection",
+					})
+					running = false
 				}
 			case <-notifier.CloseNotify():
 				// connection closed while we were waiting for more data
-				conn.running = false
-			case <-conn.shutdown:
-				// and shut down
-				conn.running = false
+				conn.logger.Log(Dict{
+					"event": eventConnectionClosedWait,
+					"message": "Downstream connection closed (while waiting)",
+				})
+				running = false
 		}
 	}
 	
-	// drain the shutdown channel
-	select {
-		case <-conn.shutdown:
-		default:
-	}
+	// we cannot drain the channel here, as it might not be closed yet.
+	// better let the our caller handle closure and draining.
+	
 	conn.logger.Log(Dict{
 		"event": eventConnectionDone,
 		"message": "Shutdown complete",

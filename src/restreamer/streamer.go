@@ -53,12 +53,28 @@ var (
 	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
 
+// Command is one of several possible constants.
+// See StreamerCommandAdd for more information.
+type Command int
+
+const (
+	// streamerCommandIgnore is a default dummy command
+	streamerCommandIgnore Command = iota
+	// streamerCommandStart is an internal start command, used to signal request
+	// processing to commence.
+	streamerCommandStart
+	// StreamerCommandAdd signals a stream to add a connection.
+	StreamerCommandAdd
+	// StreamerCommandRemove signals a stream to remove a connection.
+	StreamerCommandRemove
+)
+
 // ConnectionRequest encapsulates a request that new connection be added or removed.
 type ConnectionRequest struct {
+	// Command is the command to execute
+	Command Command
 	// Address is the remote client address
 	Address string
-	// Remove is true if the connection should be added, false if it should be removed
-	Remove bool
 	// Connection is the connection object
 	Connection *Connection
 }
@@ -121,6 +137,8 @@ func NewStreamer(qsize uint, broker ConnectionBroker) (*Streamer) {
 		logger: logger,
 		request: make(chan ConnectionRequest),
 	}
+	// start the command eater
+	go streamer.eatCommands()
 	return streamer
 }
 
@@ -132,6 +150,27 @@ func (streamer *Streamer) SetLogger(logger JsonLogger) {
 // SetCollector assigns a stats collector
 func (streamer *Streamer) SetCollector(stats Collector) {
 	streamer.stats = stats
+}
+
+// eatCommands is started in the background to drain the command
+// queue and wait for a start command, in which case it will exit.
+func (streamer *Streamer) eatCommands() {
+	running := true
+	for running {
+		select {
+			case request := <-streamer.request:
+				switch request.Command {
+					case streamerCommandStart:
+						streamer.logger.Log(Dict{
+							"event": eventStreamerQueueStart,
+							"message": "Stopping eater process and starting real processing",
+						})
+						running = false
+					default:
+						// Eating all other commands
+				}
+		}
+	}
 }
 
 // Stream is the main stream multiplier loop.
@@ -155,6 +194,11 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 	
 	// create the local outgoing connection pool
 	pool := make(map[*Connection]bool)
+	
+	// stop the eater process
+	streamer.request<- ConnectionRequest{
+		Command: streamerCommandStart,
+	}
 	
 	streamer.logger.Log(Dict{
 		"event": eventStreamerStart,
@@ -194,10 +238,26 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 					StoreBool(&streamer.running, false)
 				}
 			case request := <-streamer.request:
-				if request.Remove {
-					delete(pool, request.Connection)
-				} else {
-					pool[request.Connection] = true
+				switch request.Command {
+					case StreamerCommandRemove:
+						streamer.logger.Log(Dict{
+							"event": eventStreamerClientRemove,
+							"message": fmt.Sprintf("Removing client %s from pool", request.Address),
+						})
+						close(request.Connection.Queue)
+						delete(pool, request.Connection)
+					case StreamerCommandAdd:
+						streamer.logger.Log(Dict{
+							"event": eventStreamerClientAdd,
+							"message": fmt.Sprintf("Adding client %s to pool", request.Address),
+						})
+						pool[request.Connection] = true
+					default:
+						streamer.logger.Log(Dict{
+							"event": eventStreamerError,
+							"error": errorStreamerInvalidCommand,
+							"message": "Ignoring invalid command in started state",
+						})
 				}
 		}
 	}
@@ -207,8 +267,11 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 		// drain any leftovers
 	}
 	for conn, _ := range pool {
-		conn.Close()
+		close(conn.Queue)
 	}
+	
+	// start the command eater again
+	go streamer.eatCommands()
 	
 	streamer.logger.Log(Dict{
 		"event": eventStreamerStop,
@@ -227,7 +290,10 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		// check if the connection can be accepted
 		if streamer.broker.Accept(request.RemoteAddr, streamer) {
 			conn = NewConnection(writer, streamer.queueSize)
+			conn.SetLogger(streamer.logger.Logger)
+			
 			streamer.request<- ConnectionRequest{
+				Command: StreamerCommandAdd,
 				Address: request.RemoteAddr,
 				Connection: conn,
 			}
@@ -258,9 +324,13 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		
 		// done, remove the stale connection
 		streamer.request<- ConnectionRequest{
-			Remove: true,
+			Command: StreamerCommandRemove,
 			Address: request.RemoteAddr,
 			Connection: conn,
+		}
+		// and drain the queue AFTER we have sent the shutdown signal
+		for _ = range conn.Queue {
+			// drain any leftovers
 		}
 		streamer.logger.Log(Dict{
 			"event": eventStreamerClosed,
