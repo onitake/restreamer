@@ -18,6 +18,7 @@ package restreamer
 
 import (
 	"os"
+	"fmt"
 	"log"
 	"time"
 	"syscall"
@@ -58,13 +59,14 @@ type JsonLogger interface {
 	// Each argument is processed through json.Marshal and generates one line in the log.
 	//
 	// Example usage:
-	//   logger.Log(map[string]string{ "key": "value" }, map[string]string{ "key": "value2" })
-	Log(lines ...interface{})
+	//   logger.Log(Dict{ "key": "value" }, Dict{ "key": "value2" })
+	Log(lines ...Dict)
 }
 
 // ModuleLogger encapsulates default values for a JSON log.
 //
-// This simplifies log calls greatly.
+// This simplifies log calls, as values like the current module can be
+// initialised once, and they will be reused on every log call.
 //
 // Each log line will contain the key 'time' with the current UNIX timestamp
 // in addition to any default values in the Defaults dictionary.
@@ -77,52 +79,71 @@ type ModuleLogger struct {
 	Logger JsonLogger
 	// Defaults is a dictionary containing default keys.
 	// It is highly recommended to add any immutable data here,
-	// in particular the key 'module' with a unique name for the module sending the log.
-	Defaults map[string]interface{}
+	// in particular the key 'module' with a unique name for the module sending the log
+	// will be very useful.
+	Defaults Dict
+	// AddTimestamp determines if a "time" value with the current POSIX timestamp
+	// is added to the dictionary before it is passed to the underlying logger.
+	AddTimestamp bool
 }
 
 // Log adds predefined values to each log line and writes it to the encapsulated log.
-func (logger *ModuleLogger) Log(lines ...interface{}) {
-	for _, line := range lines {
-		processed := make(map[string]interface{})
+func (logger *ModuleLogger) Log(lines ...Dict) {
+	proclines := make([]Dict, len(lines))
+	for i, line := range lines {
+		processed := make(Dict)
 		for key, value := range logger.Defaults {
 			processed[key] = value
 		}
-		processed["time"] = time.Now().Unix()
-		processed["log"] = line
-		logger.Logger.Log(processed)
+		if logger.AddTimestamp {
+			processed["time"] = time.Now().Unix()
+		}
+		for key, value := range line {
+			processed[key] = value
+		}
+		proclines[i] = processed
 	}
+	logger.Logger.Log(proclines...)
 }
 
 // DummyLogger is a logger placeholder that doesn't actually log anything.
-type DummyLogger struct {
-}
+type DummyLogger struct{}
 
 // Log does nothing.
 //
-// Just a placeholder for a real big boy logger.
-func (*DummyLogger) Log(lines ...interface{}) {
+// Just a placeholder for a real big boy loggers.
+func (*DummyLogger) Log(lines ...Dict) {}
+
+// Multilogger logs to several backend loggers at once.
+type MultiLogger struct {
+	Loggers []JsonLogger
+}
+
+// Log writes the same log lines to all backing loggers.
+func (logger *MultiLogger) Log(lines ...Dict) {
+	for _, backer := range logger.Loggers {
+		backer.Log(lines...)
+	}
 }
 
 // ConsoleLogger is a simple logger that prints to stdout.
 //
 // Log lines are prefixed with a time stamp in RFC3339 format, like this:
 // [2006-01-02T15:04:05Z07:00] <JSON>
-type ConsoleLogger struct {
-}
+type ConsoleLogger struct{}
 
 // Log writes a log line to stdout.
 //
 // Your best bet if you don't want/need a full-blown file logging queue with
-// reopening or a central logging server.
-func (*ConsoleLogger) Log(lines ...interface{}) {
+// signal-initiated reopening or a central logging server.
+func (*ConsoleLogger) Log(lines ...Dict) {
 	for _, line := range lines {
 		data, err := json.Marshal(line)
+		now := time.Now().Format(timeFormat)
 		if err == nil {
-			now := time.Now().Format(timeFormat)
-			log.Printf("%s%s\n", now, data)
+			fmt.Printf("%s%s\n", now, data)
 		} else {
-			log.Printf("Cannot encode log line %s", line)
+			fmt.Printf("%s\"Cannot encode log line %s\"", now, line)
 		}
 	}
 }
@@ -149,13 +170,13 @@ type FileLogger struct {
 	errors uint64
 }
 
-// NewLogger creates a new FileLogger and optionally installs a SIGUSR1 handler;
+// NewFileLogger creates a new FileLogger and optionally installs a SIGUSR1 handler;
 // pass sigusr=true for that purpose. This is useful for log rotation, etc.
 //
 // Signals are only fully supported on POSIX systems, so no SIGUSR1 is sent
 // when running on Microsoft Windows, for example. The signal handler is
 // still installed, but it is never notified.
-func NewLogger(logfile string, sigusr bool) (*FileLogger, error) {
+func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	// create logger instance
 	logger := &FileLogger{
 		signals: make(chan os.Signal, signalQueueLength),
@@ -176,7 +197,7 @@ func NewLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	return logger, nil
 }
 
-func (logger *FileLogger) Log(lines ...interface{}) {
+func (logger *FileLogger) Log(lines ...Dict) {
 	// send these down the queue
 	for _, line := range lines {
 		select {

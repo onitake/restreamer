@@ -19,7 +19,7 @@ package restreamer
 import (
 	"os"
 	"io"
-	"log"
+	"fmt"
 	"time"
 	"errors"
 	"net"
@@ -27,18 +27,38 @@ import (
 	"net/url"
 )
 
+var logger *ModuleLogger = &ModuleLogger {
+	Logger: &ConsoleLogger{},
+	Defaults: Dict {
+		"module": "client",
+	},
+	AddTimestamp: true,
+}
+
 const (
 	eventClientDebug = "debug"
 	eventClientError = "error"
 	eventClientRetry = "retry"
 	eventClientConnecting = "connecting"
 	eventClientConnectionLoss = "loss"
-	eventClientConnectTimeout = "timeout"
+	eventClientConnectTimeout = "connect_timeout"
 	eventClientOffline = "offline"
 	eventClientStarted = "started"
 	eventClientStopped = "stopped"
+	eventClientOpenPath = "open_path"
+	eventClientOpenHttp = "open_http"
+	eventClientOpenTcp = "open_tcp"
+	eventClientOpenDomain = "open_domain"
+	eventClientPull = "pull"
+	eventClientClosed = "closed"
+	eventClientTimerStop = "timer_stop"
+	eventClientTimerStopped = "timer_stopped"
+	eventClientNoPacket = "nopacket"
+	eventClientTimerKill = "killed"
+	eventClientReadTimeout = "read_timeout"
 	//
 	errorClientConnect = "connect"
+	errorClientParse = "parse"
 )
 
 var (
@@ -95,15 +115,15 @@ func (*DummyConnectCloser) Connect() error {
 //     "client": "1.2.3.4:12" | client ip:port,
 // }
 type Client struct {
-	// a network dialer for TCP, UDP and HTTP
+	// connector is a network dialer for TCP, UDP and HTTP
 	connector *net.Dialer
-	// a generic HTTP client
+	// getter is a generic HTTP client
 	getter *http.Client
-	// the URLs to GET (either of them)
+	// urls is the URLs to GET (either of them)
 	urls []*url.URL
-	// the response, including the body reader
+	// response is the HTTP response, including the body reader
 	response *http.Response
-	// the input stream (socket)
+	// input is the input stream (socket)
 	input io.ReadCloser
 	// Wait is the time before reconnecting a disconnected upstream.
 	// This is a deadline: If a connection (or connection attempt) takes longer
@@ -111,18 +131,18 @@ type Client struct {
 	Wait time.Duration
 	// ReadTimeout is the timeout for individual packet reads
 	ReadTimeout time.Duration
-	// streamer is attached packet distributor
+	// streamer is the attached packet distributor
 	streamer *Streamer
-	// true while the client is streaming into the queue
-	// TODO make this atomic
+	// running is true while the client is streaming into the queue.
+	// Use ReadBool(client.running) to get the current value.
 	running AtomicBool
-	// the stats collector for this client
+	// stats is the statistics collector for this client
 	stats Collector
-	// a json logger
-	logger JsonLogger
-	// a downstream object that can handle connect/disconnect notifications
+	// logger is our augmented logging facility
+	logger *ModuleLogger
+	// listener is a downstream object that can handle connect/disconnect notifications
 	listener ConnectCloser
-	// the size of the input queue
+	// queueSize is the size of the input queue
 	queueSize uint
 }
 
@@ -149,7 +169,11 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 			urls[count] = parsed
 			count++
 		} else {
-			log.Printf("Error parsing URL %s: %s", uri, err)
+			logger.Log(Dict{
+				"event": eventClientError,
+				"error": errorClientParse,
+				"message": fmt.Sprintf("Error parsing URL %s: %s", uri, err),
+			})
 		}
 	}
 	if count < 1 {
@@ -183,21 +207,19 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		streamer: streamer,
 		running: AtomicFalse,
 		stats: &DummyCollector{},
-		logger: &DummyLogger{},
+		logger: &ModuleLogger{
+			Logger: logger.Logger,
+			Defaults: logger.Defaults,
+		},
 		listener: &DummyConnectCloser{},
 		queueSize: qsize,
 	}
 	return &client, nil
 }
 
-// SetLogger assigns a logger.
+// SetLogger assigns a backing logger, while keeping the current module defaults.
 func (client *Client) SetLogger(logger JsonLogger) {
-	client.logger = &ModuleLogger{
-		Logger: logger,
-		Defaults: map[string]interface{} {
-			"module": "client",
-		},
-	}
+	client.logger.Logger = logger
 }
 
 // SetCollector assigns a stats collector.
@@ -274,12 +296,11 @@ func (client *Client) loop() {
 			now := time.Now()
 			if now.Before(deadline) {
 				wait := deadline.Sub(now)
-				// first attempt, let's see if it works!
 				client.logger.Log(Dict{
 					"event": eventClientRetry,
 					"retry": wait.Seconds(),
+					"message": fmt.Sprintf("Retrying after %0.0f seconds.", wait.Seconds()),
 				})
-				log.Printf("Retrying after %0.0f seconds.\n", wait.Seconds());
 				time.Sleep(wait)
 			}
 			// update the deadline
@@ -304,15 +325,14 @@ func (client *Client) loop() {
 				"url": url.String(),
 				"message": err.Error(),
 			})
-			log.Printf("Got error on stream %s: %s\n", url, err)
 		}
 		
 		if client.Wait == 0 {
 			client.logger.Log(Dict{
 				"event": eventClientOffline,
 				"url": url.String(),
+				"message": "Reconnecting disabled. Stream will stay offline.",
 			})
-			log.Print("Reconnecting disabled. Stream will stay offline.\n");
 		}
 	}
 }
@@ -330,7 +350,11 @@ func (client *Client) start(url *url.URL) error {
 		switch url.Scheme {
 		// handled by os.Open
 		case "file":
-			log.Printf("Opening %s\n", url.Path)
+			client.logger.Log(Dict{
+				"event": eventClientOpenPath,
+				"path": url.Path,
+				"message": fmt.Sprintf("Opening %s.", url.Path),
+			})
 			file, err := os.Open(url.Path)
 			if err != nil {
 				return err
@@ -340,7 +364,11 @@ func (client *Client) start(url *url.URL) error {
 		case "http":
 			fallthrough
 		case "https":
-			log.Printf("Connecting to %s\n", url)
+			client.logger.Log(Dict{
+				"event": eventClientOpenHttp,
+				"url": url.String(),
+				"message": fmt.Sprintf("Connecting to %s.", url),
+			})
 			request, err := http.NewRequest("GET", url.String(), nil)
 			if err != nil {
 				return err
@@ -353,7 +381,11 @@ func (client *Client) start(url *url.URL) error {
 			client.input = response.Body
 		// handled directly by net.Dialer
 		case "tcp":
-			log.Printf("Connecting TCP socket to %s\n", url.Host)
+			client.logger.Log(Dict{
+				"event": eventClientOpenTcp,
+				"host": url.Host,
+				"message": fmt.Sprintf("Connecting TCP socket to %s.", url.Host),
+			})
 			conn, err := client.connector.Dial(url.Scheme, url.Host)
 			if err != nil {
 				return err
@@ -365,7 +397,11 @@ func (client *Client) start(url *url.URL) error {
 		case "unixgram":
 			fallthrough
 		case "unixpacket":
-			log.Printf("Connecting domain socket to %s\n", url.Path)
+			client.logger.Log(Dict{
+				"event": eventClientOpenDomain,
+				"path": url.Path,
+				"message": fmt.Sprintf("Connecting domain socket to %s.", url.Path),
+			})
 			conn, err := client.connector.Dial(url.Scheme, url.Path)
 			if err != nil {
 				return err
@@ -377,9 +413,17 @@ func (client *Client) start(url *url.URL) error {
 		
 		// start streaming
 		StoreBool(&client.running, true)
-		log.Printf("Starting to pull stream %s\n", url)
+		client.logger.Log(Dict{
+			"event": eventClientPull,
+			"url": url.String(),
+			"message": fmt.Sprintf("Starting to pull stream %s.", url),
+		})
 		err := client.pull(url)
-		log.Printf("Socket for stream %s closed\n", url)
+		client.logger.Log(Dict{
+			"event": eventClientClosed,
+			"url": url.String(),
+			"message": fmt.Sprintf("Socket for stream %s closed", url),
+		})
 		
 		// cleanup
 		client.Close()
@@ -406,7 +450,10 @@ func (client *Client) pull(url *url.URL) error {
 		var timer *time.Timer
 		if client.ReadTimeout > 0 {
 			timer = time.AfterFunc(client.ReadTimeout, func() {
-				log.Printf("Read timeout exceeded, closing connection\n")
+				client.logger.Log(Dict{
+					"event": eventClientReadTimeout,
+					"message": "Read timeout exceeded, closing connection",
+				})
 				client.input.Close()
 			})
 		}
@@ -415,12 +462,20 @@ func (client *Client) pull(url *url.URL) error {
 		packet, err = ReadPacket(client.input)
 		// we got a packet, stop the timer and drain it
 		if timer != nil && !timer.Stop() {
-			log.Printf("Stopping timer on %s\n", url)
+			client.logger.Log(Dict{
+				"event": eventClientTimerStop,
+				"url": url.String(),
+				"message": fmt.Sprintf("Stopping timer on %s", url),
+			})
 			select {
 				case <-timer.C:
 				default:
 			}
-			log.Printf("Stopped timer on %s\n", url)
+			client.logger.Log(Dict{
+				"event": eventClientTimerStopped,
+				"url": url.String(),
+				"message": fmt.Sprintf("Stopped timer on %s", url),
+			})
 		}
 		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
@@ -446,14 +501,22 @@ func (client *Client) pull(url *url.URL) error {
 				//log.Printf("Got a packet (length %d)\n", len(packet))
 				queue<- packet
 			} else {
-				log.Printf("No packet received\n")
+				client.logger.Log(Dict{
+					"event": eventClientNoPacket,
+					"url": url.String(),
+					"message": "No packet received",
+				})
 			}
 		}
 	}
 	
 	// and the connection is gone
 	if queue != nil {
-		log.Printf("Killing queue on %s\n", url)
+		client.logger.Log(Dict{
+			"event": eventClientTimerKill,
+			"url": url.String(),
+			"message": fmt.Sprintf("Killing queue on %s %s", url),
+		})
 		close(queue)
 		client.stats.SourceDisconnected()
 		client.logger.Log(Dict{
