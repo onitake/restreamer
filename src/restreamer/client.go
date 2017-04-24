@@ -27,15 +27,9 @@ import (
 	"net/url"
 )
 
-var logger *ModuleLogger = &ModuleLogger {
-	Logger: &ConsoleLogger{},
-	Defaults: Dict {
-		"module": "client",
-	},
-	AddTimestamp: true,
-}
-
 const (
+	moduleClient = "client"
+	//
 	eventClientDebug = "debug"
 	eventClientError = "error"
 	eventClientRetry = "retry"
@@ -161,6 +155,13 @@ type Client struct {
 //   readtimeout: the read timeout
 //   qsize: the input queue size
 func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint) (*Client, error) {
+	logger := &ModuleLogger{
+		Logger: &ConsoleLogger{},
+		Defaults: Dict{
+			"module": moduleClient,
+		},
+		AddTimestamp: true,
+	}
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -207,10 +208,7 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		streamer: streamer,
 		running: AtomicFalse,
 		stats: &DummyCollector{},
-		logger: &ModuleLogger{
-			Logger: logger.Logger,
-			Defaults: logger.Defaults,
-		},
+		logger: logger,
 		listener: &DummyConnectCloser{},
 		queueSize: qsize,
 	}
@@ -515,7 +513,7 @@ func (client *Client) pull(url *url.URL) error {
 		client.logger.Log(Dict{
 			"event": eventClientTimerKill,
 			"url": url.String(),
-			"message": fmt.Sprintf("Killing queue on %s %s", url),
+			"message": fmt.Sprintf("Killing queue on %s", url),
 		})
 		close(queue)
 		client.stats.SourceDisconnected()

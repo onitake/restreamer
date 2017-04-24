@@ -17,9 +17,23 @@
 package restreamer
 
 import (
-	"log"
 	"time"
 	"net/http"
+)
+
+const (
+	moduleConnection = "connection"
+	//
+	eventConnectionDebug = "debug"
+	eventConnectionError = "error"
+	eventHeaderSent = "headersent"
+	eventConnectionClosed = "closed"
+	eventConnectionClosedWait = "closedwait"
+	eventConnectionShutdown = "shutdown"
+	eventConnectionDone = "done"
+	//
+	errorConnectionNotFlushable = "noflush"
+	errorConnectionNoCloseNotify = "noclosenotify"
 )
 
 // Connection is a single active client connection.
@@ -39,14 +53,27 @@ type Connection struct {
 	writer http.ResponseWriter
 	// needed for flushing
 	flusher http.Flusher
+	// logger is a json logger
+	logger *ModuleLogger
 }
 
 // NewConnection creates a new connection object.
 // To start sending data to a client, call Serve().
 func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
+	logger := &ModuleLogger{
+		Logger: &ConsoleLogger{},
+		Defaults: Dict{
+			"module": moduleConnection,
+		},
+		AddTimestamp: true,
+	}
 	flusher, ok := destination.(http.Flusher)
 	if !ok {
-		log.Printf("ResponseWriter is not flushable!")
+		logger.Log(Dict{
+			"event": eventConnectionError,
+			"error": errorConnectionNotFlushable,
+			"message": "ResponseWriter is not flushable!",
+		})
 	}
 	conn := &Connection{
 		Queue: make(chan Packet, qsize),
@@ -54,6 +81,7 @@ func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
 		running: true,
 		writer: destination,
 		flusher: flusher,
+		logger: logger,
 	}
 	return conn
 }
@@ -80,12 +108,19 @@ func (conn *Connection) Serve() {
 	if conn.flusher != nil {
 		conn.flusher.Flush()
 	}
-	log.Printf("Sent header")
+	conn.logger.Log(Dict{
+		"event": eventHeaderSent,
+		"message": "Sent header",
+	})
 	
 	// see if can get notified about connection closure
 	notifier, ok := conn.writer.(http.CloseNotifier)
 	if !ok {
-		log.Printf("Writer does not support CloseNotify")
+		conn.logger.Log(Dict{
+			"event": eventConnectionError,
+			"error": errorConnectionNoCloseNotify,
+			"message": "Writer does not support CloseNotify",
+		})
 	}
 	
 	// start reading packets
@@ -101,17 +136,13 @@ func (conn *Connection) Serve() {
 						conn.flusher.Flush()
 					}
 				} else {
-					log.Printf("Client connection closed")
 					conn.running = false
 				}
-				//log.Printf("Wrote packet of %d bytes\n", bytes)
 			case <-notifier.CloseNotify():
 				// connection closed while we were waiting for more data
-				log.Printf("Client connection closed (while waiting)")
 				conn.running = false
 			case <-conn.shutdown:
 				// and shut down
-				log.Printf("Shutting down client connection")
 				conn.running = false
 		}
 	}
@@ -121,6 +152,10 @@ func (conn *Connection) Serve() {
 		case <-conn.shutdown:
 		default:
 	}
+	conn.logger.Log(Dict{
+		"event": eventConnectionDone,
+		"message": "Shutdown complete",
+	})
 }
 
 // ServeStreamError returns an appropriate error response to the client.

@@ -17,11 +17,27 @@
 package restreamer
 
 import (
-	"log"
-	//"time"
+	"fmt"
 	"sync"
 	"errors"
 	"net/http"
+)
+
+const (
+	moduleStreamer = "streamer"
+	//
+	eventStreamerError = "error"
+	eventStreamerQueueStart = "queuestart"
+	eventStreamerStart = "start"
+	eventStreamerStop = "stop"
+	eventStreamerClientAdd = "add"
+	eventStreamerClientRemove = "remove"
+	eventStreamerStreaming = "streaming"
+	eventStreamerClosed = "closed"
+	//
+	errorStreamerInvalidCommand = "invalidcmd"
+	errorStreamerPoolFull = "poolfull"
+	errorStreamerOffline = "offline"
 )
 
 var (
@@ -67,7 +83,7 @@ type Streamer struct {
 	// stats is the statistics collector for this stream
 	stats Collector
 	// logger is a json logger
-	logger JsonLogger
+	logger *ModuleLogger
 	// request is an unbuffered queue for requests to add or remove a connection
 	request chan ConnectionRequest
 }
@@ -90,12 +106,19 @@ type ConnectionBroker interface {
 // broker handles policy enforcement
 // stats is a statistics collector object.
 func NewStreamer(qsize uint, broker ConnectionBroker) (*Streamer) {
+	logger := &ModuleLogger{
+		Logger: &ConsoleLogger{},
+		Defaults: Dict{
+			"module": moduleStreamer,
+		},
+		AddTimestamp: true,
+	}
 	streamer := &Streamer{
 		broker: broker,
 		queueSize: int(qsize),
 		running: AtomicFalse,
 		stats: &DummyCollector{},
-		logger: &DummyLogger{},
+		logger: logger,
 		request: make(chan ConnectionRequest),
 	}
 	return streamer
@@ -103,7 +126,7 @@ func NewStreamer(qsize uint, broker ConnectionBroker) (*Streamer) {
 
 // SetLogger assigns a logger
 func (streamer *Streamer) SetLogger(logger JsonLogger) {
-	streamer.logger = logger
+	streamer.logger.Logger = logger
 }
 
 // SetCollector assigns a stats collector
@@ -133,7 +156,10 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 	// create the local outgoing connection pool
 	pool := make(map[*Connection]bool)
 	
-	log.Printf("Starting streaming")
+	streamer.logger.Log(Dict{
+		"event": eventStreamerStart,
+		"message": "Starting streaming",
+	})
 	
 	// loop until the input channel is closed
 	running := true
@@ -169,10 +195,8 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 				}
 			case request := <-streamer.request:
 				if request.Remove {
-					log.Printf("Removing client %s from pool\n", request.Address)
 					delete(pool, request.Connection)
 				} else {
-					log.Printf("Adding client %s to pool\n", request.Address)
 					pool[request.Connection] = true
 				}
 		}
@@ -186,7 +210,10 @@ func (streamer *Streamer) Stream(queue <-chan Packet) error {
 		conn.Close()
 	}
 	
-	log.Printf("Ending streaming")
+	streamer.logger.Log(Dict{
+		"event": eventStreamerStop,
+		"message": "Ending streaming",
+	})
 	return nil
 }
 
@@ -205,17 +232,28 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 				Connection: conn,
 			}
 		} else {
-			log.Printf("Refusing connection from %s, pool is full", request.RemoteAddr)
+			streamer.logger.Log(Dict{
+				"event": eventStreamerError,
+				"error": errorStreamerPoolFull,
+				"message": fmt.Sprintf("Refusing connection from %s, pool is full", request.RemoteAddr),
+			})
 		}
 	} else {
-		log.Printf("Refusing connection from %s, stream is offline", request.RemoteAddr)
+		streamer.logger.Log(Dict{
+			"event": eventStreamerError,
+			"error": errorStreamerOffline,
+			"message": fmt.Sprintf("Refusing connection from %s, stream is offline", request.RemoteAddr),
+		})
 	}
 		
 	if conn != nil {
 		// connection will be handled, report
 		streamer.stats.ConnectionAdded()
 		
-		log.Printf("Streaming to %s\n", request.RemoteAddr);
+		streamer.logger.Log(Dict{
+			"event": eventStreamerStreaming,
+			"message": fmt.Sprintf("Streaming to %s", request.RemoteAddr),
+		})
 		conn.Serve()
 		
 		// done, remove the stale connection
@@ -224,7 +262,10 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			Address: request.RemoteAddr,
 			Connection: conn,
 		}
-		log.Printf("Connection from %s closed\n", request.RemoteAddr);
+		streamer.logger.Log(Dict{
+			"event": eventStreamerClosed,
+			"message": fmt.Sprintf("Connection from %s closed", request.RemoteAddr),
+		})
 		
 		// and report
 		streamer.stats.ConnectionRemoved()
