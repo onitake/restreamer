@@ -84,7 +84,7 @@ type ModuleLogger struct {
 	// in particular the key 'module' with a unique name for the module sending the log
 	// will be very useful.
 	Defaults Dict
-	// AddTimestamp determines if a "time" value with the current POSIX timestamp
+	// AddTimestamp determines if a "time" value with the current time in RFC 3339 format
 	// is added to the dictionary before it is passed to the underlying logger.
 	AddTimestamp bool
 }
@@ -98,7 +98,7 @@ func (logger *ModuleLogger) Log(lines ...Dict) {
 			processed[key] = value
 		}
 		if logger.AddTimestamp {
-			processed["time"] = time.Now().Unix()
+			processed["time"] = time.Now().Format(timeFormat)
 		}
 		for key, value := range line {
 			processed[key] = value
