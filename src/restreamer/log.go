@@ -129,9 +129,6 @@ func (logger *MultiLogger) Log(lines ...Dict) {
 }
 
 // ConsoleLogger is a simple logger that prints to stdout.
-//
-// Log lines are prefixed with a time stamp in RFC3339 format, like this:
-// [2006-01-02T15:04:05Z07:00] <JSON>
 type ConsoleLogger struct{}
 
 // Log writes a log line to stdout.
@@ -139,20 +136,18 @@ type ConsoleLogger struct{}
 // Your best bet if you don't want/need a full-blown file logging queue with
 // signal-initiated reopening or a central logging server.
 func (*ConsoleLogger) Log(lines ...Dict) {
+	encoder := json.NewEncoder(os.Stdout)
 	for _, line := range lines {
-		data, err := json.Marshal(line)
-		now := time.Now().Format(timeFormat)
-		if err == nil {
-			fmt.Printf("%s%s\n", now, data)
-		} else {
-			fmt.Printf("%s\"Cannot encode log line %s\"", now, line)
+		err := encoder.Encode(line)
+		if err != nil {
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":%s}\n", line)
 		}
 	}
 }
 
 // A FileLogger writes JSON-formatted log lines to a file.
 //
-// Log lines are prefixed with a time stamp in RFC3339 format, like this:
+// Log lines are prefixed with a timestamp in RFC3339 format, like this:
 // [2006-01-02T15:04:05Z07:00] <JSON>
 type FileLogger struct {
 	// notification channel
@@ -199,6 +194,7 @@ func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	return logger, nil
 }
 
+// Log writes a series of log lines, prefixed by a time stamp in RFC3339 format.
 func (logger *FileLogger) Log(lines ...Dict) {
 	// send these down the queue
 	for _, line := range lines {
@@ -218,10 +214,8 @@ func (logger *FileLogger) writeLog(line interface{}) {
 	if logger.log != nil {
 		data, err := json.Marshal(line)
 		if err == nil {
-			now := time.Now().Format(timeFormat)
-			logger.log.Write([]byte(now))
-			logger.log.Write(data)
-			logger.log.Write([]byte("\n"))
+			format := fmt.Sprintf("[%s] %s\n", time.Now().Format(timeFormat), data)
+			logger.log.Write([]byte(format))
 			logger.lines++
 		} else {
 			log.Printf("Cannot encode log line %s", line)
