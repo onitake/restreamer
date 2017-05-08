@@ -31,10 +31,11 @@ const (
 	signalQueueLength int = 100
 	// the maximum number of unwritten log messages
 	logQueueLength int = 100
+	// how to format time strings
+	timeFormat string = time.RFC3339
 )
 
 var (
-	timeFormat string = "[" + time.RFC3339 + "] "
 )
 
 // Dict is a generic string:any dictionary type, for more convenience
@@ -68,9 +69,10 @@ type JsonLogger interface {
 // This simplifies log calls, as values like the current module can be
 // initialised once, and they will be reused on every log call.
 //
-// Each log line will contain the key 'time' with the current UNIX timestamp
-// in addition to any default values in the Defaults dictionary.
-// The logged data itself is encapsulated inside the 'log' key.
+// If AddTimestamp is true, each log line will contain the key 'time' with the
+// current time in RFC 3339 format (ex.: 2006-01-02T15:04:05Z07:00).
+//
+// The keys in the Defaults dictionary will always be added.
 //
 // It is highly recommended to add at least a 'module' key to the defaults,
 // so the logging module can be identified.
