@@ -27,6 +27,8 @@ import (
 )
 
 const (
+	moduleMain= "main"
+	//
 	eventMainError = "error"
 	eventMainConfig = "config"
 	eventMainConfigStream = "stream"
@@ -55,7 +57,15 @@ func ShuffleStrings(rnd *rand.Rand, list []string) []string {
 }
 
 func main() {
-	var logger restreamer.JsonLogger = &restreamer.ConsoleLogger{}
+	var logbackend restreamer.JsonLogger = &restreamer.ConsoleLogger{}
+	
+	logger := &restreamer.ModuleLogger{
+		Logger: logbackend,
+		Defaults: restreamer.Dict{
+			"module": moduleMain,
+		},
+		AddTimestamp: true,
+	}
 	
 	rnd := rand.New(rand.NewSource(time.Now().Unix()))
 	
@@ -86,7 +96,8 @@ func main() {
 		if err != nil {
 			log.Fatal("Error opening log: ", err)
 		}
-		logger = flogger
+		logbackend = flogger
+		logger.Logger = logbackend
 	}
 	
 	clients := make(map[string]*restreamer.Client)
@@ -117,7 +128,7 @@ func main() {
 			
 			streamer := restreamer.NewStreamer(config.OutputBuffer, controller)
 			streamer.SetCollector(reg)
-			streamer.SetLogger(logger)
+			streamer.SetLogger(logbackend)
 			
 			// shuffle the list here, not later
 			// should give a bit more randomness
@@ -126,7 +137,7 @@ func main() {
 			client, err := restreamer.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
 			if err == nil {
 				client.SetCollector(reg)
-				client.SetLogger(logger)
+				client.SetLogger(logbackend)
 				client.Connect()
 				clients[streamdef.Serve] = client
 				mux.Handle(streamdef.Serve, streamer)
@@ -153,7 +164,7 @@ func main() {
 				log.Print(err)
 			} else {
 				proxy.SetStatistics(stats)
-				proxy.SetLogger(logger)
+				proxy.SetLogger(logbackend)
 				mux.Handle(streamdef.Serve, proxy)
 			}
 			
