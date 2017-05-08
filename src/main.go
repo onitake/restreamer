@@ -57,6 +57,8 @@ func ShuffleStrings(rnd *rand.Rand, list []string) []string {
 func main() {
 	var logger restreamer.JsonLogger = &restreamer.ConsoleLogger{}
 	
+	rnd := rand.New(rand.NewSource(time.Now().Unix()))
+	
 	var configname string
 	if len(os.Args) > 1 {
 		configname = os.Args[1]
@@ -79,16 +81,6 @@ func main() {
 		EnableProfiling()
 	}
 	
-	var stats restreamer.Statistics
-	if config.NoStats {
-		stats = &restreamer.DummyStatistics{}
-	} else {
-		stats = restreamer.NewStatistics(config.MaxConnections)
-	}
-	
-	controller := restreamer.NewAccessController(config.MaxConnections)
-	controller.SetLogger(logger)
-	
 	if config.Log != "" {
 		flogger, err := restreamer.NewFileLogger(config.Log, true)
 		if err != nil {
@@ -97,9 +89,17 @@ func main() {
 		logger = flogger
 	}
 	
-	rnd := rand.New(rand.NewSource(time.Now().Unix()))
-	
 	clients := make(map[string]*restreamer.Client)
+	
+	var stats restreamer.Statistics
+	if config.NoStats {
+		stats = &restreamer.DummyStatistics{}
+	} else {
+		stats = restreamer.NewStatistics(config.MaxConnections)
+	}
+	
+	controller := restreamer.NewAccessController(config.MaxConnections)
+	controller.SetLogger(logbackend)
 	
 	i := 0
 	mux := http.NewServeMux()
