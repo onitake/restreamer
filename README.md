@@ -1,3 +1,5 @@
+![restreamer logo](doc/logo.png)
+
 # restreamer
 
 HTTP transport stream proxy
