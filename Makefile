@@ -1,6 +1,7 @@
 export GOPATH=$(shell pwd)
 #export GODEBUG=gctrace=1
-CGO_ENABLED=0
+# build from pure Go, without libc
+export CGO_ENABLED=0
 
 .PHONY: all clean run
 
