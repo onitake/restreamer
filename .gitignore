@@ -1,5 +1,3 @@
-streams
 bin
 pkg
-restreamer.json
-
+/*.json

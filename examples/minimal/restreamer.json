@@ -1,0 +1,1 @@
+{"listen":":8000","timeout":0,"maxconnections":1,"log":"","resources":[{"type":"api","api":"health","serve": "/health"},{"type":"stream","serve":"/stream.ts","remote":"http://localhost:8001/"}]}
