@@ -14,6 +14,9 @@ all: bin/restreamer
 clean:
 	rm -f bin/* pkg/*
 
+docker: bin/restreamer
+	docker build -t restreamer .
+
 bin/restreamer: src/main.go src/profile.go pkg/librestreamer.a
 	go build -o $@ src/main.go src/profile.go
 
