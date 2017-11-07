@@ -1,7 +1,11 @@
 export GOPATH=$(shell pwd)
+# profiling
 #export GODEBUG=gctrace=1
 # build from pure Go, without libc
 export CGO_ENABLED=0
+# cross compilation
+#export GOOS=windows
+#export GOARCH=amd64
 
 .PHONY: all clean run
 
