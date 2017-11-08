@@ -96,6 +96,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		TotalBytesReceived uint64 `json:"total_bytes_received"`
 		TotalBytesSent uint64 `json:"total_bytes_sent"`
 		TotalBytesDropped uint64 `json:"total_bytes_dropped"`
+		TotalStreamTime int64 `json:"total_stream_time_ns"`
 		PacketsPerSecondReceived uint64 `json:"packets_per_second_received"`
 		PacketsPerSecondSent uint64 `json:"packets_per_second_sent"`
 		PacketsPerSecondDropped uint64 `json:"packets_per_second_dropped"`
@@ -116,6 +117,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	stats.TotalBytesReceived = global.TotalBytesReceived
 	stats.TotalBytesSent = global.TotalBytesSent
 	stats.TotalBytesDropped = global.TotalBytesDropped
+	stats.TotalStreamTime = global.TotalStreamTime
 	stats.PacketsPerSecondReceived = global.PacketsPerSecondReceived
 	stats.PacketsPerSecondSent = global.PacketsPerSecondSent
 	stats.PacketsPerSecondDropped = global.PacketsPerSecondDropped

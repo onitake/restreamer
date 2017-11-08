@@ -44,6 +44,8 @@ type Collector interface {
 	SourceDisconnected()
 	// IsUpstreamConnected tells you if upstream is connected.
 	IsUpstreamConnected() bool
+	// StreamDuration reports how long a downstream connection was up
+	StreamDuration(duration time.Duration)
 }
 
 // realCollector represents per-stream state information
@@ -60,6 +62,8 @@ type realCollector struct {
 	packetsDropped uint64
 	// upstream connection state, 0 = offline, !0 = connected
 	connected int32
+	// total streaming duration
+	duration int64
 }
 
 func (stats *realCollector) ConnectionAdded() {
@@ -94,6 +98,10 @@ func (stats *realCollector) IsUpstreamConnected() bool {
 	return atomic.LoadInt32(&stats.connected) != 0
 }
 
+func (stats *realCollector) StreamDuration(duration time.Duration) {
+	atomic.AddInt64(&stats.duration, int64(duration))
+}
+
 // clone creates a copy of the stats object - useful for
 // storing state temporarily.
 func (stats *realCollector) clone() *realCollector {
@@ -103,6 +111,7 @@ func (stats *realCollector) clone() *realCollector {
 		packetsSent: atomic.LoadUint64(&stats.packetsSent),
 		packetsDropped: atomic.LoadUint64(&stats.packetsDropped),
 		connected: atomic.LoadInt32(&stats.connected),
+		duration: atomic.LoadInt64(&stats.duration),
 	}
 }
 
@@ -122,9 +131,10 @@ func (stats *realCollector) clone() *realCollector {
 func (from *realCollector) invsub(to *realCollector) {
 	from.connections = to.connections - from.connections
 	from.packetsReceived = to.packetsReceived - from.packetsReceived
-	from.packetsSent= to.packetsSent - from.packetsSent
-	from.packetsDropped= to.packetsDropped - from.packetsDropped
+	from.packetsSent = to.packetsSent - from.packetsSent
+	from.packetsDropped = to.packetsDropped - from.packetsDropped
 	from.connected = to.connected
+	from.duration = to.duration - from.duration
 }
 
 // StreamStatistics is the current state of a single stream
@@ -138,6 +148,7 @@ type StreamStatistics struct {
 	TotalBytesReceived uint64
 	TotalBytesSent uint64
 	TotalBytesDropped uint64
+	TotalStreamTime int64
 	PacketsPerSecondReceived uint64
 	PacketsPerSecondSent uint64
 	PacketsPerSecondDropped uint64
@@ -212,6 +223,7 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 	stats.global.TotalBytesReceived = 0
 	stats.global.TotalBytesSent = 0
 	stats.global.TotalBytesDropped = 0
+	stats.global.TotalStreamTime = 0
 	stats.global.PacketsPerSecondReceived = 0
 	stats.global.PacketsPerSecondSent = 0
 	stats.global.PacketsPerSecondDropped = 0
@@ -232,6 +244,7 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 		stream.TotalBytesReceived = stream.TotalPacketsReceived * PacketSize
 		stream.TotalBytesSent = stream.TotalPacketsSent * PacketSize
 		stream.TotalBytesDropped = stream.TotalPacketsDropped * PacketSize
+		stream.TotalStreamTime += diff.duration
 		stream.PacketsPerSecondReceived = uint64(float64(diff.packetsReceived) / delta.Seconds())
 		stream.PacketsPerSecondSent = uint64(float64(diff.packetsSent) / delta.Seconds())
 		stream.PacketsPerSecondDropped = uint64(float64(diff.packetsDropped) / delta.Seconds())
@@ -248,6 +261,7 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 		stats.global.TotalBytesReceived += stream.TotalBytesReceived
 		stats.global.TotalBytesSent += stream.TotalBytesSent
 		stats.global.TotalBytesDropped += stream.TotalBytesDropped
+		stats.global.TotalStreamTime += stream.TotalStreamTime
 		stats.global.PacketsPerSecondReceived += stream.PacketsPerSecondReceived
 		stats.global.PacketsPerSecondSent += stream.PacketsPerSecondSent
 		stats.global.PacketsPerSecondDropped += stream.PacketsPerSecondDropped
@@ -435,4 +449,7 @@ func (stats *DummyCollector) SourceDisconnected() {
 
 func (stats *DummyCollector) IsUpstreamConnected() bool {
 	return false
+}
+
+func (stats *DummyCollector) StreamDuration(duration time.Duration) {
 }

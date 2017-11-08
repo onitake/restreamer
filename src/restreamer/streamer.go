@@ -19,6 +19,7 @@ package restreamer
 import (
 	"fmt"
 	"sync"
+	"time"
 	"errors"
 	"net/http"
 )
@@ -321,7 +322,10 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			"message": fmt.Sprintf("Streaming to %s", request.RemoteAddr),
 			"remote": request.RemoteAddr,
 		})
+		
+		start := time.Now()
 		conn.Serve()
+		duration := time.Since(start)
 		
 		// done, remove the stale connection
 		streamer.request<- ConnectionRequest{
@@ -337,10 +341,12 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			"event": eventStreamerClosed,
 			"message": fmt.Sprintf("Connection from %s closed", request.RemoteAddr),
 			"remote": request.RemoteAddr,
+			"duration": duration,
 		})
 		
 		// and report
 		streamer.stats.ConnectionRemoved()
+		streamer.stats.StreamDuration(duration)
 		
 		// also notify the broker
 		streamer.broker.Release(streamer)
