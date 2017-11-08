@@ -53,11 +53,15 @@ type Connection struct {
 
 // NewConnection creates a new connection object.
 // To start sending data to a client, call Serve().
-func NewConnection(destination http.ResponseWriter, qsize int) (*Connection) {
+//
+// clientaddr should point to the remote address of the connecting client
+// and will be used for logging.
+func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) (*Connection) {
 	logger := &ModuleLogger{
 		Logger: &ConsoleLogger{},
 		Defaults: Dict{
 			"module": moduleConnection,
+			"remote": clientaddr,
 		},
 		AddTimestamp: true,
 	}
@@ -153,11 +157,11 @@ func (conn *Connection) Serve() {
 	}
 	
 	// we cannot drain the channel here, as it might not be closed yet.
-	// better let the our caller handle closure and draining.
+	// better let our caller handle closure and draining.
 	
 	conn.logger.Log(Dict{
 		"event": eventConnectionDone,
-		"message": "Shutdown complete",
+		"message": "Streaming finished",
 	})
 }
 

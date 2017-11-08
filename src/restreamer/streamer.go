@@ -289,7 +289,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	if LoadBool(&streamer.running) {
 		// check if the connection can be accepted
 		if streamer.broker.Accept(request.RemoteAddr, streamer) {
-			conn = NewConnection(writer, streamer.queueSize)
+			conn = NewConnection(writer, streamer.queueSize, request.RemoteAddr)
 			conn.SetLogger(streamer.logger.Logger)
 			
 			streamer.request<- ConnectionRequest{
@@ -319,6 +319,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		streamer.logger.Log(Dict{
 			"event": eventStreamerStreaming,
 			"message": fmt.Sprintf("Streaming to %s", request.RemoteAddr),
+			"remote": request.RemoteAddr,
 		})
 		conn.Serve()
 		
@@ -335,6 +336,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		streamer.logger.Log(Dict{
 			"event": eventStreamerClosed,
 			"message": fmt.Sprintf("Connection from %s closed", request.RemoteAddr),
+			"remote": request.RemoteAddr,
 		})
 		
 		// and report
