@@ -24,7 +24,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/onitake/restreamer/src/restreamer"
+	"github.com/unprofession-al/restreamer/lib"
 )
 
 const (
