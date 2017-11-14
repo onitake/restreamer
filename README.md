@@ -45,12 +45,17 @@ These are the key components:
 
 ## Compilation
 
-Compiling restreamer is very easy if you have GNU make installed.
-Just run `make` to build `bin/restreamer`.
+Go (aka golang) is required to build resteamer. Please refer to 
+https://golang.org/doc/install for details.
 
-It is also possible to add the source code repository to your GOPATH
-and build restreamer using `go build`.
+To compile restreamer just invoke the standard `go get`
 
+```
+go get -u https://github.com/onitake/restreamer
+```
+
+As an alternative you can also invoke `make` if you have GNU make 
+installed. This will build `bin/restreamer`.
 
 ## Configuration
 
