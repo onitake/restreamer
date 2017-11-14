@@ -17,16 +17,18 @@
 package main
 
 import (
-	"log"
-	"net/url"
-	"net/http"
 	"encoding/hex"
-	"restreamer"
+	"log"
+	"net/http"
+	"net/url"
+
+	restreamer "github.com/unprofession-al/restreamer/lib"
 )
 
 type testWriter struct {
 	header http.Header
 }
+
 func newTestWriter() *testWriter {
 	return &testWriter{
 		header: make(http.Header),
@@ -49,12 +51,12 @@ func test(proxy *restreamer.Proxy) {
 	writer := newTestWriter()
 	uri, _ := url.ParseRequestURI("http://host/test.txt")
 	request := &http.Request{
-		Method: "GET",
-		URL: uri,
-		Proto: "HTTP/1.0",
+		Method:     "GET",
+		URL:        uri,
+		Proto:      "HTTP/1.0",
 		ProtoMajor: 1,
 		ProtoMinor: 0,
-		Header: make(http.Header),
+		Header:     make(http.Header),
 	}
 	proxy.ServeHTTP(writer, request)
 }
