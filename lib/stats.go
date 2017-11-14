@@ -17,9 +17,9 @@
 package restreamer
 
 import (
-	"time"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Collector is the public face of a statistics collector.
@@ -106,12 +106,12 @@ func (stats *realCollector) StreamDuration(duration time.Duration) {
 // storing state temporarily.
 func (stats *realCollector) clone() *realCollector {
 	return &realCollector{
-		connections: atomic.LoadInt64(&stats.connections),
+		connections:     atomic.LoadInt64(&stats.connections),
 		packetsReceived: atomic.LoadUint64(&stats.packetsReceived),
-		packetsSent: atomic.LoadUint64(&stats.packetsSent),
-		packetsDropped: atomic.LoadUint64(&stats.packetsDropped),
-		connected: atomic.LoadInt32(&stats.connected),
-		duration: atomic.LoadInt64(&stats.duration),
+		packetsSent:     atomic.LoadUint64(&stats.packetsSent),
+		packetsDropped:  atomic.LoadUint64(&stats.packetsDropped),
+		connected:       atomic.LoadInt32(&stats.connected),
+		duration:        atomic.LoadInt64(&stats.duration),
 	}
 }
 
@@ -140,22 +140,22 @@ func (from *realCollector) invsub(to *realCollector) {
 // StreamStatistics is the current state of a single stream
 // or all streams combined.
 type StreamStatistics struct {
-	Connections int64
-	MaxConnections int64
-	TotalPacketsReceived uint64
-	TotalPacketsSent uint64
-	TotalPacketsDropped uint64
-	TotalBytesReceived uint64
-	TotalBytesSent uint64
-	TotalBytesDropped uint64
-	TotalStreamTime int64
+	Connections              int64
+	MaxConnections           int64
+	TotalPacketsReceived     uint64
+	TotalPacketsSent         uint64
+	TotalPacketsDropped      uint64
+	TotalBytesReceived       uint64
+	TotalBytesSent           uint64
+	TotalBytesDropped        uint64
+	TotalStreamTime          int64
 	PacketsPerSecondReceived uint64
-	PacketsPerSecondSent uint64
-	PacketsPerSecondDropped uint64
-	BytesPerSecondReceived uint64
-	BytesPerSecondSent uint64
-	BytesPerSecondDropped uint64
-	Connected bool
+	PacketsPerSecondSent     uint64
+	PacketsPerSecondDropped  uint64
+	BytesPerSecondReceived   uint64
+	BytesPerSecondSent       uint64
+	BytesPerSecondDropped    uint64
+	Connected                bool
 }
 
 // Statistics is the access interface for a stat tracker.
@@ -184,12 +184,12 @@ type Statistics interface {
 
 // realStatistics implements a full statistics collector and API endpoint generator.
 type realStatistics struct {
-	lock sync.RWMutex
-	running bool
+	lock     sync.RWMutex
+	running  bool
 	shutdown chan bool
 	internal map[string]*realCollector
-	streams map[string]*StreamStatistics
-	global *StreamStatistics
+	streams  map[string]*StreamStatistics
+	global   *StreamStatistics
 }
 
 // NewStatistics creates a new statistics container.
@@ -202,7 +202,7 @@ func NewStatistics(maxconns uint) Statistics {
 	stats := &realStatistics{
 		shutdown: make(chan bool),
 		internal: make(map[string]*realCollector),
-		streams: make(map[string]*StreamStatistics),
+		streams:  make(map[string]*StreamStatistics),
 		global: &StreamStatistics{
 			MaxConnections: int64(maxconns),
 		},
@@ -214,7 +214,7 @@ func NewStatistics(maxconns uint) Statistics {
 func (stats *realStatistics) update(delta time.Duration, change map[string]*realCollector) {
 	// acquire the global write lock
 	stats.lock.Lock()
-	
+
 	// reset the global counters
 	stats.global.Connections = 0
 	stats.global.TotalPacketsReceived = 0
@@ -231,11 +231,11 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 	stats.global.BytesPerSecondSent = 0
 	stats.global.BytesPerSecondDropped = 0
 	stats.global.Connected = false
-	
+
 	// loop over all streams
 	for name, stream := range stats.streams {
 		diff := change[name]
-		
+
 		// update the stats
 		stream.Connections += diff.connections
 		stream.TotalPacketsReceived += diff.packetsReceived
@@ -252,7 +252,7 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 		stream.BytesPerSecondSent = stream.PacketsPerSecondSent * PacketSize
 		stream.BytesPerSecondDropped = stream.PacketsPerSecondDropped * PacketSize
 		stream.Connected = diff.connected != 0
-		
+
 		// update the global counters as well
 		stats.global.Connections += stream.Connections
 		stats.global.TotalPacketsReceived += stream.TotalPacketsReceived
@@ -272,7 +272,7 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 			stats.global.Connected = true
 		}
 	}
-	
+
 	// and done
 	stats.lock.Unlock()
 }
@@ -309,18 +309,18 @@ func (stats *realStatistics) loop() {
 
 	for running {
 		select {
-			case <-stats.shutdown:
-				running = false
-			case <-ticker.C:
-				// calculate the elapsed time
-				now := time.Now()
-				// calculate the state delta and update the stored state
-				delta := previous
-				previous = stats.delta(previous)
-				// and update
-				stats.update(now.Sub(before), delta)
-				// stash the current time
-				before = now
+		case <-stats.shutdown:
+			running = false
+		case <-ticker.C:
+			// calculate the elapsed time
+			now := time.Now()
+			// calculate the state delta and update the stored state
+			delta := previous
+			previous = stats.delta(previous)
+			// and update
+			stats.update(now.Sub(before), delta)
+			// stash the current time
+			before = now
 		}
 	}
 	// this should close the channel as well
@@ -339,7 +339,7 @@ func (stats *realStatistics) Start() {
 // Stop stops the updater thread.
 func (stats *realStatistics) Stop() {
 	if stats.running {
-		stats.shutdown<- true
+		stats.shutdown <- true
 	}
 }
 

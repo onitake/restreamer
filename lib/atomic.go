@@ -32,7 +32,7 @@ type AtomicBool int32
 
 const (
 	AtomicFalse AtomicBool = 0
-	AtomicTrue AtomicBool = 1
+	AtomicTrue  AtomicBool = 1
 )
 
 // CompareAndSwapBool executes the compare-and-swap operation for a boolean value.

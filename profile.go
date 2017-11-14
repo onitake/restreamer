@@ -33,7 +33,7 @@ func EnableProfiling() {
 	// Enable block profiling (granularity: 100 ms)
 	runtime.SetBlockProfileRate(100000000)
 	// Register URL to force reclaiming memory
-	http.HandleFunc("/reclaim", func (http.ResponseWriter, *http.Request) {
+	http.HandleFunc("/reclaim", func(http.ResponseWriter, *http.Request) {
 		log.Printf("Reclaiming memory")
 		debug.FreeOSMemory()
 	})

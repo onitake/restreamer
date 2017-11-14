@@ -24,10 +24,10 @@ import (
 const (
 	moduleAcl = "acl"
 	//
-	eventAclError = "error"
+	eventAclError    = "error"
 	eventAclAccepted = "accepted"
-	eventAclDenied = "denied"
-	eventAclRemoved = "removed"
+	eventAclDenied   = "denied"
+	eventAclRemoved  = "removed"
 	//
 	errorAclNoConnection = "noconnection"
 )
@@ -58,7 +58,7 @@ func NewAccessController(maxconnections uint) *AccessController {
 	}
 	return &AccessController{
 		maxconnections: maxconnections,
-		logger: logger,
+		logger:         logger,
 	}
 }
 
@@ -82,19 +82,19 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 	// print some info
 	if accept {
 		control.logger.Log(Dict{
-			"event": eventAclAccepted,
-			"remote": remoteaddr,
+			"event":       eventAclAccepted,
+			"remote":      remoteaddr,
 			"connections": control.connections,
-			"max": control.maxconnections,
-			"message": fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
+			"max":         control.maxconnections,
+			"message":     fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
 		})
 	} else {
 		control.logger.Log(Dict{
-			"event": eventAclDenied,
-			"remote": remoteaddr,
+			"event":       eventAclDenied,
+			"remote":      remoteaddr,
 			"connections": control.connections,
-			"max": control.maxconnections,
-			"message": fmt.Sprintf("Denied connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
+			"max":         control.maxconnections,
+			"message":     fmt.Sprintf("Denied connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
 		})
 	}
 	// return the result
@@ -114,15 +114,15 @@ func (control *AccessController) Release(streamer *Streamer) {
 	control.lock.Unlock()
 	if remove {
 		control.logger.Log(Dict{
-			"event": eventAclRemoved,
+			"event":       eventAclRemoved,
 			"connections": control.connections,
-			"max": control.maxconnections,
-			"message": fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
+			"max":         control.maxconnections,
+			"message":     fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
 		})
 	} else {
 		control.logger.Log(Dict{
-			"event": eventAclError,
-			"error": errorAclNoConnection,
+			"event":   eventAclError,
+			"error":   errorAclNoConnection,
 			"message": fmt.Sprintf("Error, no connection to remove"),
 		})
 	}
