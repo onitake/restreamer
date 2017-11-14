@@ -17,13 +17,13 @@
 package restreamer
 
 import (
-	"os"
+	"encoding/json"
 	"fmt"
 	"log"
-	"time"
-	"syscall"
+	"os"
 	"os/signal"
-	"encoding/json"
+	"syscall"
+	"time"
 )
 
 const (
@@ -35,8 +35,7 @@ const (
 	timeFormat string = time.RFC3339
 )
 
-var (
-)
+var ()
 
 // Dict is a generic string:any dictionary type, for more convenience
 // when creating structured logs.
@@ -176,21 +175,21 @@ type FileLogger struct {
 func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	// create logger instance
 	logger := &FileLogger{
-		signals: make(chan os.Signal, signalQueueLength),
-		name: logfile,
-		messages: make(chan interface{}, logQueueLength), 
+		signals:  make(chan os.Signal, signalQueueLength),
+		name:     logfile,
+		messages: make(chan interface{}, logQueueLength),
 	}
-	
+
 	// open the log for the first time
 	err := logger.reopenLog()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// install signal handler and start listening thread
 	signal.Notify(logger.signals, syscall.SIGUSR1)
 	go logger.handle()
-	
+
 	return logger, nil
 }
 
@@ -199,11 +198,11 @@ func (logger *FileLogger) Log(lines ...Dict) {
 	// send these down the queue
 	for _, line := range lines {
 		select {
-			case logger.messages<- line:
-				// ok
-			default:
-				log.Printf("Log queue is full, message dropped!")
-				logger.drops++
+		case logger.messages <- line:
+			// ok
+		default:
+			log.Printf("Log queue is full, message dropped!")
+			logger.drops++
 		}
 	}
 }
@@ -230,40 +229,40 @@ func (logger *FileLogger) writeLog(line interface{}) {
 // Closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
 	log.Printf("Closing log")
-	logger.signals<- syscall.SIGHUP
+	logger.signals <- syscall.SIGHUP
 }
 
 // Closes the log and stops/removes the signal handler
 func (logger *FileLogger) closeLog() error {
 	log.Printf("Really closing log")
-	
+
 	// uninstall the singal handler
 	signal.Stop(logger.signals)
 	// signal stop
-	logger.signals <-os.Interrupt
-	
+	logger.signals <- os.Interrupt
+
 	// close the log
 	err := logger.log.Close()
 	logger.log = nil
-	
+
 	return err
 }
 
 // (Re-)opens the log file.
 func (logger *FileLogger) reopenLog() error {
 	log.Printf("Reopening log")
-	
+
 	var err error = nil
-	
+
 	if logger.log != nil {
 		// close first
 		err = logger.log.Close()
 		logger.log = nil
 	}
 	if err == nil {
-		logger.log, err = os.OpenFile(logger.name, os.O_WRONLY | os.O_APPEND | os.O_CREATE, os.FileMode(0666))
+		logger.log, err = os.OpenFile(logger.name, os.O_WRONLY|os.O_APPEND|os.O_CREATE, os.FileMode(0666))
 	}
-	
+
 	return err
 }
 
@@ -271,34 +270,34 @@ func (logger *FileLogger) reopenLog() error {
 // If USR1 is received the log file is closed and reopened.
 func (logger *FileLogger) handle() {
 	running := true
-	
+
 	for running {
 		select {
-			case signal := <-logger.signals:
-				// check signal type
-				switch signal {
-					case syscall.SIGUSR1:
-						// reopen the log file
-						err := logger.reopenLog()
-						if err != nil {
-							// if this fails, print a message to the standard log
-							log.Printf("Error reopening log: %s", err)
-						}
-					case syscall.SIGHUP:
-						// reopen the log file
-						err := logger.closeLog()
-						if err != nil {
-							// if this fails, print a message to the standard log
-							log.Printf("Error reopening log: %s", err)
-						}
-					case os.Interrupt:
-						// shutdown requested
-						running = false
-						log.Printf("Shutting down logger")
+		case signal := <-logger.signals:
+			// check signal type
+			switch signal {
+			case syscall.SIGUSR1:
+				// reopen the log file
+				err := logger.reopenLog()
+				if err != nil {
+					// if this fails, print a message to the standard log
+					log.Printf("Error reopening log: %s", err)
 				}
-			case line := <-logger.messages:
-				// encode and write the next line
-				logger.writeLog(line)
+			case syscall.SIGHUP:
+				// reopen the log file
+				err := logger.closeLog()
+				if err != nil {
+					// if this fails, print a message to the standard log
+					log.Printf("Error reopening log: %s", err)
+				}
+			case os.Interrupt:
+				// shutdown requested
+				running = false
+				log.Printf("Shutting down logger")
+			}
+		case line := <-logger.messages:
+			// encode and write the next line
+			logger.writeLog(line)
 		}
 	}
 }

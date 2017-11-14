@@ -40,7 +40,7 @@ package restreamer
 //     set.Remove(value)
 //   Test:
 //     if set.Contains(value)
-type Set map[interface{}] bool
+type Set map[interface{}]bool
 
 // MakeSet creates a new empty set.
 func MakeSet() Set {

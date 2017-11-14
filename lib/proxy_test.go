@@ -14,54 +14,68 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package main
+package restreamer
 
 import (
-	"log"
-	"net/url"
-	"net/http"
 	"encoding/hex"
-	"restreamer"
+	"log"
+	"net/http"
+	"net/url"
+	"testing"
 )
 
 type testWriter struct {
 	header http.Header
 }
+
 func newTestWriter() *testWriter {
 	return &testWriter{
 		header: make(http.Header),
 	}
 }
+
 func (writer *testWriter) Header() http.Header {
 	return writer.header
 }
+
 func (writer *testWriter) Write(data []byte) (int, error) {
 	log.Printf("Write data:")
 	log.Print(hex.Dump(data))
 	return len(data), nil
 }
+
 func (writer *testWriter) WriteHeader(status int) {
 	log.Printf("Write header, status code %d:", status)
 	log.Print(writer.header)
 }
 
-func test(proxy *restreamer.Proxy) {
+func TestDirect(t *testing.T) {
+	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0)
+
 	writer := newTestWriter()
 	uri, _ := url.ParseRequestURI("http://host/test.txt")
 	request := &http.Request{
-		Method: "GET",
-		URL: uri,
-		Proto: "HTTP/1.0",
+		Method:     "GET",
+		URL:        uri,
+		Proto:      "HTTP/1.0",
 		ProtoMajor: 1,
 		ProtoMinor: 0,
-		Header: make(http.Header),
+		Header:     make(http.Header),
 	}
-	proxy.ServeHTTP(writer, request)
+	direct.ServeHTTP(writer, request)
 }
 
-func main() {
-	direct, _ := restreamer.NewProxy("file:///tmp/test.txt", 10, 0)
-	test(direct)
-	cached, _ := restreamer.NewProxy("file:///tmp/test.txt", 10, 1)
-	test(cached)
+func TestCached(t *testing.T) {
+	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1)
+	writer := newTestWriter()
+	uri, _ := url.ParseRequestURI("http://host/test.txt")
+	request := &http.Request{
+		Method:     "GET",
+		URL:        uri,
+		Proto:      "HTTP/1.0",
+		ProtoMajor: 1,
+		ProtoMinor: 0,
+		Header:     make(http.Header),
+	}
+	cached.ServeHTTP(writer, request)
 }

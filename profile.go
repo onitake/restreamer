@@ -16,12 +16,29 @@
 
 package main
 
+import _ "net/http/pprof"
 import (
 	"log"
 	"net/http"
+	"runtime"
+	"runtime/debug"
 )
 
-func main() {
-	// Simple static webserver:
-	log.Fatal(http.ListenAndServe("localhost:8000", http.FileServer(http.Dir("streams"))))
+func EnableProfiling() {
+	/*profile, err := os.Create("server.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	pprof.WriteHeapProfile(profile)*/
+	// Enable block profiling (granularity: 100 ms)
+	runtime.SetBlockProfileRate(100000000)
+	// Register URL to force reclaiming memory
+	http.HandleFunc("/reclaim", func(http.ResponseWriter, *http.Request) {
+		log.Printf("Reclaiming memory")
+		debug.FreeOSMemory()
+	})
+	go func() {
+		// Start profiling web server
+		log.Println(http.ListenAndServe(":6060", nil))
+	}()
 }

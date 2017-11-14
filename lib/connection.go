@@ -17,22 +17,22 @@
 package restreamer
 
 import (
-	"time"
 	"net/http"
+	"time"
 )
 
 const (
 	moduleConnection = "connection"
 	//
-	eventConnectionDebug = "debug"
-	eventConnectionError = "error"
-	eventHeaderSent = "headersent"
-	eventConnectionClosed = "closed"
+	eventConnectionDebug      = "debug"
+	eventConnectionError      = "error"
+	eventHeaderSent           = "headersent"
+	eventConnectionClosed     = "closed"
 	eventConnectionClosedWait = "closedwait"
-	eventConnectionShutdown = "shutdown"
-	eventConnectionDone = "done"
+	eventConnectionShutdown   = "shutdown"
+	eventConnectionDone       = "done"
 	//
-	errorConnectionNotFlushable = "noflush"
+	errorConnectionNotFlushable  = "noflush"
 	errorConnectionNoCloseNotify = "noclosenotify"
 )
 
@@ -56,7 +56,7 @@ type Connection struct {
 //
 // clientaddr should point to the remote address of the connecting client
 // and will be used for logging.
-func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) (*Connection) {
+func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) *Connection {
 	logger := &ModuleLogger{
 		Logger: &ConsoleLogger{},
 		Defaults: Dict{
@@ -68,16 +68,16 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 	flusher, ok := destination.(http.Flusher)
 	if !ok {
 		logger.Log(Dict{
-			"event": eventConnectionError,
-			"error": errorConnectionNotFlushable,
+			"event":   eventConnectionError,
+			"error":   errorConnectionNotFlushable,
 			"message": "ResponseWriter is not flushable!",
 		})
 	}
 	conn := &Connection{
-		Queue: make(chan Packet, qsize),
-		writer: destination,
+		Queue:   make(chan Packet, qsize),
+		writer:  destination,
 		flusher: flusher,
-		logger: logger,
+		logger:  logger,
 	}
 	return conn
 }
@@ -102,65 +102,65 @@ func (conn *Connection) Serve() {
 		conn.flusher.Flush()
 	}
 	conn.logger.Log(Dict{
-		"event": eventHeaderSent,
+		"event":   eventHeaderSent,
 		"message": "Sent header",
 	})
-	
+
 	// see if can get notified about connection closure
 	notifier, ok := conn.writer.(http.CloseNotifier)
 	if !ok {
 		conn.logger.Log(Dict{
-			"event": eventConnectionError,
-			"error": errorConnectionNoCloseNotify,
+			"event":   eventConnectionError,
+			"error":   errorConnectionNoCloseNotify,
 			"message": "Writer does not support CloseNotify",
 		})
 	}
-	
+
 	// start reading packets
 	running := true
 	for running {
 		select {
-			case packet, ok := <-conn.Queue:
-				if ok {
-					// packet received, log
-					//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-					// send the packet out
-					_, err := conn.writer.Write(packet)
-					if err == nil {
-						if conn.flusher != nil {
-							conn.flusher.Flush()
-						}
-					} else {
-						conn.logger.Log(Dict{
-							"event": eventConnectionClosed,
-							"message": "Downstream connection closed",
-						})
-						running = false
+		case packet, ok := <-conn.Queue:
+			if ok {
+				// packet received, log
+				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				// send the packet out
+				_, err := conn.writer.Write(packet)
+				if err == nil {
+					if conn.flusher != nil {
+						conn.flusher.Flush()
 					}
-					//log.Printf("Wrote packet of %d bytes\n", bytes)
 				} else {
-					// channel closed, exit
 					conn.logger.Log(Dict{
-						"event": eventConnectionShutdown,
-						"message": "Shutting down client connection",
+						"event":   eventConnectionClosed,
+						"message": "Downstream connection closed",
 					})
 					running = false
 				}
-			case <-notifier.CloseNotify():
-				// connection closed while we were waiting for more data
+				//log.Printf("Wrote packet of %d bytes\n", bytes)
+			} else {
+				// channel closed, exit
 				conn.logger.Log(Dict{
-					"event": eventConnectionClosedWait,
-					"message": "Downstream connection closed (while waiting)",
+					"event":   eventConnectionShutdown,
+					"message": "Shutting down client connection",
 				})
 				running = false
+			}
+		case <-notifier.CloseNotify():
+			// connection closed while we were waiting for more data
+			conn.logger.Log(Dict{
+				"event":   eventConnectionClosedWait,
+				"message": "Downstream connection closed (while waiting)",
+			})
+			running = false
 		}
 	}
-	
+
 	// we cannot drain the channel here, as it might not be closed yet.
 	// better let our caller handle closure and draining.
-	
+
 	conn.logger.Log(Dict{
-		"event": eventConnectionDone,
+		"event":   eventConnectionDone,
 		"message": "Streaming finished",
 	})
 }
