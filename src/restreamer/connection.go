@@ -95,6 +95,8 @@ func (conn *Connection) Serve() {
 	conn.writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
 	// other headers to comply with the specs
 	conn.writer.Header().Set("Accept-Range", "none")
+    // suppress caching by intermediate proxies
+    conn.writer.Header().Set("Cache-Control", "no-cache,no-store,no-transform")
 	// use Add and Set to set more headers here
 	// chunked mode should be on by default
 	conn.writer.WriteHeader(http.StatusOK)
