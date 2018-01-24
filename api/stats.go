@@ -14,12 +14,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package restreamer
+package api
 
 import (
 	"time"
 	"sync"
 	"sync/atomic"
+    "github.com/onitake/restreamer/util"
+    "github.com/onitake/restreamer/mpegts"
 )
 
 // Collector is the public face of a statistics collector.
@@ -60,8 +62,8 @@ type realCollector struct {
 	packetsSent uint64
 	// total number of dropped packets
 	packetsDropped uint64
-	// upstream connection state, 0 = offline, !0 = connected
-	connected int32
+	// upstream connection state
+	connected util.AtomicBool
 	// total streaming duration
 	duration int64
 }
@@ -87,15 +89,15 @@ func (stats *realCollector) PacketDropped() {
 }
 
 func (stats *realCollector) SourceConnected() {
-	atomic.StoreInt32(&stats.connected, 1)
+	util.StoreBool(&stats.connected, true)
 }
 
 func (stats *realCollector) SourceDisconnected() {
-	atomic.StoreInt32(&stats.connected, 0)
+	util.StoreBool(&stats.connected, false)
 }
 
 func (stats *realCollector) IsUpstreamConnected() bool {
-	return atomic.LoadInt32(&stats.connected) != 0
+	return util.LoadBool(&stats.connected)
 }
 
 func (stats *realCollector) StreamDuration(duration time.Duration) {
@@ -110,7 +112,7 @@ func (stats *realCollector) clone() *realCollector {
 		packetsReceived: atomic.LoadUint64(&stats.packetsReceived),
 		packetsSent: atomic.LoadUint64(&stats.packetsSent),
 		packetsDropped: atomic.LoadUint64(&stats.packetsDropped),
-		connected: atomic.LoadInt32(&stats.connected),
+		connected: util.ToAtomicBool(util.LoadBool(&stats.connected)),
 		duration: atomic.LoadInt64(&stats.duration),
 	}
 }
@@ -241,16 +243,16 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 		stream.TotalPacketsReceived += diff.packetsReceived
 		stream.TotalPacketsSent += diff.packetsSent
 		stream.TotalPacketsDropped += diff.packetsDropped
-		stream.TotalBytesReceived = stream.TotalPacketsReceived * PacketSize
-		stream.TotalBytesSent = stream.TotalPacketsSent * PacketSize
-		stream.TotalBytesDropped = stream.TotalPacketsDropped * PacketSize
+		stream.TotalBytesReceived = stream.TotalPacketsReceived * mpegts.PacketSize
+		stream.TotalBytesSent = stream.TotalPacketsSent * mpegts.PacketSize
+		stream.TotalBytesDropped = stream.TotalPacketsDropped * mpegts.PacketSize
 		stream.TotalStreamTime += diff.duration
 		stream.PacketsPerSecondReceived = uint64(float64(diff.packetsReceived) / delta.Seconds())
 		stream.PacketsPerSecondSent = uint64(float64(diff.packetsSent) / delta.Seconds())
 		stream.PacketsPerSecondDropped = uint64(float64(diff.packetsDropped) / delta.Seconds())
-		stream.BytesPerSecondReceived = stream.PacketsPerSecondReceived * PacketSize
-		stream.BytesPerSecondSent = stream.PacketsPerSecondSent * PacketSize
-		stream.BytesPerSecondDropped = stream.PacketsPerSecondDropped * PacketSize
+		stream.BytesPerSecondReceived = stream.PacketsPerSecondReceived * mpegts.PacketSize
+		stream.BytesPerSecondSent = stream.PacketsPerSecondSent * mpegts.PacketSize
+		stream.BytesPerSecondDropped = stream.PacketsPerSecondDropped * mpegts.PacketSize
 		stream.Connected = diff.connected != 0
 		
 		// update the global counters as well

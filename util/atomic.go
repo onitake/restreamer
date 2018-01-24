@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package restreamer
+package util
 
 import (
 	"sync/atomic"
@@ -34,6 +34,15 @@ const (
 	AtomicFalse AtomicBool = 0
 	AtomicTrue AtomicBool = 1
 )
+
+// ToAtomicBool converts a bool value to the corresponding AtomicBool value
+func ToAtomicBool(value bool) AtomicBool {
+	if value {
+		return AtomicTrue
+	} else {
+		return AtomicFalse
+	}
+}
 
 // CompareAndSwapBool executes the compare-and-swap operation for a boolean value.
 func CompareAndSwapBool(addr *AtomicBool, old, new bool) (swapped bool) {

@@ -19,6 +19,8 @@ package restreamer
 import (
 	"time"
 	"net/http"
+    "github.com/onitake/restreamer/util"
+    "github.com/onitake/restreamer/mpegts"
 )
 
 const (
@@ -42,13 +44,13 @@ const (
 // No separate thread is created.
 type Connection struct {
 	// Queue is the per-connection packet queue
-	Queue chan Packet
+	Queue chan mpegts.Packet
 	// the destination socket
 	writer http.ResponseWriter
 	// needed for flushing
 	flusher http.Flusher
 	// logger is a json logger
-	logger *ModuleLogger
+	logger *util.ModuleLogger
 }
 
 // NewConnection creates a new connection object.
@@ -57,9 +59,9 @@ type Connection struct {
 // clientaddr should point to the remote address of the connecting client
 // and will be used for logging.
 func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) (*Connection) {
-	logger := &ModuleLogger{
-		Logger: &ConsoleLogger{},
-		Defaults: Dict{
+	logger := &util.ModuleLogger{
+		Logger: &util.ConsoleLogger{},
+		Defaults: util.Dict{
 			"module": moduleConnection,
 			"remote": clientaddr,
 		},
@@ -67,14 +69,14 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 	}
 	flusher, ok := destination.(http.Flusher)
 	if !ok {
-		logger.Log(Dict{
+		logger.Log(util.Dict{
 			"event": eventConnectionError,
 			"error": errorConnectionNotFlushable,
 			"message": "ResponseWriter is not flushable!",
 		})
 	}
 	conn := &Connection{
-		Queue: make(chan Packet, qsize),
+		Queue: make(chan mpegts.Packet, qsize),
 		writer: destination,
 		flusher: flusher,
 		logger: logger,
@@ -83,7 +85,7 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 }
 
 // SetLogger assigns a logger
-func (conn *Connection) SetLogger(logger JsonLogger) {
+func (conn *Connection) SetLogger(logger util.JsonLogger) {
 	conn.logger.Logger = logger
 }
 
@@ -103,7 +105,7 @@ func (conn *Connection) Serve() {
 	if conn.flusher != nil {
 		conn.flusher.Flush()
 	}
-	conn.logger.Log(Dict{
+	conn.logger.Log(util.Dict{
 		"event": eventHeaderSent,
 		"message": "Sent header",
 	})
@@ -111,7 +113,7 @@ func (conn *Connection) Serve() {
 	// see if can get notified about connection closure
 	notifier, ok := conn.writer.(http.CloseNotifier)
 	if !ok {
-		conn.logger.Log(Dict{
+		conn.logger.Log(util.Dict{
 			"event": eventConnectionError,
 			"error": errorConnectionNoCloseNotify,
 			"message": "Writer does not support CloseNotify",
@@ -133,7 +135,7 @@ func (conn *Connection) Serve() {
 							conn.flusher.Flush()
 						}
 					} else {
-						conn.logger.Log(Dict{
+						conn.logger.Log(util.Dict{
 							"event": eventConnectionClosed,
 							"message": "Downstream connection closed",
 						})
@@ -142,7 +144,7 @@ func (conn *Connection) Serve() {
 					//log.Printf("Wrote packet of %d bytes\n", bytes)
 				} else {
 					// channel closed, exit
-					conn.logger.Log(Dict{
+					conn.logger.Log(util.Dict{
 						"event": eventConnectionShutdown,
 						"message": "Shutting down client connection",
 					})
@@ -150,7 +152,7 @@ func (conn *Connection) Serve() {
 				}
 			case <-notifier.CloseNotify():
 				// connection closed while we were waiting for more data
-				conn.logger.Log(Dict{
+				conn.logger.Log(util.Dict{
 					"event": eventConnectionClosedWait,
 					"message": "Downstream connection closed (while waiting)",
 				})
@@ -161,7 +163,7 @@ func (conn *Connection) Serve() {
 	// we cannot drain the channel here, as it might not be closed yet.
 	// better let our caller handle closure and draining.
 	
-	conn.logger.Log(Dict{
+	conn.logger.Log(util.Dict{
 		"event": eventConnectionDone,
 		"message": "Streaming finished",
 	})

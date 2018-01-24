@@ -30,6 +30,8 @@ import (
 	"net/http"
 	"net/url"
 	"hash/fnv"
+    "github.com/onitake/restreamer/util"
+    "github.com/onitake/restreamer/api"
 )
 
 const (
@@ -70,9 +72,9 @@ type Proxy struct {
 	// the cached data
 	data []byte
 	// the global stats collector
-	stats Statistics
+	stats api.Statistics
 	// a json logger
-	logger JsonLogger
+	logger util.JsonLogger
 }
 
 // NewProxy constructs a new HTTP proxy.
@@ -98,18 +100,18 @@ func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 		// otherwise, add a "dirty" flag that tells when the resource needs to be fetched.
 		last: time.Unix(0, 0),
 		header: make(http.Header),
-		stats: &DummyStatistics{},
-		logger: &DummyLogger{},
+		stats: &api.DummyStatistics{},
+		logger: &util.DummyLogger{},
 	}, nil
 }
 
 // Assigns a logger
-func (proxy *Proxy) SetLogger(logger JsonLogger) {
+func (proxy *Proxy) SetLogger(logger util.JsonLogger) {
 	proxy.logger = logger
 }
 
 // Assigns a stats collector
-func (proxy *Proxy) SetStatistics(stats Statistics) {
+func (proxy *Proxy) SetStatistics(stats api.Statistics) {
 	proxy.stats = stats
 }
 

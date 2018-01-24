@@ -25,6 +25,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"github.com/onitake/restreamer/util"
+	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/mpegts"
 )
 
 const (
@@ -72,22 +75,22 @@ var (
 	ErrNoUrl = errors.New("restreamer: no parseable upstream URL")
 )
 
-// ConnectCloser is an interface for objects that support a Connect() and Close() method.
-// Most suitable for self-managed classes that have an 'offline' and 'online' state.
-type ConnectCloser interface {
+// connectCloser represents types that have a Connect() and a Close() method.
+// It extends on the io.Closer type.
+type connectCloser interface {
 	// support the Closer interface
 	io.Closer
 	// and the Connect() method
 	Connect() error
 }
 
-// DummyConnectCloser is a no-action implementation of the ConnectCloser interface.
-type DummyConnectCloser struct {
+// dummyConnectCloser is a no-action implementation of the connectCloser interface.
+type dummyConnectCloser struct {
 }
-func (*DummyConnectCloser) Close() error {
+func (*dummyConnectCloser) Close() error {
 	return nil
 }
-func (*DummyConnectCloser) Connect() error {
+func (*dummyConnectCloser) Connect() error {
 	return nil
 }
 
@@ -129,13 +132,13 @@ type Client struct {
 	streamer *Streamer
 	// running is true while the client is streaming into the queue.
 	// Use ReadBool(client.running) to get the current value.
-	running AtomicBool
+	running util.AtomicBool
 	// stats is the statistics collector for this client
-	stats Collector
+	stats api.Collector
 	// logger is our augmented logging facility
-	logger *ModuleLogger
+	logger *util.ModuleLogger
 	// listener is a downstream object that can handle connect/disconnect notifications
-	listener ConnectCloser
+	listener connectCloser
 	// queueSize is the size of the input queue
 	queueSize uint
 }
@@ -155,9 +158,9 @@ type Client struct {
 //   readtimeout: the read timeout
 //   qsize: the input queue size
 func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint) (*Client, error) {
-	logger := &ModuleLogger{
-		Logger: &ConsoleLogger{},
-		Defaults: Dict{
+	logger := &util.ModuleLogger{
+		Logger: &util.ConsoleLogger{},
+		Defaults: util.Dict{
 			"module": moduleClient,
 		},
 		AddTimestamp: true,
@@ -170,7 +173,7 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 			urls[count] = parsed
 			count++
 		} else {
-			logger.Log(Dict{
+			logger.Log(util.Dict{
 				"event": eventClientError,
 				"error": errorClientParse,
 				"message": fmt.Sprintf("Error parsing URL %s: %s", uri, err),
@@ -206,22 +209,22 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		Wait: time.Duration(reconnect) * time.Second,
 		ReadTimeout: time.Duration(readtimeout) * time.Second,
 		streamer: streamer,
-		running: AtomicFalse,
-		stats: &DummyCollector{},
+		running: util.AtomicFalse,
+		stats: &api.DummyCollector{},
 		logger: logger,
-		listener: &DummyConnectCloser{},
+		listener: &dummyConnectCloser{},
 		queueSize: qsize,
 	}
 	return &client, nil
 }
 
 // SetLogger assigns a backing logger, while keeping the current module defaults.
-func (client *Client) SetLogger(logger JsonLogger) {
+func (client *Client) SetLogger(logger util.JsonLogger) {
 	client.logger.Logger = logger
 }
 
 // SetCollector assigns a stats collector.
-func (client *Client) SetCollector(stats Collector) {
+func (client *Client) SetCollector(stats api.Collector) {
 	client.stats = stats
 }
 
@@ -229,7 +232,7 @@ func (client *Client) SetCollector(stats Collector) {
 // connection is closed or reconnected.
 //
 // Only one listener is supported.
-func (client *Client) SetStateListener(listener ConnectCloser) {
+func (client *Client) SetStateListener(listener connectCloser) {
 	client.listener = listener
 }
 
@@ -271,7 +274,7 @@ func (client *Client) Status() string {
 
 // Connected returns true if the socket is connected.
 func (client *Client) Connected() bool {
-	return LoadBool(&client.running)
+	return util.LoadBool(&client.running)
 }
 
 // loop tries to connect and loops until successful.
@@ -294,7 +297,7 @@ func (client *Client) loop() {
 			now := time.Now()
 			if now.Before(deadline) {
 				wait := deadline.Sub(now)
-				client.logger.Log(Dict{
+				client.logger.Log(util.Dict{
 					"event": eventClientRetry,
 					"retry": wait.Seconds(),
 					"message": fmt.Sprintf("Retrying after %0.0f seconds.", wait.Seconds()),
@@ -310,14 +313,14 @@ func (client *Client) loop() {
 		next = (next + 1) % len(client.urls)
 		
 		// connect
-		client.logger.Log(Dict{
+		client.logger.Log(util.Dict{
 			"event": eventClientConnecting,
 			"url": url.String(),
 		})
 		err := client.start(url)
 		if err != nil {
 			// not handled, log
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientError,
 				"error": errorClientConnect,
 				"url": url.String(),
@@ -326,7 +329,7 @@ func (client *Client) loop() {
 		}
 		
 		if client.Wait == 0 {
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientOffline,
 				"url": url.String(),
 				"message": "Reconnecting disabled. Stream will stay offline.",
@@ -337,9 +340,9 @@ func (client *Client) loop() {
 
 // start connects the socket, sends the HTTP request and starts streaming.
 func (client *Client) start(url *url.URL) error {
-	/*client.logger.Log(Dict{
+	/*client.logger.Log(util.Dict{
 		"event": eventClientDebug,
-		"debug": Dict{
+		"debug": util.Dict{
 			"timeout": client.Timeout,
 		},
 		"url": url.String(),
@@ -348,7 +351,7 @@ func (client *Client) start(url *url.URL) error {
 		switch url.Scheme {
 		// handled by os.Open
 		case "file":
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientOpenPath,
 				"path": url.Path,
 				"message": fmt.Sprintf("Opening %s.", url.Path),
@@ -362,7 +365,7 @@ func (client *Client) start(url *url.URL) error {
 		case "http":
 			fallthrough
 		case "https":
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientOpenHttp,
 				"url": url.String(),
 				"message": fmt.Sprintf("Connecting to %s.", url),
@@ -379,7 +382,7 @@ func (client *Client) start(url *url.URL) error {
 			client.input = response.Body
 		// handled directly by net.Dialer
 		case "tcp":
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientOpenTcp,
 				"host": url.Host,
 				"message": fmt.Sprintf("Connecting TCP socket to %s.", url.Host),
@@ -395,7 +398,7 @@ func (client *Client) start(url *url.URL) error {
 		case "unixgram":
 			fallthrough
 		case "unixpacket":
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientOpenDomain,
 				"path": url.Path,
 				"message": fmt.Sprintf("Connecting domain socket to %s.", url.Path),
@@ -410,14 +413,14 @@ func (client *Client) start(url *url.URL) error {
 		}
 		
 		// start streaming
-		StoreBool(&client.running, true)
-		client.logger.Log(Dict{
+		util.StoreBool(&client.running, true)
+		client.logger.Log(util.Dict{
 			"event": eventClientPull,
 			"url": url.String(),
 			"message": fmt.Sprintf("Starting to pull stream %s.", url),
 		})
 		err := client.pull(url)
-		client.logger.Log(Dict{
+		client.logger.Log(util.Dict{
 			"event": eventClientClosed,
 			"url": url.String(),
 			"message": fmt.Sprintf("Socket for stream %s closed", url),
@@ -438,17 +441,17 @@ func (client *Client) pull(url *url.URL) error {
 	// declare here so we can send back individual errors
 	var err error
 	// the packet queue will be allocated and connected to the streamer as soon as the first packet has been received
-	var queue chan Packet
+	var queue chan mpegts.Packet
 	// save a few bytes
-	var packet Packet
+	var packet mpegts.Packet
 	
-	for LoadBool(&client.running) {
+	for util.LoadBool(&client.running) {
 		// somewhat hacky read timeout:
 		// close the connection when the timer fires.
 		var timer *time.Timer
 		if client.ReadTimeout > 0 {
 			timer = time.AfterFunc(client.ReadTimeout, func() {
-				client.logger.Log(Dict{
+				client.logger.Log(util.Dict{
 					"event": eventClientReadTimeout,
 					"message": "Read timeout exceeded, closing connection",
 				})
@@ -457,10 +460,10 @@ func (client *Client) pull(url *url.URL) error {
 		}
 		// read a packet
 		//log.Printf("Reading a packet from %p\n", client.input)
-		packet, err = ReadPacket(client.input)
+		packet, err = mpegts.ReadPacket(client.input)
 		// we got a packet, stop the timer and drain it
 		if timer != nil && !timer.Stop() {
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientTimerStop,
 				"url": url.String(),
 				"message": fmt.Sprintf("Stopping timer on %s", url),
@@ -469,7 +472,7 @@ func (client *Client) pull(url *url.URL) error {
 				case <-timer.C:
 				default:
 			}
-			client.logger.Log(Dict{
+			client.logger.Log(util.Dict{
 				"event": eventClientTimerStopped,
 				"url": url.String(),
 				"message": fmt.Sprintf("Stopped timer on %s", url),
@@ -477,18 +480,18 @@ func (client *Client) pull(url *url.URL) error {
 		}
 		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
-			StoreBool(&client.running, false)
+			util.StoreBool(&client.running, false)
 		} else {
 			if packet != nil {
 				// report connection up
 				if queue == nil {
 					client.listener.Connect()
 					client.stats.SourceConnected()
-					client.logger.Log(Dict{
+					client.logger.Log(util.Dict{
 						"event": eventClientStarted,
 						"url": url.String(),
 					})
-					queue = make(chan Packet, client.queueSize)
+					queue = make(chan mpegts.Packet, client.queueSize)
 					go client.streamer.Stream(queue)
 				}
 				
@@ -499,7 +502,7 @@ func (client *Client) pull(url *url.URL) error {
 				//log.Printf("Got a packet (length %d)\n", len(packet))
 				queue<- packet
 			} else {
-				client.logger.Log(Dict{
+				client.logger.Log(util.Dict{
 					"event": eventClientNoPacket,
 					"url": url.String(),
 					"message": "No packet received",
@@ -510,14 +513,14 @@ func (client *Client) pull(url *url.URL) error {
 	
 	// and the connection is gone
 	if queue != nil {
-		client.logger.Log(Dict{
+		client.logger.Log(util.Dict{
 			"event": eventClientTimerKill,
 			"url": url.String(),
 			"message": fmt.Sprintf("Killing queue on %s", url),
 		})
 		close(queue)
 		client.stats.SourceDisconnected()
-		client.logger.Log(Dict{
+		client.logger.Log(util.Dict{
 			"event": eventClientStopped,
 			"url": url.String(),
 		})

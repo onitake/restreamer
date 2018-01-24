@@ -14,13 +14,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package restreamer
+package api
 
 import (
 	"log"
 	"net/http"
 	"encoding/json"
 )
+
+// connectChecker represents a type that can report its "connected" status.
+type connectChecker interface {
+	Connected() bool
+}
 
 // healthApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting system health.
@@ -141,12 +146,12 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 // The HTTP handler returns status code 200 if a stream is connected
 // and 404 if not.
 type streamStateApi struct {
-	client *Client
+	client connectChecker
 }
 
 // NewStreamStateApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
-func NewStreamStateApi(client *Client) http.Handler {
+func NewStreamStateApi(client connectChecker) http.Handler {
 	return &streamStateApi{
 		client: client,
 	}

@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package restreamer
+package util
 
 // Set is a set type, based on a map where keys represent the values.
 //

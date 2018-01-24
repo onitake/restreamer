@@ -23,7 +23,9 @@ import (
 	"time"
 	"net/http"
 	"math/rand"
-	"github.com/onitake/restreamer"
+	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/util"
+	"github.com/onitake/restreamer/streaming"
 )
 
 const (
@@ -43,25 +45,12 @@ const (
 	errorMainInvalidResource = "invalid_resource"
 )
 
-// Shuffle shuffles a slice using Knuth's version of the Fisher-Yates algorithm.
-func ShuffleStrings(rnd *rand.Rand, list []string) []string {
-	N := len(list)
-	ret := make([]string, N)
-	copy(ret, list)
-	for i := 0; i < N; i++ {
-		// choose index uniformly in [i, N-1]
-		r := i + rnd.Intn(N - i)
-		ret[r], ret[i] = ret[i], ret[r]
-	}
-	return ret
-}
-
 func main() {
-	var logbackend restreamer.JsonLogger = &restreamer.ConsoleLogger{}
+	var logbackend util.JsonLogger = &util.ConsoleLogger{}
 	
-	logger := &restreamer.ModuleLogger{
+	logger := &util.ModuleLogger{
 		Logger: logbackend,
-		Defaults: restreamer.Dict{
+		Defaults: util.Dict{
 			"module": moduleMain,
 		},
 		AddTimestamp: true,
@@ -81,7 +70,7 @@ func main() {
 		log.Fatal("Error parsing configuration: ", err)
 	}
 	
-	logger.Log(restreamer.Dict{
+	logger.Log(util.Dict{
 		"event": eventMainConfig,
 		"listen": config.Listen,
 		"timeout": config.Timeout,
@@ -92,7 +81,7 @@ func main() {
 	}
 	
 	if config.Log != "" {
-		flogger, err := restreamer.NewFileLogger(config.Log, true)
+		flogger, err := util.NewFileLogger(config.Log, true)
 		if err != nil {
 			log.Fatal("Error opening log: ", err)
 		}
@@ -102,11 +91,11 @@ func main() {
 	
 	clients := make(map[string]*restreamer.Client)
 	
-	var stats restreamer.Statistics
+	var stats api.Statistics
 	if config.NoStats {
-		stats = &restreamer.DummyStatistics{}
+		stats = &api.DummyStatistics{}
 	} else {
-		stats = restreamer.NewStatistics(config.MaxConnections)
+		stats = api.NewStatistics(config.MaxConnections)
 	}
 	
 	controller := restreamer.NewAccessController(config.MaxConnections)
@@ -117,7 +106,7 @@ func main() {
 	for _, streamdef := range config.Resources {
 		switch streamdef.Type {
 		case "stream":
-			logger.Log(restreamer.Dict{
+			logger.Log(util.Dict{
 				"event": eventMainConfigStream,
 				"serve": streamdef.Serve,
 				"remote": streamdef.Remote,
@@ -132,7 +121,7 @@ func main() {
 			
 			// shuffle the list here, not later
 			// should give a bit more randomness
-			remotes := ShuffleStrings(rnd, streamdef.Remotes)
+			remotes := util.ShuffleStrings(rnd, streamdef.Remotes)
 			
 			client, err := restreamer.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
 			if err == nil {
@@ -142,7 +131,7 @@ func main() {
 				clients[streamdef.Serve] = client
 				mux.Handle(streamdef.Serve, streamer)
 				
-				logger.Log(restreamer.Dict{
+				logger.Log(util.Dict{
 					"event": eventMainHandled,
 					"number": i,
 					"message": fmt.Sprintf("Handled connection %d", i),
@@ -153,7 +142,7 @@ func main() {
 			}
 			
 		case "static":
-			logger.Log(restreamer.Dict{
+			logger.Log(util.Dict{
 				"event": eventMainConfigStatic,
 				"serve": streamdef.Serve,
 				"remote": streamdef.Remote,
@@ -171,23 +160,23 @@ func main() {
 		case "api":
 			switch streamdef.Api {
 			case "health":
-				logger.Log(restreamer.Dict{
+				logger.Log(util.Dict{
 					"event": eventMainConfigApi,
 					"api": "health",
 					"serve": streamdef.Serve,
 					"message": fmt.Sprintf("Registering global health API on %s", streamdef.Serve),
 				})
-				mux.Handle(streamdef.Serve, restreamer.NewHealthApi(stats))
+				mux.Handle(streamdef.Serve, api.NewHealthApi(stats))
 			case "statistics":
-				logger.Log(restreamer.Dict{
+				logger.Log(util.Dict{
 					"event": eventMainConfigApi,
 					"api": "statistics",
 					"serve": streamdef.Serve,
 					"message": fmt.Sprintf("Registering global statistics API on %s", streamdef.Serve),
 				})
-				mux.Handle(streamdef.Serve, restreamer.NewStatisticsApi(stats))
+				mux.Handle(streamdef.Serve, api.NewStatisticsApi(stats))
 			case "check":
-				logger.Log(restreamer.Dict{
+				logger.Log(util.Dict{
 					"event": eventMainConfigApi,
 					"api": "check",
 					"serve": streamdef.Serve,
@@ -195,9 +184,9 @@ func main() {
 				})
 				client := clients[streamdef.Remote]
 				if client != nil {
-					mux.Handle(streamdef.Serve, restreamer.NewStreamStateApi(client))
+					mux.Handle(streamdef.Serve, api.NewStreamStateApi(client))
 				} else {
-					logger.Log(restreamer.Dict{
+					logger.Log(util.Dict{
 						"event": eventMainError,
 						"error": errorMainStreamNotFound,
 						"api": "check",
@@ -206,7 +195,7 @@ func main() {
 					})
 				}
 			default:
-				logger.Log(restreamer.Dict{
+				logger.Log(util.Dict{
 					"event": eventMainError,
 					"error": errorMainInvalidApi,
 					"api": streamdef.Api,
@@ -215,7 +204,7 @@ func main() {
 			}
 			
 		default:
-			logger.Log(restreamer.Dict{
+			logger.Log(util.Dict{
 				"event": eventMainError,
 				"error": errorMainInvalidResource,
 				"type": streamdef.Type,
@@ -227,12 +216,12 @@ func main() {
 	if i == 0 {
 		log.Fatal("No streams available")
 	} else {
-		logger.Log(restreamer.Dict{
+		logger.Log(util.Dict{
 			"event": eventMainStartMonitor,
 			"message": "Starting stats monitor",
 		})
 		stats.Start()
-		logger.Log(restreamer.Dict{
+		logger.Log(util.Dict{
 			"event": eventMainStartServer,
 			"message": "Starting server",
 		})

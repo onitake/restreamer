@@ -17,8 +17,7 @@
 package restreamer
 
 import (
-	"log"
-    "testing"
+	"testing"
 	"net/url"
 	"net/http"
 	"encoding/hex"
@@ -33,17 +32,10 @@ type MockWriter struct {
 	header http.Header
 	log Logger
 }
-func newMockWriter() *MockWriter {
+func newMockWriter(logger Logger) *MockWriter {
 	return &MockWriter{
 		header: make(http.Header),
-		log: struct {
-			Log: func(args ...interface{}) {
-				log.Log(args)
-			}
-			Logf: func(format string, args ...interface{}) {
-				log.Logf(format, args)
-			}
-		}
+		log: logger,
 	}
 }
 func (writer *MockWriter) Header() http.Header {
@@ -59,8 +51,8 @@ func (writer *MockWriter) WriteHeader(status int) {
 	writer.log.Log(writer.header)
 }
 
-func testWithProxy(t *testing.T, proxy *restreamer.Proxy) {
-	writer := newMockWriter()
+func testWithProxy(t *testing.T, proxy *Proxy) {
+	writer := newMockWriter(t)
 	writer.log = t
 	uri, _ := url.ParseRequestURI("http://host/test.txt")
 	request := &http.Request{
@@ -76,7 +68,7 @@ func testWithProxy(t *testing.T, proxy *restreamer.Proxy) {
 
 func TestProxy(t *testing.T) {
 	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0)
-	testWithProxy(direct)
+	testWithProxy(t, direct)
 	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1)
-	testWithProxy(cached)
+	testWithProxy(t, cached)
 }

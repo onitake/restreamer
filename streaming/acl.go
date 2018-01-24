@@ -19,6 +19,7 @@ package restreamer
 import (
 	"fmt"
 	"sync"
+    "github.com/onitake/restreamer/util"
 )
 
 const (
@@ -43,15 +44,15 @@ type AccessController struct {
 	// must be accessed atomically.
 	connections uint
 	// logger is a json logger
-	logger *ModuleLogger
+	logger *util.ModuleLogger
 }
 
 // NewAccessController creates a connection broker object that
 // handles access control according to the number of connected clients.
 func NewAccessController(maxconnections uint) *AccessController {
-	logger := &ModuleLogger{
-		Logger: &ConsoleLogger{},
-		Defaults: Dict{
+	logger := &util.ModuleLogger{
+		Logger: &util.ConsoleLogger{},
+		Defaults: util.Dict{
 			"module": moduleAcl,
 		},
 		AddTimestamp: true,
@@ -63,7 +64,7 @@ func NewAccessController(maxconnections uint) *AccessController {
 }
 
 // SetLogger assigns a logger
-func (control *AccessController) SetLogger(logger JsonLogger) {
+func (control *AccessController) SetLogger(logger util.JsonLogger) {
 	control.logger.Logger = logger
 }
 
@@ -81,7 +82,7 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 	control.lock.Unlock()
 	// print some info
 	if accept {
-		control.logger.Log(Dict{
+		control.logger.Log(util.Dict{
 			"event": eventAclAccepted,
 			"remote": remoteaddr,
 			"connections": control.connections,
@@ -89,7 +90,7 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 			"message": fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
 		})
 	} else {
-		control.logger.Log(Dict{
+		control.logger.Log(util.Dict{
 			"event": eventAclDenied,
 			"remote": remoteaddr,
 			"connections": control.connections,
@@ -113,14 +114,14 @@ func (control *AccessController) Release(streamer *Streamer) {
 	}
 	control.lock.Unlock()
 	if remove {
-		control.logger.Log(Dict{
+		control.logger.Log(util.Dict{
 			"event": eventAclRemoved,
 			"connections": control.connections,
 			"max": control.maxconnections,
 			"message": fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
 		})
 	} else {
-		control.logger.Log(Dict{
+		control.logger.Log(util.Dict{
 			"event": eventAclError,
 			"error": errorAclNoConnection,
 			"message": fmt.Sprintf("Error, no connection to remove"),
