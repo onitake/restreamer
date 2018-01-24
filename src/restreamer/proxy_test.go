@@ -14,39 +14,54 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package main
+package restreamer
 
 import (
 	"log"
+    "testing"
 	"net/url"
 	"net/http"
 	"encoding/hex"
-	"restreamer"
 )
 
-type testWriter struct {
-	header http.Header
-}
-func newTestWriter() *testWriter {
-	return &testWriter{
-		header: make(http.Header),
-	}
-}
-func (writer *testWriter) Header() http.Header {
-	return writer.header
-}
-func (writer *testWriter) Write(data []byte) (int, error) {
-	log.Printf("Write data:")
-	log.Print(hex.Dump(data))
-	return len(data), nil
-}
-func (writer *testWriter) WriteHeader(status int) {
-	log.Printf("Write header, status code %d:", status)
-	log.Print(writer.header)
+type Logger interface {
+	Log(args ...interface{})
+	Logf(format string, args ...interface{})
 }
 
-func test(proxy *restreamer.Proxy) {
-	writer := newTestWriter()
+type MockWriter struct {
+	header http.Header
+	log Logger
+}
+func newMockWriter() *MockWriter {
+	return &MockWriter{
+		header: make(http.Header),
+		log: struct {
+			Log: func(args ...interface{}) {
+				log.Log(args)
+			}
+			Logf: func(format string, args ...interface{}) {
+				log.Logf(format, args)
+			}
+		}
+	}
+}
+func (writer *MockWriter) Header() http.Header {
+	return writer.header
+}
+func (writer *MockWriter) Write(data []byte) (int, error) {
+	writer.log.Log("Write data:")
+	writer.log.Log(hex.Dump(data))
+	return len(data), nil
+}
+func (writer *MockWriter) WriteHeader(status int) {
+	writer.log.Logf("Write header, status code %d:", status)
+	writer.log.Log(writer.header)
+}
+
+func testWithProxy(t *testing.T, proxy *restreamer.Proxy) {
+	writer := newMockWriter()
+	writer.log = t
 	uri, _ := url.ParseRequestURI("http://host/test.txt")
 	request := &http.Request{
 		Method: "GET",
@@ -59,9 +74,9 @@ func test(proxy *restreamer.Proxy) {
 	proxy.ServeHTTP(writer, request)
 }
 
-func main() {
-	direct, _ := restreamer.NewProxy("file:///tmp/test.txt", 10, 0)
-	test(direct)
-	cached, _ := restreamer.NewProxy("file:///tmp/test.txt", 10, 1)
-	test(cached)
+func TestProxy(t *testing.T) {
+	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0)
+	testWithProxy(direct)
+	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1)
+	testWithProxy(cached)
 }
