@@ -23,7 +23,7 @@ import (
 	"time"
 	"net/http"
 	"math/rand"
-	"restreamer"
+	"github.com/onitake/restreamer"
 )
 
 const (
