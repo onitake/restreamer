@@ -17,9 +17,9 @@
 package api
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
-	"encoding/json"
 )
 
 // connectChecker represents a type that can report its "connected" status.
@@ -46,10 +46,10 @@ func NewHealthApi(stats Statistics) http.Handler {
 func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	global := api.stats.GetGlobalStatistics()
 	var stats struct {
-		Status string `json:"status"`
-		Viewer int `json:"viewer"`
-		Limit int `json:"limit"`
-		Bandwidth int `json:"bandwidth"`
+		Status    string `json:"status"`
+		Viewer    int    `json:"viewer"`
+		Limit     int    `json:"limit"`
+		Bandwidth int    `json:"bandwidth"`
 	}
 	if global.Connections < global.MaxConnections {
 		stats.Status = "ok"
@@ -59,19 +59,18 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	stats.Viewer = int(global.Connections)
 	stats.Limit = int(global.MaxConnections)
 	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
-	
+
 	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
 	if err == nil {
-		writer.WriteHeader(http.StatusOK);
+		writer.WriteHeader(http.StatusOK)
 		writer.Write(response)
 	} else {
-		writer.WriteHeader(http.StatusInternalServerError);
+		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("500 internal server error"))
 		log.Print(err)
 	}
 }
-
 
 // statisticsApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting total system statistics.
@@ -92,22 +91,22 @@ func NewStatisticsApi(stats Statistics) http.Handler {
 func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	global := api.stats.GetGlobalStatistics()
 	var stats struct {
-		Status string `json:"status"`
-		Connections int `json:"connections"`
-		MaxConnections int `json:"max_connections"`
-		TotalPacketsReceived uint64 `json:"total_packets_received"`
-		TotalPacketsSent uint64 `json:"total_packets_sent"`
-		TotalPacketsDropped uint64 `json:"total_packets_dropped"`
-		TotalBytesReceived uint64 `json:"total_bytes_received"`
-		TotalBytesSent uint64 `json:"total_bytes_sent"`
-		TotalBytesDropped uint64 `json:"total_bytes_dropped"`
-		TotalStreamTime int64 `json:"total_stream_time_ns"`
+		Status                   string `json:"status"`
+		Connections              int    `json:"connections"`
+		MaxConnections           int    `json:"max_connections"`
+		TotalPacketsReceived     uint64 `json:"total_packets_received"`
+		TotalPacketsSent         uint64 `json:"total_packets_sent"`
+		TotalPacketsDropped      uint64 `json:"total_packets_dropped"`
+		TotalBytesReceived       uint64 `json:"total_bytes_received"`
+		TotalBytesSent           uint64 `json:"total_bytes_sent"`
+		TotalBytesDropped        uint64 `json:"total_bytes_dropped"`
+		TotalStreamTime          int64  `json:"total_stream_time_ns"`
 		PacketsPerSecondReceived uint64 `json:"packets_per_second_received"`
-		PacketsPerSecondSent uint64 `json:"packets_per_second_sent"`
-		PacketsPerSecondDropped uint64 `json:"packets_per_second_dropped"`
-		BytesPerSecondReceived uint64 `json:"bytes_per_second_received"`
-		BytesPerSecondSent uint64 `json:"bytes_per_second_sent"`
-		BytesPerSecondDropped uint64 `json:"bytes_per_second_dropped"`
+		PacketsPerSecondSent     uint64 `json:"packets_per_second_sent"`
+		PacketsPerSecondDropped  uint64 `json:"packets_per_second_dropped"`
+		BytesPerSecondReceived   uint64 `json:"bytes_per_second_received"`
+		BytesPerSecondSent       uint64 `json:"bytes_per_second_sent"`
+		BytesPerSecondDropped    uint64 `json:"bytes_per_second_dropped"`
 	}
 	if global.Connections < global.MaxConnections {
 		stats.Status = "ok"
@@ -129,14 +128,14 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	stats.BytesPerSecondReceived = global.BytesPerSecondReceived
 	stats.BytesPerSecondSent = global.BytesPerSecondSent
 	stats.BytesPerSecondDropped = global.BytesPerSecondDropped
-	
+
 	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
 	if err == nil {
-		writer.WriteHeader(http.StatusOK);
+		writer.WriteHeader(http.StatusOK)
 		writer.Write(response)
 	} else {
-		writer.WriteHeader(http.StatusInternalServerError);
+		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte("500 internal server error"))
 		log.Print(err)
 	}
@@ -163,10 +162,10 @@ func NewStreamStateApi(client connectChecker) http.Handler {
 func (stat *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Add("Content-Type", "text/plain")
 	if stat.client.Connected() {
-		writer.WriteHeader(http.StatusOK);
+		writer.WriteHeader(http.StatusOK)
 		writer.Write([]byte("200 ok"))
 	} else {
-		writer.WriteHeader(http.StatusNotFound);
+		writer.WriteHeader(http.StatusNotFound)
 		writer.Write([]byte("404 not found"))
 	}
 }

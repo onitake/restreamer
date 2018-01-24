@@ -27,7 +27,7 @@ func ShuffleStrings(rnd *rand.Rand, list []string) []string {
 	copy(ret, list)
 	for i := 0; i < N; i++ {
 		// choose index uniformly in [i, N-1]
-		r := i + rnd.Intn(N - i)
+		r := i + rnd.Intn(N-i)
 		ret[r], ret[i] = ret[i], ret[r]
 	}
 	return ret

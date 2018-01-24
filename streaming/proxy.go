@@ -17,27 +17,27 @@
 package restreamer
 
 import (
-	"os"
+	"errors"
+	"fmt"
+	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/util"
+	"hash/fnv"
 	"io"
 	"log"
-	"fmt"
-	"sync"
-	"time"
 	"mime"
-	"path"
-	"errors"
-	"strconv"
 	"net/http"
 	"net/url"
-	"hash/fnv"
-    "github.com/onitake/restreamer/util"
-    "github.com/onitake/restreamer/api"
+	"os"
+	"path"
+	"strconv"
+	"sync"
+	"time"
 )
 
 const (
-	proxyBufferSize = 1024
-	proxyDefaultLimit = 10*1024*1024
-	proxyDefaultMime = "application/octet-stream"
+	proxyBufferSize   = 1024
+	proxyDefaultLimit = 10 * 1024 * 1024
+	proxyDefaultMime  = "application/octet-stream"
 )
 
 var (
@@ -45,7 +45,7 @@ var (
 	headerList = []string{
 		"Content-Type",
 	}
-	ErrNoLength = errors.New("restreamer: Fetching of remote resource with unknown length not supported")
+	ErrNoLength      = errors.New("restreamer: Fetching of remote resource with unknown length not supported")
 	ErrLimitExceeded = errors.New("restreamer: Resource too large for cache")
 )
 
@@ -88,9 +88,9 @@ func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &Proxy{
-		url: parsed,
+		url:     parsed,
 		timeout: time.Duration(timeout) * time.Second,
 		// TODO make this configurable
 		limit: proxyDefaultLimit,
@@ -98,9 +98,9 @@ func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 		// not perfect, will cause problems if epoch is 0.
 		// but it's very unlikely this will ever be a problem.
 		// otherwise, add a "dirty" flag that tells when the resource needs to be fetched.
-		last: time.Unix(0, 0),
+		last:   time.Unix(0, 0),
 		header: make(http.Header),
-		stats: &api.DummyStatistics{},
+		stats:  &api.DummyStatistics{},
 		logger: &util.DummyLogger{},
 	}, nil
 }
@@ -115,7 +115,7 @@ func (proxy *Proxy) SetStatistics(stats api.Statistics) {
 	proxy.stats = stats
 }
 
-// Get opens the remote or local resource specified by the URL and returns a reader, 
+// Get opens the remote or local resource specified by the URL and returns a reader,
 // upstream HTTP headers, an HTTP status code and the resource data length, or -1 if no length is available.
 // Local resources contain guessed data
 // Supported schemas: file, http and https.
@@ -125,13 +125,13 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 	var header http.Header = make(http.Header)
 	var err error = nil
 	var length int64 = 0
-	
+
 	if url.Scheme == "file" {
 		log.Printf("Fetching %s\n", url.Path)
 		reader, err = os.Open(url.Path)
 		if err == nil {
 			status = http.StatusOK
-			
+
 			// guess the size
 			info, err2 := os.Stat(url.Path)
 			if err2 == nil {
@@ -140,7 +140,7 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 				// we can't stat, so the length is indefinite...
 				length = -1
 			}
-			
+
 			// guess the mime type
 			mtype := mime.TypeByExtension(path.Ext(url.Path))
 			if mtype != "" {
@@ -155,11 +155,11 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 		}
 	} else {
 		log.Printf("Fetching %s\n", url)
-		getter := &http.Client {
+		getter := &http.Client{
 			Timeout: timeout,
 		}
 		response, err := getter.Get(url.String())
-		if (err == nil) {
+		if err == nil {
 			status = response.StatusCode
 			reader = response.Body
 			length = response.ContentLength
@@ -169,7 +169,7 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 			status = http.StatusBadGateway
 		}
 	}
-	
+
 	return reader, header, status, length, err
 }
 
@@ -177,13 +177,13 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 func (proxy *Proxy) cache() error {
 	// acquire the write lock first
 	proxy.lock.Lock()
-	
+
 	// double check to avoid a double fetch race
 	now := time.Now()
 	if now.Sub(proxy.last) > proxy.stale {
 		// get a getter
 		getter, header, status, length, err := Get(proxy.url, proxy.timeout)
-		
+
 		// no length, no cache
 		if length < 0 {
 			// TODO maybe allow caching of resources without length?
@@ -195,24 +195,24 @@ func (proxy *Proxy) cache() error {
 			err = ErrLimitExceeded
 			length = 0
 		}
-		
+
 		// update
 		proxy.header = header
 		proxy.status = status
 		proxy.last = now
 		proxy.data = make([]byte, length)
-		
+
 		if err == nil {
 			// fetch the data
 			var bytes int
 			bytes, err = getter.Read(proxy.data)
-			
+
 			// TODO we should also support reading in multiple chunks
 			if int64(bytes) != length {
 				log.Printf("Short read, not all data was transferred in one go. expected=%d got=%d", length, bytes)
 				proxy.data = proxy.data[:bytes]
 			}
-			
+
 			if err == nil {
 				// calculate the ETag as the 64-bit FNV-1a checksum of the data, formatted as a hex string
 				hash := fnv.New64a()
@@ -220,12 +220,12 @@ func (proxy *Proxy) cache() error {
 				proxy.etag = fmt.Sprintf("%016x", hash.Sum64())
 			}
 		}
-		
+
 		if err != nil {
 			return err
 		}
 	}
-	
+
 	proxy.lock.Unlock()
 	return nil
 }
@@ -235,12 +235,12 @@ func (proxy *Proxy) cache() error {
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	// lock first
 	proxy.lock.RLock()
-	
+
 	// handle cached and non-cached resources separately
 	if proxy.stale > 0 {
 		// cached
 		var err error
-		
+
 		// check if we need to fetch
 		if time.Since(proxy.last) > proxy.stale {
 			// not so nice: augmenting the read lock to a write lock would be nicer.
@@ -253,11 +253,11 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			// and get back to serving
 			proxy.lock.RLock()
 		}
-	
+
 		if err != nil {
 			log.Printf("Error fetching resource: %s", err)
 		}
-		
+
 		// copy headers here
 		for _, key := range headerList {
 			value := proxy.header.Get(key)
@@ -265,12 +265,12 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 				writer.Header().Set(key, value)
 			}
 		}
-		
+
 		// headers for cached data
 		writer.Header().Set("ETag", proxy.etag)
 		// TODO maybe use the actual resource stale time here (Since())
 		writer.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int(proxy.stale.Seconds())))
-		
+
 		// verify if ETag has matched
 		if proxy.etag != "" && request.Header.Get("If-None-Match") == proxy.etag {
 			// send only a 304
@@ -285,14 +285,14 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		}
 	} else {
 		// non-cached
-		
+
 		// get a getter
 		getter, header, status, length, err := Get(proxy.url, proxy.timeout)
-		
+
 		if err != nil {
 			log.Printf("Error connecting to upstream: %s", err)
 		}
-		
+
 		// write the header
 		for _, key := range headerList {
 			value := header.Get(key)
@@ -305,7 +305,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			writer.Header().Set("Content-Length", strconv.FormatInt(length, 10))
 		}
 		writer.WriteHeader(status)
-		
+
 		// and transfer the data
 		buffer := make([]byte, proxyBufferSize)
 		eof := false
@@ -326,6 +326,6 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 			}
 		}
 	}
-	
+
 	proxy.lock.RUnlock()
 }

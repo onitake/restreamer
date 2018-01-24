@@ -17,10 +17,10 @@
 package restreamer
 
 import (
-	"testing"
-	"net/url"
-	"net/http"
 	"encoding/hex"
+	"net/http"
+	"net/url"
+	"testing"
 )
 
 type Logger interface {
@@ -30,12 +30,13 @@ type Logger interface {
 
 type MockWriter struct {
 	header http.Header
-	log Logger
+	log    Logger
 }
+
 func newMockWriter(logger Logger) *MockWriter {
 	return &MockWriter{
 		header: make(http.Header),
-		log: logger,
+		log:    logger,
 	}
 }
 func (writer *MockWriter) Header() http.Header {
@@ -56,12 +57,12 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 	writer.log = t
 	uri, _ := url.ParseRequestURI("http://host/test.txt")
 	request := &http.Request{
-		Method: "GET",
-		URL: uri,
-		Proto: "HTTP/1.0",
+		Method:     "GET",
+		URL:        uri,
+		Proto:      "HTTP/1.0",
 		ProtoMajor: 1,
 		ProtoMinor: 0,
-		Header: make(http.Header),
+		Header:     make(http.Header),
 	}
 	proxy.ServeHTTP(writer, request)
 }

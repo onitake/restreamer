@@ -32,7 +32,7 @@ type AtomicBool int32
 
 const (
 	AtomicFalse AtomicBool = 0
-	AtomicTrue AtomicBool = 1
+	AtomicTrue  AtomicBool = 1
 )
 
 // ToAtomicBool converts a bool value to the corresponding AtomicBool value

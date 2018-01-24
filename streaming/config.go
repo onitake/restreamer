@@ -17,8 +17,8 @@
 package restreamer
 
 import (
-	"os"
 	"encoding/json"
+	"os"
 )
 
 // Configuration is a representation of the configurable settings.
@@ -76,37 +76,37 @@ type Configuration struct {
 // with default values.
 func DefaultConfiguration() Configuration {
 	return Configuration{
-		Listen: "localhost:http",
-		Timeout: 0,
-		Reconnect: 10,
-		InputBuffer: 1000,
-		OutputBuffer: 400,
+		Listen:         "localhost:http",
+		Timeout:        0,
+		Reconnect:      10,
+		InputBuffer:    1000,
+		OutputBuffer:   400,
 		MaxConnections: 1,
-		NoStats: false,
+		NoStats:        false,
 	}
 }
 
 // LoadConfiguration loads a configuration in JSON format from "filename".
 func LoadConfiguration(filename string) (Configuration, error) {
 	config := DefaultConfiguration()
-	
+
 	fd, err := os.Open(filename)
 	if err == nil {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(&config)
 		fd.Close()
 	}
-	
+
 	for i := range config.Resources {
 		// add remote to remotes list, if given
 		if len(config.Resources[i].Remote) > 0 {
 			length := len(config.Resources[i].Remotes)
-			remotes := make([]string, length + 1)
+			remotes := make([]string, length+1)
 			remotes[0] = config.Resources[i].Remote
 			copy(remotes[1:], config.Resources[i].Remotes)
 			config.Resources[i].Remotes = remotes
 		}
 	}
-	
+
 	return config, err
 }

@@ -17,31 +17,31 @@
 package restreamer
 
 import (
-	"fmt"
-	"sync"
-	"time"
 	"errors"
-	"net/http"
-	"github.com/onitake/restreamer/util"
+	"fmt"
 	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/mpegts"
+	"github.com/onitake/restreamer/util"
+	"net/http"
+	"sync"
+	"time"
 )
 
 const (
 	moduleStreamer = "streamer"
 	//
-	eventStreamerError = "error"
-	eventStreamerQueueStart = "queuestart"
-	eventStreamerStart = "start"
-	eventStreamerStop = "stop"
-	eventStreamerClientAdd = "add"
+	eventStreamerError        = "error"
+	eventStreamerQueueStart   = "queuestart"
+	eventStreamerStart        = "start"
+	eventStreamerStop         = "stop"
+	eventStreamerClientAdd    = "add"
 	eventStreamerClientRemove = "remove"
-	eventStreamerStreaming = "streaming"
-	eventStreamerClosed = "closed"
+	eventStreamerStreaming    = "streaming"
+	eventStreamerClosed       = "closed"
 	//
 	errorStreamerInvalidCommand = "invalidcmd"
-	errorStreamerPoolFull = "poolfull"
-	errorStreamerOffline = "offline"
+	errorStreamerPoolFull       = "poolfull"
+	errorStreamerOffline        = "offline"
 )
 
 var (
@@ -125,7 +125,7 @@ type ConnectionBroker interface {
 // qsize is the length of each connection's queue (in packets).
 // broker handles policy enforcement
 // stats is a statistics collector object.
-func NewStreamer(qsize uint, broker ConnectionBroker) (*Streamer) {
+func NewStreamer(qsize uint, broker ConnectionBroker) *Streamer {
 	logger := &util.ModuleLogger{
 		Logger: &util.ConsoleLogger{},
 		Defaults: util.Dict{
@@ -134,12 +134,12 @@ func NewStreamer(qsize uint, broker ConnectionBroker) (*Streamer) {
 		AddTimestamp: true,
 	}
 	streamer := &Streamer{
-		broker: broker,
+		broker:    broker,
 		queueSize: int(qsize),
-		running: util.AtomicFalse,
-		stats: &api.DummyCollector{},
-		logger: logger,
-		request: make(chan ConnectionRequest),
+		running:   util.AtomicFalse,
+		stats:     &api.DummyCollector{},
+		logger:    logger,
+		request:   make(chan ConnectionRequest),
 	}
 	// start the command eater
 	go streamer.eatCommands()
@@ -162,17 +162,17 @@ func (streamer *Streamer) eatCommands() {
 	running := true
 	for running {
 		select {
-			case request := <-streamer.request:
-				switch request.Command {
-					case streamerCommandStart:
-						streamer.logger.Log(util.Dict{
-							"event": eventStreamerQueueStart,
-							"message": "Stopping eater process and starting real processing",
-						})
-						running = false
-					default:
-						// Eating all other commands
-				}
+		case request := <-streamer.request:
+			switch request.Command {
+			case streamerCommandStart:
+				streamer.logger.Log(util.Dict{
+					"event":   eventStreamerQueueStart,
+					"message": "Stopping eater process and starting real processing",
+				})
+				running = false
+			default:
+				// Eating all other commands
+			}
 		}
 	}
 }
@@ -195,77 +195,77 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 	if !util.CompareAndSwapBool(&streamer.running, false, true) {
 		return ErrAlreadyRunning
 	}
-	
+
 	// create the local outgoing connection pool
 	pool := make(map[*Connection]bool)
-	
+
 	// stop the eater process
-	streamer.request<- ConnectionRequest{
+	streamer.request <- ConnectionRequest{
 		Command: streamerCommandStart,
 	}
-	
+
 	streamer.logger.Log(util.Dict{
-		"event": eventStreamerStart,
+		"event":   eventStreamerStart,
 		"message": "Starting streaming",
 	})
-	
+
 	// loop until the input channel is closed
 	running := true
 	for running {
 		select {
-			case packet, ok := <-queue:
-				if ok {
-					// got a packet, distribute
-					//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-					//log.Printf("Got packet (length %d)\n", len(packet))
-					
-					for conn, _ := range pool {
-						select {
-							case conn.Queue<- packet:
-								// packet distributed, done
-								//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-								
-								// report the packet
-								streamer.stats.PacketSent()
-							default:
-								// queue is full
-								//log.Print(ErrSlowRead)
-								
-								// report the drop
-								streamer.stats.PacketDropped()
-						}
-					}
-				} else {
-					// channel closed, exit
-					running = false
-					// and stop everything
-					util.StoreBool(&streamer.running, false)
-				}
-			case request := <-streamer.request:
-				switch request.Command {
-					case StreamerCommandRemove:
-						streamer.logger.Log(util.Dict{
-							"event": eventStreamerClientRemove,
-							"message": fmt.Sprintf("Removing client %s from pool", request.Address),
-						})
-						close(request.Connection.Queue)
-						delete(pool, request.Connection)
-					case StreamerCommandAdd:
-						streamer.logger.Log(util.Dict{
-							"event": eventStreamerClientAdd,
-							"message": fmt.Sprintf("Adding client %s to pool", request.Address),
-						})
-						pool[request.Connection] = true
+		case packet, ok := <-queue:
+			if ok {
+				// got a packet, distribute
+				//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+				//log.Printf("Got packet (length %d)\n", len(packet))
+
+				for conn, _ := range pool {
+					select {
+					case conn.Queue <- packet:
+						// packet distributed, done
+						//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+
+						// report the packet
+						streamer.stats.PacketSent()
 					default:
-						streamer.logger.Log(util.Dict{
-							"event": eventStreamerError,
-							"error": errorStreamerInvalidCommand,
-							"message": "Ignoring invalid command in started state",
-						})
+						// queue is full
+						//log.Print(ErrSlowRead)
+
+						// report the drop
+						streamer.stats.PacketDropped()
+					}
 				}
+			} else {
+				// channel closed, exit
+				running = false
+				// and stop everything
+				util.StoreBool(&streamer.running, false)
+			}
+		case request := <-streamer.request:
+			switch request.Command {
+			case StreamerCommandRemove:
+				streamer.logger.Log(util.Dict{
+					"event":   eventStreamerClientRemove,
+					"message": fmt.Sprintf("Removing client %s from pool", request.Address),
+				})
+				close(request.Connection.Queue)
+				delete(pool, request.Connection)
+			case StreamerCommandAdd:
+				streamer.logger.Log(util.Dict{
+					"event":   eventStreamerClientAdd,
+					"message": fmt.Sprintf("Adding client %s to pool", request.Address),
+				})
+				pool[request.Connection] = true
+			default:
+				streamer.logger.Log(util.Dict{
+					"event":   eventStreamerError,
+					"error":   errorStreamerInvalidCommand,
+					"message": "Ignoring invalid command in started state",
+				})
+			}
 		}
 	}
-	
+
 	// clean up
 	for _ = range queue {
 		// drain any leftovers
@@ -273,12 +273,12 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 	for conn, _ := range pool {
 		close(conn.Queue)
 	}
-	
+
 	// start the command eater again
 	go streamer.eatCommands()
-	
+
 	streamer.logger.Log(util.Dict{
-		"event": eventStreamerStop,
+		"event":   eventStreamerStop,
 		"message": "Ending streaming",
 	})
 	return nil
@@ -288,52 +288,52 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	var conn *Connection = nil
-	
+
 	// prevent race conditions first
 	if util.LoadBool(&streamer.running) {
 		// check if the connection can be accepted
 		if streamer.broker.Accept(request.RemoteAddr, streamer) {
 			conn = NewConnection(writer, streamer.queueSize, request.RemoteAddr)
 			conn.SetLogger(streamer.logger.Logger)
-			
-			streamer.request<- ConnectionRequest{
-				Command: StreamerCommandAdd,
-				Address: request.RemoteAddr,
+
+			streamer.request <- ConnectionRequest{
+				Command:    StreamerCommandAdd,
+				Address:    request.RemoteAddr,
 				Connection: conn,
 			}
 		} else {
 			streamer.logger.Log(util.Dict{
-				"event": eventStreamerError,
-				"error": errorStreamerPoolFull,
+				"event":   eventStreamerError,
+				"error":   errorStreamerPoolFull,
 				"message": fmt.Sprintf("Refusing connection from %s, pool is full", request.RemoteAddr),
 			})
 		}
 	} else {
 		streamer.logger.Log(util.Dict{
-			"event": eventStreamerError,
-			"error": errorStreamerOffline,
+			"event":   eventStreamerError,
+			"error":   errorStreamerOffline,
 			"message": fmt.Sprintf("Refusing connection from %s, stream is offline", request.RemoteAddr),
 		})
 	}
-		
+
 	if conn != nil {
 		// connection will be handled, report
 		streamer.stats.ConnectionAdded()
-		
+
 		streamer.logger.Log(util.Dict{
-			"event": eventStreamerStreaming,
+			"event":   eventStreamerStreaming,
 			"message": fmt.Sprintf("Streaming to %s", request.RemoteAddr),
-			"remote": request.RemoteAddr,
+			"remote":  request.RemoteAddr,
 		})
-		
+
 		start := time.Now()
 		conn.Serve()
 		duration := time.Since(start)
-		
+
 		// done, remove the stale connection
-		streamer.request<- ConnectionRequest{
-			Command: StreamerCommandRemove,
-			Address: request.RemoteAddr,
+		streamer.request <- ConnectionRequest{
+			Command:    StreamerCommandRemove,
+			Address:    request.RemoteAddr,
 			Connection: conn,
 		}
 		// and drain the queue AFTER we have sent the shutdown signal
@@ -341,16 +341,16 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			// drain any leftovers
 		}
 		streamer.logger.Log(util.Dict{
-			"event": eventStreamerClosed,
-			"message": fmt.Sprintf("Connection from %s closed", request.RemoteAddr),
-			"remote": request.RemoteAddr,
+			"event":    eventStreamerClosed,
+			"message":  fmt.Sprintf("Connection from %s closed", request.RemoteAddr),
+			"remote":   request.RemoteAddr,
 			"duration": duration,
 		})
-		
+
 		// and report
 		streamer.stats.ConnectionRemoved()
 		streamer.stats.StreamDuration(duration)
-		
+
 		// also notify the broker
 		streamer.broker.Release(streamer)
 	} else {

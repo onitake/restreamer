@@ -50,11 +50,11 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 		offset += nbytes
 		//log.Printf("Read %d bytes\n", nbytes)
 	}
-	
+
 	// quick check if it starts with the sync byte 0x47
 	if garbage[0] != SyncByte {
 		log.Printf("Partial packet received, scanning for sync byte\n")
-		
+
 		// nope, scan first
 		sync := -1
 		for i, bytes := range garbage {
@@ -69,7 +69,7 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 			return nil, nil
 		}
 		//log.Printf("Sync byte found at %d\n", sync)
-		
+
 		offset = 0
 		// if the sync byte was not at the beginning,
 		// create a new packet and append the remaining data.
@@ -88,7 +88,7 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 		// return the assembled packet
 		return packet, nil
 	}
-	
+
 	// and done
 	return garbage, nil
 }
