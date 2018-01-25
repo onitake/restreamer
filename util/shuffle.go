@@ -21,6 +21,19 @@ import (
 )
 
 // Shuffle shuffles a slice using Knuth's version of the Fisher-Yates algorithm.
+func Shuffle(rnd *rand.Rand, list []interface{}) []interface{} {
+	N := len(list)
+	ret := make([]interface{}, N)
+	copy(ret, list)
+	for i := 0; i < N; i++ {
+		// choose index uniformly in [i, N-1]
+		r := i + rnd.Intn(N-i)
+		ret[r], ret[i] = ret[i], ret[r]
+	}
+	return ret
+}
+
+// ShuffleStrings shuffles a string slice using Knuth's version of the Fisher-Yates algorithm.
 func ShuffleStrings(rnd *rand.Rand, list []string) []string {
 	N := len(list)
 	ret := make([]string, N)
