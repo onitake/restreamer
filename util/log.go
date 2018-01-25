@@ -22,20 +22,29 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 )
 
 const (
-	// the maximum number of unhandled control signals
+	// signalQueueLength specifies the maximum number of unhandled control signals
 	signalQueueLength int = 100
-	// the maximum number of unwritten log messages
+	// logQueueLength specifies the maximum number of unwritten log messages
 	logQueueLength int = 100
-	// how to format time strings
+	// timeFormat configures the format for time strings
 	timeFormat string = time.RFC3339
+	// hupSignal is a signal identifier for a "reopen the log" notification.
+	// Distinct from UserSignal.
+	hupSignal internalSignal = internalSignal("HUP")
+	// shutdownSignal is a signal identifier for a "stop logging" notification.
+	shutdownSignal internalSignal = internalSignal("SDN")
 )
 
-var ()
+type internalSignal string
+
+func (s internalSignal) Signal() {}
+func (s internalSignal) String() string {
+	return string(s)
+}
 
 // Dict is a generic string:any dictionary type, for more convenience
 // when creating structured logs.
@@ -187,7 +196,7 @@ func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	}
 
 	// install signal handler and start listening thread
-	signal.Notify(logger.signals, syscall.SIGUSR1)
+	RegisterUserSignalHandler(logger.signals)
 	go logger.handle()
 
 	return logger, nil
@@ -229,7 +238,7 @@ func (logger *FileLogger) writeLog(line interface{}) {
 // Closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
 	log.Printf("Closing log")
-	logger.signals <- syscall.SIGHUP
+	logger.signals <- hupSignal
 }
 
 // Closes the log and stops/removes the signal handler
@@ -239,7 +248,7 @@ func (logger *FileLogger) closeLog() error {
 	// uninstall the singal handler
 	signal.Stop(logger.signals)
 	// signal stop
-	logger.signals <- os.Interrupt
+	logger.signals <- shutdownSignal
 
 	// close the log
 	err := logger.log.Close()
@@ -276,21 +285,21 @@ func (logger *FileLogger) handle() {
 		case signal := <-logger.signals:
 			// check signal type
 			switch signal {
-			case syscall.SIGUSR1:
+			case UserSignal:
 				// reopen the log file
 				err := logger.reopenLog()
 				if err != nil {
 					// if this fails, print a message to the standard log
 					log.Printf("Error reopening log: %s", err)
 				}
-			case syscall.SIGHUP:
+			case hupSignal:
 				// reopen the log file
 				err := logger.closeLog()
 				if err != nil {
 					// if this fails, print a message to the standard log
 					log.Printf("Error reopening log: %s", err)
 				}
-			case os.Interrupt:
+			case shutdownSignal:
 				// shutdown requested
 				running = false
 				log.Printf("Shutting down logger")
