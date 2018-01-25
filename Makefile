@@ -10,7 +10,7 @@ export CGO_ENABLED=0
 PACKAGE_PREFIX=github.com/onitake
 PACKAGE=restreamer
 PACKAGE_PATH=src/$(PACKAGE_PREFIX)/$(PACKAGE)
-RESTREAMER_SOURCES=cmd/restreamer.go cmd/profile.go
+RESTREAMER_SOURCES=restreamer.go profile.go
 UTIL_SOURCES=util/log.go util/set.go util/atomic.go util/shuffle.go
 API_SOURCES=api/api.go api/stats.go
 MPEGTS_SOURCES=mpegts/packet.go
@@ -29,7 +29,7 @@ clean:
 	rm -f bin/* $(PACKAGE_PATH)
 	rm -rf src
 
-test:
+test: $(PACKAGE_PATH)
 	go test $(PACKAGE_PREFIX)/$(PACKAGE)/util
 	#go test $(PACKAGE_PREFIX)/$(PACKAGE)/streaming
 
