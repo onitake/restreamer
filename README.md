@@ -4,7 +4,7 @@
 
 HTTP transport stream proxy
 
-Copyright © 2016-2017 Gregor Riepl;
+Copyright © 2016-2018 Gregor Riepl;
 All rights reserved.
 
 Please see the LICENSE file for details on permitted use of this software.
@@ -34,32 +34,50 @@ programming language, and suited perfectly for the development of
 network services.
 
 These are the key components:
-* Client - HTTP getter for fetching upstream data
-* Connection - HTTP server that feeds data to clients
-* Streamer - connection broker and data queue
-* Api - web API for service monitoring
-* Statistics - stat collector and tracker
-* Proxy - static web server and proxy
+* util - a small utility library
+* streaming/client - HTTP getter for fetching upstream data
+* streaming/connection - HTTP server that feeds data to clients
+* streaming/streamer - connection broker and data queue
+* api/api - web API for service monitoring
+* api/stats - stat collector and tracker
+* streaming/proxy - static web server and proxy
 * restreamer - core program that glues the components together
 
 
 ## Compilation
 
-Compiling restreamer is very easy if you have GNU make installed.
-Just run `make` to build `bin/restreamer`.
+restreamer is go-gettable.
+Just invoke:
 
-It is also possible to add the source code repository to your GOPATH
-and build restreamer using `go build`.
+```CGO_ENABLED=0 go build github.com/onitake/restreamer```
+
+Disabling CGO is recommended, as that will produce a standalone binary that
+does not depend on libc. This is useful for running restreamer in a container.
+
+A makefile is also provided, allowing builds outside GOPATH.
+Simply invoke `make` to build `bin/restreamer`.
+
+You can also use `make test` to run the test suite.
 
 
 ## Configuration
 
 All configuration is done through a configuration file named `restreamer.json`.
 
-See restreamer.example.json for a documented example.
+See `examples/documented/restreamer.json` for a documented example.
 
-The input and output buffer sizes should be adapted to the expected
-stream bitrates and must account for unstable or slow client-side internet connections.
+The input and output buffer sizes should be adapted to the expected stream
+bitrates and must account for unstable or slow client-side internet connections.
+
+Output buffers should cover at least 1-5 seconds of video and the input buffer
+should be 4 times as much.
+The amount of packets to buffer, based on the video+audio bitrates, can be
+calculated with this formula (overhead is not taken into account):
+
+```
+mpegts_packet_size = 188
+buffer_size_packets = (avg_video_bitrate + avg_audio_bitrate) * buffer_size_seconds / (mpegts_packet_size * 8)
+```
 
 It is also important to keep the bandwidth of the network interfaces
 in mind, so the connection limit should be set accordingly.
@@ -72,19 +90,21 @@ max_buffer_memory = mpegts_packet_size * (number_of_streams * input_buffer_size 
 ```
 
 It is possible to specify multiple upstream URLs per stream.
-These will be tested in a round-robin fashion, with the first successful
-one being used. If a connection is terminated, all URLs will be
-tried again after a delay. If the delay is 0, the stream will stay offline.
+These will be tested in a round-robin fashion in random order,
+with the first successful one being used.
+The list is only shuffled once, at program startup.
+
+If a connection is terminated, all URLs will be tried again after a delay.
+If delay is 0, the stream will stay offline.
 
 
 ## Logging
 
-restreamer does not implement any logging of its own.
-Connect/disconnect messages and other system activity is printed to standard
-output, where it can be collected into the syslog or journal.
+restreamer has a JSON logging module built in.
+Output can be sent to stdout or written to a log file.
 
-If more sophisticated logs are required, they need to be implemented
-separately, or through a frontend proxy (such as nginx).
+It is highly recommended to log to stdout and collect logs using journald
+or a similar logging engine.
 
 
 ## Testing
