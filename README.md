@@ -106,6 +106,12 @@ The list is only shuffled once, at program startup.
 If a connection is terminated, all URLs will be tried again after a delay.
 If delay is 0, the stream will stay offline.
 
+To protect against overload, both a soft and a hard limit on the number of
+downstream connections can be set. When the soft limit is reached, the health
+API will start reporting that the server is "full". Once the hard limit is
+reached, new connections will be responded with a 404. A 503 would be more
+appropriate, but this is not handled well by many legacy streaming clients.
+
 
 ## Logging
 

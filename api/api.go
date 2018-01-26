@@ -49,15 +49,18 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		Status    string `json:"status"`
 		Viewer    int    `json:"viewer"`
 		Limit     int    `json:"limit"`
+		Max       int    `json:"max"`
 		Bandwidth int    `json:"bandwidth"`
 	}
-	if global.Connections < global.MaxConnections {
+	// report the soft limit instead of the hard limit
+	if global.Connections < global.FullConnections {
 		stats.Status = "ok"
 	} else {
 		stats.Status = "full"
 	}
 	stats.Viewer = int(global.Connections)
-	stats.Limit = int(global.MaxConnections)
+	stats.Limit = int(global.FullConnections)
+	stats.Max = int(global.MaxConnections)
 	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
 
 	writer.Header().Add("Content-Type", "application/json")
@@ -94,6 +97,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		Status                   string `json:"status"`
 		Connections              int    `json:"connections"`
 		MaxConnections           int    `json:"max_connections"`
+		FullConnections          int    `json:"full_connections"`
 		TotalPacketsReceived     uint64 `json:"total_packets_received"`
 		TotalPacketsSent         uint64 `json:"total_packets_sent"`
 		TotalPacketsDropped      uint64 `json:"total_packets_dropped"`
@@ -108,13 +112,18 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		BytesPerSecondSent       uint64 `json:"bytes_per_second_sent"`
 		BytesPerSecondDropped    uint64 `json:"bytes_per_second_dropped"`
 	}
-	if global.Connections < global.MaxConnections {
+	if global.Connections < global.FullConnections {
 		stats.Status = "ok"
 	} else {
-		stats.Status = "full"
+		if global.Connections < global.MaxConnections {
+			stats.Status = "full"
+		} else {
+			stats.Status = "overload"
+		}
 	}
 	stats.Connections = int(global.Connections)
 	stats.MaxConnections = int(global.MaxConnections)
+	stats.FullConnections = int(global.FullConnections)
 	stats.TotalPacketsReceived = global.TotalPacketsReceived
 	stats.TotalPacketsSent = global.TotalPacketsSent
 	stats.TotalPacketsDropped = global.TotalPacketsDropped

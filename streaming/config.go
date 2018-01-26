@@ -47,6 +47,8 @@ type Configuration struct {
 	OutputBuffer uint `json:"outputbuffer"`
 	// MaxConnections is the maximum total number of concurrent connections
 	MaxConnections uint `json:"maxconnections"`
+	// FullConnections is the soft limit on the total number of concurrent connections
+	FullConnections uint `json:"fullconnections"`
 	// NoStats set to true to disable statistics
 	NoStats bool `json:"nostats"`
 	// Log is access log file name
@@ -76,13 +78,14 @@ type Configuration struct {
 // with default values.
 func DefaultConfiguration() Configuration {
 	return Configuration{
-		Listen:         "localhost:http",
-		Timeout:        0,
-		Reconnect:      10,
-		InputBuffer:    1000,
-		OutputBuffer:   400,
-		MaxConnections: 1,
-		NoStats:        false,
+		Listen:          "localhost:http",
+		Timeout:         0,
+		Reconnect:       10,
+		InputBuffer:     1000,
+		OutputBuffer:    400,
+		MaxConnections:  1,
+		FullConnections: 1,
+		NoStats:         false,
 	}
 }
 
@@ -95,6 +98,11 @@ func LoadConfiguration(filename string) (Configuration, error) {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(&config)
 		fd.Close()
+	}
+
+	// special handling for the soft limit: if 0, use the hard limit
+	if config.FullConnections == 0 {
+		config.FullConnections = config.MaxConnections
 	}
 
 	for i := range config.Resources {

@@ -95,7 +95,7 @@ func main() {
 	if config.NoStats {
 		stats = &api.DummyStatistics{}
 	} else {
-		stats = api.NewStatistics(config.MaxConnections)
+		stats = api.NewStatistics(config.MaxConnections, config.FullConnections)
 	}
 
 	controller := restreamer.NewAccessController(config.MaxConnections)

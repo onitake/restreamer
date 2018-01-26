@@ -144,6 +144,7 @@ func (from *realCollector) invsub(to *realCollector) {
 type StreamStatistics struct {
 	Connections              int64
 	MaxConnections           int64
+	FullConnections          int64
 	TotalPacketsReceived     uint64
 	TotalPacketsSent         uint64
 	TotalPacketsDropped      uint64
@@ -199,14 +200,15 @@ type realStatistics struct {
 // Register your streams with RegisterStream(), this will return an updateable
 // statistics object. You should not write to the individual fields directly,
 // instead access them using the Add...() methods.
-// Snapshots of the aggregated statistics can then be means of the Get...() methods.
-func NewStatistics(maxconns uint) Statistics {
+// Snapshots of the aggregated statistics can then be fetched with the Get...() methods.
+func NewStatistics(maxconns uint, fullcons uint) Statistics {
 	stats := &realStatistics{
 		shutdown: make(chan bool),
 		internal: make(map[string]*realCollector),
 		streams:  make(map[string]*StreamStatistics),
 		global: &StreamStatistics{
-			MaxConnections: int64(maxconns),
+			MaxConnections:  int64(maxconns),
+			FullConnections: int64(fullcons),
 		},
 	}
 	return stats
