@@ -30,7 +30,6 @@ import (
 	"os"
 	"path"
 	"strconv"
-	"sync"
 	"time"
 )
 
@@ -38,6 +37,7 @@ const (
 	proxyBufferSize   = 1024
 	proxyDefaultLimit = 10 * 1024 * 1024
 	proxyDefaultMime  = "application/octet-stream"
+	proxyFetchQueue   = 10
 )
 
 var (
@@ -49,28 +49,38 @@ var (
 	ErrLimitExceeded = errors.New("restreamer: Resource too large for cache")
 )
 
+// fetchableResource contains a cachable resource and its metadata.
+// This encapsulated type is used to ship data between the fetcher and the server.
+type fetchableResource struct {
+	// contents
+	data []byte
+	// upstream status code
+	statusCode int
+	// resource hash received from upstream, or computed
+	etag string
+	// upstream headers
+	header http.Header
+	// last update time (for aging)
+	updated time.Time
+}
+
 // Proxy implements a caching HTTP proxy.
 type Proxy struct {
 	// the upstream URL (file/http/https)
 	url *url.URL
 	// HTTP client timeout
 	timeout time.Duration
-	// maximum size of remote resource
-	limit int64
-	// fetch lock
-	lock sync.RWMutex
 	// the cache time
 	stale time.Duration
-	// the last fetch time
-	last time.Time
-	// the upstream status code
-	status int
-	// cache ETag to reduce traffic
-	etag string
-	// upstream headers
-	header http.Header
-	// the cached data
-	data []byte
+	// maximum size of remote resource
+	limit int64
+	// fetcher data request channel
+	fetcher chan chan<- *fetchableResource
+	// the cached resource
+	// NOTE do not access this dirctly, use the fetcher instead
+	resource *fetchableResource
+	// a channel to signal shutdown to the fetcher
+	shutdown chan struct{}
 	// the global stats collector
 	stats api.Statistics
 	// a json logger
@@ -92,34 +102,35 @@ func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 	return &Proxy{
 		url:     parsed,
 		timeout: time.Duration(timeout) * time.Second,
+		stale:   time.Duration(cache) * time.Second,
 		// TODO make this configurable
 		limit: proxyDefaultLimit,
-		stale: time.Duration(cache) * time.Second,
-		// not perfect, will cause problems if epoch is 0.
-		// but it's very unlikely this will ever be a problem.
-		// otherwise, add a "dirty" flag that tells when the resource needs to be fetched.
-		last:   time.Unix(0, 0),
-		header: make(http.Header),
-		stats:  &api.DummyStatistics{},
-		logger: &util.DummyLogger{},
+		// TODO make queue length configurable
+		fetcher:  make(chan chan<- *fetchableResource, proxyFetchQueue),
+		shutdown: make(chan struct{}),
+		resource: nil,
+		stats:    &api.DummyStatistics{},
+		logger:   &util.DummyLogger{},
 	}, nil
 }
 
-// Assigns a logger
+// SetLogger assigns a logger.
+// NOTE You shouldn't call this after calling Start().
 func (proxy *Proxy) SetLogger(logger util.JsonLogger) {
 	proxy.logger = logger
 }
 
-// Assigns a stats collector
+// SetStatistics assigns a stats collector.
+// NOTE You shouldn't call this after calling Start().
 func (proxy *Proxy) SetStatistics(stats api.Statistics) {
 	proxy.stats = stats
 }
 
-// Get opens the remote or local resource specified by the URL and returns a reader,
+// Get opens a remote or local resource specified by URL and returns a reader,
 // upstream HTTP headers, an HTTP status code and the resource data length, or -1 if no length is available.
-// Local resources contain guessed data
-// Supported schemas: file, http and https.
-func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int64, error) {
+// Local resources contain guessed data.
+// Supported protocols: file, http and https.
+func Get(url *url.URL, timeout time.Duration) (reader io.Reader, header http.Header, status int, length int64, err error) {
 	var status int = http.StatusNotFound
 	var reader io.Reader = nil
 	var header http.Header = make(http.Header)
@@ -154,7 +165,7 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 			}
 		}
 	} else {
-		log.Printf("Fetching %s\n", url)
+		log.Printf("Fetching %s", url)
 		getter := &http.Client{
 			Timeout: timeout,
 		}
@@ -171,6 +182,35 @@ func Get(url *url.URL, timeout time.Duration) (io.Reader, http.Header, int, int6
 	}
 
 	return reader, header, status, length, err
+}
+
+// Start launches the fetcher thread.
+// This should only be called once.
+func (proxy *Proxy) Start() {
+	log.Print("Starting fetcher")
+	go proxy.fetch()
+}
+
+// Stop stops the fetcher thread.
+func (proxy *Proxy) Stop() {
+	close(proxy.shutdown)
+}
+
+// fetch waits for fetch requests and handles them one-by-one.
+// If the resource is already cached and not stale, it replies very quickly.
+// Performance impact should be minimal in this case.
+func (proxy *Proxy) cache() error {
+	running := true
+	for running {
+		select {
+		case <-proxy.shutdown:
+			log.Print("Shutting down")
+			running = false
+		case request <- proxy.fetcher:
+			log.Print("Handling fetch request")
+			request <- nil
+		}
+	}
 }
 
 // cache fetches the remote resource into memory.
