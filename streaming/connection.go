@@ -177,6 +177,8 @@ func ServeStreamError(writer http.ResponseWriter, status int) {
 	writer.Header().Set("Last-Modified", time.Now().UTC().Format(http.TimeFormat))
 	// other headers to comply with the specs
 	writer.Header().Set("Accept-Range", "none")
+	// suppress caching by intermediate proxies
+	conn.writer.Header().Set("Cache-Control", "no-cache,no-store,no-transform")
 	// ...and the application-supplied status code
 	writer.WriteHeader(http.StatusNotFound)
 }
