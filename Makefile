@@ -1,11 +1,29 @@
-export GOPATH=$(shell pwd)
-# profiling
-#export GODEBUG=gctrace=1
-# build from pure Go, without libc
-export CGO_ENABLED=0
+# override the go path to allow building outside workspace
+export GOPATH = $(shell pwd)
+# enable profiling
+#export GODEBUG = gctrace=1
+# use go netcode instead of libc
+export CGO_ENABLED = 0
+
 # cross compilation
-#export GOOS=windows
-#export GOARCH=amd64
+# example:
+# make GOOS=windows GOARCH=amd64
+# will produce bin/restreamer-windows-amd64.exe
+ifdef GOOS
+export GOOS = $(GOOS)
+PACKAGE_OS := -$(GOOS)
+endif
+ifdef GOARCH
+export GOARCH = $(GOARCH)
+PACKAGE_ARCH += -$(GOARCH)
+endif
+ifeq ($(OS),Windows_NT)
+	EXE_SUFFIX = .exe
+else ifeq ($(GOOS),windows)
+	EXE_SUFFIX = .exe
+else
+	EXE_SUFFIX =
+endif
 
 PACKAGE_PREFIX=github.com/onitake
 PACKAGE=restreamer
@@ -16,10 +34,11 @@ API_SOURCES=api/api.go api/stats.go
 MPEGTS_SOURCES=mpegts/packet.go
 STREAMING_SOURCES=streaming/connection.go streaming/client.go streaming/streamer.go streaming/proxy.go streaming/acl.go streaming/config.go streaming/manager.go
 LIB_SOURCES=$(UTIL_SOURCES) $(API_SOURCES) $(MPEGTS_SOURCES) $(STREAMING_SOURCES)
+RESTREAMER_EXE=restreamer$(PACKAGE_OS)$(PACKAGE_ARCH)$(EXE_SUFFIX)
 
 .PHONY: all clean test
 
-all: bin/restreamer
+all: bin/$(RESTREAMER_EXE)
 
 $(PACKAGE_PATH):
 	mkdir -p "src/$(PACKAGE_PREFIX)"
@@ -36,5 +55,5 @@ test: $(PACKAGE_PATH)
 docker: bin/restreamer
 	docker build -t restreamer .
 
-bin/restreamer: $(PACKAGE_PATH) $(RESTREAMER_SOURCES) $(LIB_SOURCES)
+bin/$(RESTREAMER_EXE): $(PACKAGE_PATH) $(RESTREAMER_SOURCES) $(LIB_SOURCES)
 	go build -o $@ $(RESTREAMER_SOURCES)

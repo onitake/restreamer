@@ -49,13 +49,22 @@ These are the key components:
 restreamer is go-gettable.
 Just invoke:
 
-```CGO_ENABLED=0 go build github.com/onitake/restreamer```
+```
+CGO_ENABLED=0 go build github.com/onitake/restreamer
+```
 
-Disabling CGO is recommended, as that will produce a standalone binary that
-does not depend on libc. This is useful for running restreamer in a container.
+Disabling CGO is recommended, as this will produce a standalone binary that
+does not depend on libc. This is useful for running restreamer in a bare container.
 
 A makefile is also provided, allowing builds outside GOPATH.
 Simply invoke `make` to build `bin/restreamer`.
+
+Passing GOOS and/or GOARCH to `make` will yield cross-compiled binaries for the
+respective platform. For example:
+
+```
+make GOOS=windows GOARCH=amd64
+```
 
 You can also use `make test` to run the test suite.
 
