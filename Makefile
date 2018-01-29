@@ -50,7 +50,7 @@ clean:
 
 test: $(PACKAGE_PATH)
 	go test $(PACKAGE_PREFIX)/$(PACKAGE)/util
-	#go test $(PACKAGE_PREFIX)/$(PACKAGE)/streaming
+	go test $(PACKAGE_PREFIX)/$(PACKAGE)/streaming
 
 docker: bin/restreamer
 	docker build -t restreamer .

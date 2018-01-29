@@ -64,7 +64,9 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 		ProtoMinor: 0,
 		Header:     make(http.Header),
 	}
+	proxy.Start()
 	proxy.ServeHTTP(writer, request)
+	proxy.Shutdown()
 }
 
 func TestProxy(t *testing.T) {
