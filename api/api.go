@@ -70,7 +70,7 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		writer.Write(response)
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte("500 internal server error"))
+		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
 		log.Print(err)
 	}
 }
