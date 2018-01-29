@@ -154,6 +154,7 @@ func main() {
 			} else {
 				proxy.SetStatistics(stats)
 				proxy.SetLogger(logbackend)
+				proxy.Start()
 				mux.Handle(streamdef.Serve, proxy)
 			}
 

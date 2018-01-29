@@ -23,7 +23,6 @@ import (
 	"github.com/onitake/restreamer/util"
 	"hash/fnv"
 	"io"
-	"log"
 	"mime"
 	"net/http"
 	"net/url"
@@ -38,6 +37,28 @@ const (
 	proxyDefaultLimit = 10 * 1024 * 1024
 	proxyDefaultMime  = "application/octet-stream"
 	proxyFetchQueue   = 10
+	//
+	moduleProxy = "proxy"
+	//
+	eventProxyError           = "error"
+	eventProxyStart           = "start"
+	eventProxyShutdown        = "shutdown"
+	eventProxyRequest         = "request"
+	eventProxyOffline         = "offline"
+	eventProxyFetch           = "fetch"
+	eventProxyFetched         = "fetched"
+	eventProxyRequesting      = "requesting"
+	eventProxyRequestDone     = "requestdone"
+	eventProxyReplyNotChanged = "replynotchanged"
+	eventProxyReplyContent    = "replycontent"
+	eventProxyStale           = "stale"
+	eventProxyReturn          = "return"
+	//
+	errorProxyInvalidUrl    = "invalidurl"
+	errorProxyNoLength      = "nolength"
+	errorProxyLimitExceeded = "limitexceeded"
+	errorProxyShortRead     = "shortread"
+	errorProxyGet           = "get"
 )
 
 var (
@@ -47,6 +68,7 @@ var (
 	}
 	ErrNoLength      = errors.New("restreamer: Fetching of remote resource with unknown length not supported")
 	ErrLimitExceeded = errors.New("restreamer: Resource too large for cache")
+	ErrShortRead     = errors.New("restreamer: Short read, not all data was transferred in one go")
 )
 
 // fetchableResource contains a cachable resource and its metadata.
@@ -84,7 +106,7 @@ type Proxy struct {
 	// the global stats collector
 	stats api.Statistics
 	// a json logger
-	logger util.JsonLogger
+	logger *util.ModuleLogger
 }
 
 // NewProxy constructs a new HTTP proxy.
@@ -94,6 +116,15 @@ type Proxy struct {
 // every time it is requested.
 // timeout sets the upstream HTTP connection timeout.
 func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
+	logger := &util.ModuleLogger{
+		Logger: &util.ConsoleLogger{},
+		Defaults: util.Dict{
+			"module": moduleProxy,
+			"uri":    uri,
+		},
+		AddTimestamp: true,
+	}
+
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -110,18 +141,16 @@ func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 		shutdown: make(chan struct{}),
 		resource: nil,
 		stats:    &api.DummyStatistics{},
-		logger:   &util.DummyLogger{},
+		logger:   logger,
 	}, nil
 }
 
 // SetLogger assigns a logger.
-// NOTE You shouldn't call this after calling Start().
 func (proxy *Proxy) SetLogger(logger util.JsonLogger) {
-	proxy.logger = logger
+	proxy.logger.Logger = logger
 }
 
 // SetStatistics assigns a stats collector.
-// NOTE You shouldn't call this after calling Start().
 func (proxy *Proxy) SetStatistics(stats api.Statistics) {
 	proxy.stats = stats
 }
@@ -131,14 +160,13 @@ func (proxy *Proxy) SetStatistics(stats api.Statistics) {
 // Local resources contain guessed data.
 // Supported protocols: file, http and https.
 func Get(url *url.URL, timeout time.Duration) (reader io.Reader, header http.Header, status int, length int64, err error) {
-	var status int = http.StatusNotFound
-	var reader io.Reader = nil
-	var header http.Header = make(http.Header)
-	var err error = nil
-	var length int64 = 0
+	status = http.StatusNotFound
+	reader = nil
+	header = make(http.Header)
+	err = nil
+	length = 0
 
 	if url.Scheme == "file" {
-		log.Printf("Fetching %s\n", url.Path)
 		reader, err = os.Open(url.Path)
 		if err == nil {
 			status = http.StatusOK
@@ -165,7 +193,6 @@ func Get(url *url.URL, timeout time.Duration) (reader io.Reader, header http.Hea
 			}
 		}
 	} else {
-		log.Printf("Fetching %s", url)
 		getter := &http.Client{
 			Timeout: timeout,
 		}
@@ -187,185 +214,215 @@ func Get(url *url.URL, timeout time.Duration) (reader io.Reader, header http.Hea
 // Start launches the fetcher thread.
 // This should only be called once.
 func (proxy *Proxy) Start() {
-	log.Print("Starting fetcher")
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyStart,
+		"message": "Starting fetcher",
+	})
 	go proxy.fetch()
 }
 
 // Stop stops the fetcher thread.
 func (proxy *Proxy) Stop() {
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyShutdown,
+		"message": "Shutting down fetcher",
+	})
 	close(proxy.shutdown)
 }
 
 // fetch waits for fetch requests and handles them one-by-one.
 // If the resource is already cached and not stale, it replies very quickly.
 // Performance impact should be minimal in this case.
-func (proxy *Proxy) cache() error {
+// Blocks while the resource is fetched.
+func (proxy *Proxy) fetch() {
 	running := true
 	for running {
 		select {
 		case <-proxy.shutdown:
-			log.Print("Shutting down")
 			running = false
-		case request <- proxy.fetcher:
-			log.Print("Handling fetch request")
-			request <- nil
+		case request := <-proxy.fetcher:
+			proxy.logger.Log(util.Dict{
+				"event":    eventProxyRequest,
+				"message":  "Handling request",
+				"resource": proxy.resource,
+			})
+			// verify if we need to refetch
+			now := time.Now()
+			if proxy.resource == nil || now.Sub(proxy.resource.updated) > proxy.stale {
+				// stale, cache first
+				proxy.logger.Log(util.Dict{
+					"event":   eventProxyStale,
+					"message": "Resource is stale",
+				})
+				proxy.resource = proxy.cache()
+			}
+			// and return
+			proxy.logger.Log(util.Dict{
+				"event":   eventProxyReturn,
+				"message": "Returning resource",
+			})
+			request <- proxy.resource
 		}
 	}
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyOffline,
+		"message": "Fetcher is offline",
+	})
+}
+
+// eTag calculates a hash value of data and returns it as a hex string.
+// Suitable for HTTP Etags.
+func Etag(data []byte) string {
+	// 64-bit FNV-1a checksum of the data, formatted as a hex string
+	hash := fnv.New64a()
+	hash.Write(data)
+	return fmt.Sprintf("%016x", hash.Sum64())
 }
 
 // cache fetches the remote resource into memory.
-func (proxy *Proxy) cache() error {
-	// acquire the write lock first
-	proxy.lock.Lock()
+// Does not return errors. Instead, the cached resource contains a suitable return code and error content.
+func (proxy *Proxy) cache() *fetchableResource {
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyFetch,
+		"message": "Fetching resource from upstream",
+	})
 
-	// double check to avoid a double fetch race
-	now := time.Now()
-	if now.Sub(proxy.last) > proxy.stale {
-		// get a getter
-		getter, header, status, length, err := Get(proxy.url, proxy.timeout)
+	// fetch from upstream
+	getter, header, status, length, err := Get(proxy.url, proxy.timeout)
+	if err != nil {
+		proxy.logger.Log(util.Dict{
+			"event":   eventProxyError,
+			"error":   errorProxyGet,
+			"message": err.Error(),
+		})
+	}
 
-		// no length, no cache
+	// construct the return value
+	res := &fetchableResource{
+		header:     header,
+		statusCode: status,
+	}
+
+	if err == nil {
+		// verify the length
 		if length < 0 {
 			// TODO maybe allow caching of resources without length?
 			err = ErrNoLength
-			length = 0
-		}
-		// too large, no cache
-		if length > proxy.limit {
+			proxy.logger.Log(util.Dict{
+				"event":   eventProxyError,
+				"error":   errorProxyNoLength,
+				"message": ErrNoLength,
+			})
+			res.statusCode = http.StatusBadGateway
+			res.data = []byte(http.StatusText(res.statusCode))
+			res.header = make(http.Header)
+		} else if length > proxy.limit {
 			err = ErrLimitExceeded
-			length = 0
-		}
-
-		// update
-		proxy.header = header
-		proxy.status = status
-		proxy.last = now
-		proxy.data = make([]byte, length)
-
-		if err == nil {
-			// fetch the data
-			var bytes int
-			bytes, err = getter.Read(proxy.data)
-
-			// TODO we should also support reading in multiple chunks
-			if int64(bytes) != length {
-				log.Printf("Short read, not all data was transferred in one go. expected=%d got=%d", length, bytes)
-				proxy.data = proxy.data[:bytes]
-			}
-
-			if err == nil {
-				// calculate the ETag as the 64-bit FNV-1a checksum of the data, formatted as a hex string
-				hash := fnv.New64a()
-				hash.Write(proxy.data)
-				proxy.etag = fmt.Sprintf("%016x", hash.Sum64())
-			}
-		}
-
-		if err != nil {
-			return err
+			proxy.logger.Log(util.Dict{
+				"event":   eventProxyError,
+				"error":   errorProxyLimitExceeded,
+				"message": ErrLimitExceeded,
+			})
+			res.statusCode = http.StatusBadGateway
+			res.data = []byte(http.StatusText(res.statusCode))
+			res.header = make(http.Header)
 		}
 	}
 
-	proxy.lock.Unlock()
-	return nil
+	if err == nil {
+		res.data = make([]byte, length)
+
+		// fetch the data
+		// TODO we should probably read in chunks
+		var bytes int
+		bytes, err = getter.Read(res.data)
+
+		if err == nil && int64(bytes) != length {
+			err = ErrShortRead
+			proxy.logger.Log(util.Dict{
+				"event":    eventProxyError,
+				"error":    errorProxyShortRead,
+				"message":  ErrShortRead,
+				"length":   length,
+				"received": bytes,
+			})
+			res.data = res.data[:bytes]
+		}
+	}
+
+	res.updated = time.Now()
+	// calculate the content hash
+	res.etag = Etag(res.data)
+
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyFetched,
+		"message": "Fetched resource from upstream",
+		"etag":    res.etag,
+		"length":  len(res.data),
+		"status":  res.statusCode,
+	})
+
+	return res
 }
 
 // ServeHTTP handles an incoming connection.
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	// lock first
-	proxy.lock.RLock()
+	// create a return channel for the fetcher
+	fetchable := make(chan *fetchableResource)
 
-	// handle cached and non-cached resources separately
-	if proxy.stale > 0 {
-		// cached
-		var err error
+	// request and wait for completion
+	// since the channels are unbuffered, they will block on read/write
+	// timeout must happen in the fetcher!
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyRequesting,
+		"message": "Handling incoming request",
+	})
+	proxy.fetcher <- fetchable
+	proxy.logger.Log(util.Dict{
+		"event":   "waiting",
+		"message": "Waiting for response",
+	})
+	res := <-fetchable
+	close(fetchable)
+	proxy.logger.Log(util.Dict{
+		"event":   eventProxyRequestDone,
+		"message": "Request complete",
+	})
 
-		// check if we need to fetch
-		if time.Since(proxy.last) > proxy.stale {
-			// not so nice: augmenting the read lock to a write lock would be nicer.
-			// but there's no such luxury, so we need to unlock first and check
-			// again after we've acquired the write lock.
-			proxy.lock.RUnlock()
-			// cache the resource
-			log.Printf("Resource %s is stale, re-fetching\n", proxy.url)
-			err = proxy.cache()
-			// and get back to serving
-			proxy.lock.RLock()
-		}
-
-		if err != nil {
-			log.Printf("Error fetching resource: %s", err)
-		}
-
-		// copy headers here
-		for _, key := range headerList {
-			value := proxy.header.Get(key)
-			if value != "" {
-				writer.Header().Set(key, value)
-			}
-		}
-
-		// headers for cached data
-		writer.Header().Set("ETag", proxy.etag)
-		// TODO maybe use the actual resource stale time here (Since())
-		writer.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int(proxy.stale.Seconds())))
-
-		// verify if ETag has matched
-		if proxy.etag != "" && request.Header.Get("If-None-Match") == proxy.etag {
-			// send only a 304
-			writer.WriteHeader(http.StatusNotModified)
-			// no content here
-		} else {
-			// otherwise, send updated data
-			writer.Header().Set("Content-Length", strconv.Itoa(len(proxy.data)))
-			writer.WriteHeader(proxy.status)
-			// and push the content
-			writer.Write(proxy.data)
-		}
-	} else {
-		// non-cached
-
-		// get a getter
-		getter, header, status, length, err := Get(proxy.url, proxy.timeout)
-
-		if err != nil {
-			log.Printf("Error connecting to upstream: %s", err)
-		}
-
-		// write the header
-		for _, key := range headerList {
-			value := header.Get(key)
-			if value != "" {
-				writer.Header().Set(key, value)
-			}
-		}
-		writer.Header().Set("Cache-Control", "no-cache")
-		if length != -1 {
-			writer.Header().Set("Content-Length", strconv.FormatInt(length, 10))
-		}
-		writer.WriteHeader(status)
-
-		// and transfer the data
-		buffer := make([]byte, proxyBufferSize)
-		eof := false
-		for !eof {
-			bytes, err := getter.Read(buffer)
-			log.Printf("Got %d bytes, error %s", bytes, err)
-			if bytes > 0 {
-				bytes, err = writer.Write(buffer[:bytes])
-				log.Printf("Wrote %d bytes, error %s", bytes, err)
-			} else {
-				log.Printf("No data received, should we exit here?")
-			}
-			if err != nil {
-				if err != io.EOF {
-					log.Printf("Error sending data to client: %s", err)
-				}
-				eof = true
-			}
+	// copy (appropriate) headers
+	for _, key := range headerList {
+		value := res.header.Get(key)
+		if value != "" {
+			writer.Header().Set(key, value)
 		}
 	}
 
-	proxy.lock.RUnlock()
+	// headers for cached data
+	writer.Header().Set("ETag", res.etag)
+	// TODO maybe use the actual resource stale time here (Since())
+	// TODO no-cache for errors!
+	writer.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d", int(proxy.stale.Seconds())))
+
+	// verify if ETag has matched
+	if res.etag != "" && request.Header.Get("If-None-Match") == res.etag {
+		proxy.logger.Log(util.Dict{
+			"event":   eventProxyReplyNotChanged,
+			"message": "Returning 304",
+		})
+		// send only a 304
+		writer.WriteHeader(http.StatusNotModified)
+		// no content here
+	} else {
+		proxy.logger.Log(util.Dict{
+			"event":   eventProxyReplyContent,
+			"message": "Returning updated content",
+			"updated": res.updated,
+		})
+		// otherwise, send updated data
+		writer.Header().Set("Content-Length", strconv.Itoa(len(res.data)))
+		writer.WriteHeader(res.statusCode)
+		// and push the content
+		writer.Write(res.data)
+	}
 }
