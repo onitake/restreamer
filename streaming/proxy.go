@@ -221,8 +221,8 @@ func (proxy *Proxy) Start() {
 	go proxy.fetch()
 }
 
-// Stop stops the fetcher thread.
-func (proxy *Proxy) Stop() {
+// Shutdown stops the fetcher thread.
+func (proxy *Proxy) Shutdown() {
 	proxy.logger.Log(util.Dict{
 		"event":   eventProxyShutdown,
 		"message": "Shutting down fetcher",
