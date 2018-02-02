@@ -102,6 +102,7 @@ type Proxy struct {
 	// NOTE do not access this dirctly, use the fetcher instead
 	resource *fetchableResource
 	// a channel to signal shutdown to the fetcher
+	// this channel should never be written to - shutdown is signalled by closing the channel
 	shutdown chan struct{}
 	// the global stats collector
 	stats api.Statistics
