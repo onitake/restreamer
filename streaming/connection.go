@@ -47,8 +47,6 @@ type Connection struct {
 	Queue chan mpegts.Packet
 	// the destination socket
 	writer http.ResponseWriter
-	// needed for flushing
-	flusher http.Flusher
 	// logger is a json logger
 	logger *util.ModuleLogger
 }
@@ -67,18 +65,9 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 		},
 		AddTimestamp: true,
 	}
-	flusher, ok := destination.(http.Flusher)
-	if !ok {
-		logger.Log(util.Dict{
-			"event":   eventConnectionError,
-			"error":   errorConnectionNotFlushable,
-			"message": "ResponseWriter is not flushable!",
-		})
-	}
 	conn := &Connection{
 		Queue:   make(chan mpegts.Packet, qsize),
 		writer:  destination,
-		flusher: flusher,
 		logger:  logger,
 	}
 	return conn
@@ -102,8 +91,16 @@ func (conn *Connection) Serve() {
 	// use Add and Set to set more headers here
 	// chunked mode should be on by default
 	conn.writer.WriteHeader(http.StatusOK)
-	if conn.flusher != nil {
-		conn.flusher.Flush()
+	// try to flush the header
+	flusher, ok := conn.writer.(http.Flusher)
+	if !ok {
+		conn.logger.Log(util.Dict{
+			"event":   eventConnectionError,
+			"error":   errorConnectionNotFlushable,
+			"message": "ResponseWriter is not flushable!",
+		})
+	} else {
+		flusher.Flush()
 	}
 	conn.logger.Log(util.Dict{
 		"event":   eventHeaderSent,
@@ -130,11 +127,7 @@ func (conn *Connection) Serve() {
 				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				// send the packet out
 				_, err := conn.writer.Write(packet)
-				if err == nil {
-					if conn.flusher != nil {
-						conn.flusher.Flush()
-					}
-				} else {
+				if err != nil {
 					conn.logger.Log(util.Dict{
 						"event":   eventConnectionClosed,
 						"message": "Downstream connection closed",
