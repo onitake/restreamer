@@ -127,6 +127,9 @@ func (conn *Connection) Serve() {
 				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				// send the packet out
 				_, err := conn.writer.Write(packet)
+				// NOTE we shouldn't flush here, to avoid swamping the kernel with syscalls.
+				// see https://golang.org/pkg/net/http/?m=all#response.Write for details
+				// on how Go buffers HTTP responses (hint: a 2KiB bufio and a 4KiB bufio)
 				if err != nil {
 					conn.logger.Log(util.Dict{
 						"event":   eventConnectionClosed,

@@ -30,8 +30,8 @@ load demands.
 ## Architecture
 
 restreamer is written in [Go](https://golang.org/), a very versatile
-programming language, and suited perfectly for the development of
-network services.
+programming language. The built-in network layer makes it a first-class
+choice for a streaming server.
 
 These are the key components:
 * util - a small utility library
@@ -163,3 +163,24 @@ Using the built-in Go profiler can be more useful to watch memory usage.
 You should check out the `profiler` branch, it opens a separate web
 server on port 6060 that Go pprof can connect to. See [net/http/pprof](https://golang.org/pkg/net/http/pprof/)
 for instructions on its usage.
+
+### Syscall Load
+
+Live streaming services like restreamer require realtime or near-realtime
+operation. Latency should be minimised, highlighting the importance of
+small buffers. Unfortunately, small buffers will increase the number of
+syscalls needed to feed data to the remote clients.
+
+In light of the recently published [speculative execution exploits
+affecting Intel CPUs](https://meltdownattack.com/), high syscall rates will
+have a devastating effect on performance on these CPUs due to
+mitigations in the operating system.
+
+For this reason, restreamer is relying on buffered I/O, with default buffer
+sizes as set in the Go http package. In the current implementation,
+a 2KiB and a 4KiB buffer is used. This should give a good compromise
+between moderate latency and limited system load.
+
+Even with these buffers, performance loss compared with unmitigated systems
+is considerable. If this is unacceptable, it is highly recommended to run
+restreamer on a system that does not need/use Meltdown mitigations.
