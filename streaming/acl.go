@@ -74,7 +74,8 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 	accept := false
 	// protect concurrent access
 	control.lock.Lock()
-	if control.connections < control.maxconnections {
+	// check if the limit is disabled or unreached
+	if control.maxconnections == 0 || control.connections < control.maxconnections {
 		// and increase the counter
 		control.connections++
 		accept = true

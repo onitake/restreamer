@@ -25,51 +25,50 @@ import (
 // These are normally read from a JSON file and deserialized by
 // the builtin marshaler.
 type Configuration struct {
-	// Listen is the interface to listen on
+	// Listen is the interface to listen on.
 	Listen string `json:"listen"`
 	// Timeout is the connection timeout
-	// (both input and output)
+	// (both input and output).
 	Timeout uint `json:"timeout"`
-	// Reconnect is the reconnect delay
+	// Reconnect is the reconnect delay.
 	Reconnect uint `json:"reconnect"`
-	// ReadTimeout is the upstream read timeout
+	// ReadTimeout is the upstream read timeout.
 	ReadTimeout uint `json:"readtimeout"`
-	// InputBuffer is the maximum number of packets
+	// InputBuffer is the maximum number of packets.
 	// on the input buffer
 	InputBuffer uint `json:"inputbuffer"`
-	// OutputBuffer is the size of the output buffer
-	// per connection
-	// note that each connection will
-	// eat at least OutputBuffer * 192 bytes
-	// when the queue is full, so
-	// you should adjust the value according
-	// to the amount of RAM available
+	// OutputBuffer is the size of the output buffer per connection.
+	// Note that each connection will eat at least OutputBuffer * 192 bytes
+	// when the queue is full, so you should adjust the value according
+	// to the amount of RAM available.
 	OutputBuffer uint `json:"outputbuffer"`
-	// MaxConnections is the maximum total number of concurrent connections
+	// MaxConnections is the maximum total number of concurrent connections.
+	// If it is 0, no hard limit will be imposed.
 	MaxConnections uint `json:"maxconnections"`
-	// FullConnections is the soft limit on the total number of concurrent connections
+	// FullConnections is the soft limit on the total number of concurrent connections.
+	// If it is 0, no soft limit will be imposed/reported.
 	FullConnections uint `json:"fullconnections"`
-	// NoStats set to true to disable statistics
+	// NoStats disables statistics collection, if set.
 	NoStats bool `json:"nostats"`
-	// Log is access log file name
+	// Log is the access log file name.
 	Log string `json:"log"`
 	// Profile determines if profiling should be enabled.
 	// Set to true to turn on the pprof web server.
 	Profile bool `json:"profile"`
-	// Resources is the list of streams
+	// Resources is the list of streams.
 	Resources []struct {
-		// Type is the resource type
+		// Type is the resource type.
 		Type string `json:"type"`
-		// Api is the API type
+		// Api is the API type.
 		Api string `json:"api"`
-		// Serve is the local URL to serve this stream under
+		// Serve is the local URL to serve this stream under.
 		Serve string `json:"serve"`
-		// Remote is a single upstream URL or API argument
-		// will be added to Remotes during parsing
+		// Remote is a single upstream URL or API argument;
+		// it will be added to Remotes during parsing.
 		Remote string `json:"remote"`
-		// Remotes is the upstream URLs
+		// Remotes is the upstream URLs.
 		Remotes []string `json:"remotes"`
-		// Cache the cache time in seconds
+		// Cache the cache time in seconds.
 		Cache uint `json:"cache"`
 	} `json:"resources"`
 }
@@ -78,14 +77,12 @@ type Configuration struct {
 // with default values.
 func DefaultConfiguration() Configuration {
 	return Configuration{
-		Listen:          "localhost:http",
-		Timeout:         0,
-		Reconnect:       10,
-		InputBuffer:     1000,
-		OutputBuffer:    400,
-		MaxConnections:  1,
-		FullConnections: 1,
-		NoStats:         false,
+		Listen:       "localhost:http",
+		Timeout:      0,
+		Reconnect:    10,
+		InputBuffer:  1000,
+		OutputBuffer: 400,
+		NoStats:      false,
 	}
 }
 
@@ -98,11 +95,6 @@ func LoadConfiguration(filename string) (Configuration, error) {
 		decoder := json.NewDecoder(fd)
 		err = decoder.Decode(&config)
 		fd.Close()
-	}
-
-	// special handling for the soft limit: if 0, use the hard limit
-	if config.FullConnections == 0 {
-		config.FullConnections = config.MaxConnections
 	}
 
 	for i := range config.Resources {

@@ -52,11 +52,13 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		Max       int    `json:"max"`
 		Bandwidth int    `json:"bandwidth"`
 	}
-	// report the soft limit instead of the hard limit
-	if global.Connections < global.FullConnections {
-		stats.Status = "ok"
-	} else {
+	// report for both hard and soft, respecting disabled limits
+	if global.MaxConnections != 0 && global.Connections >= global.MaxConnections {
 		stats.Status = "full"
+	} else if global.FullConnections != 0 && global.Connections >= global.FullConnections {
+		stats.Status = "full"
+	} else {
+		stats.Status = "ok"
 	}
 	stats.Viewer = int(global.Connections)
 	stats.Limit = int(global.FullConnections)
@@ -112,14 +114,13 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		BytesPerSecondSent       uint64 `json:"bytes_per_second_sent"`
 		BytesPerSecondDropped    uint64 `json:"bytes_per_second_dropped"`
 	}
-	if global.Connections < global.FullConnections {
-		stats.Status = "ok"
+	// report for both hard and soft, respecting disabled limits
+	if global.MaxConnections != 0 && global.Connections >= global.MaxConnections {
+		stats.Status = "overload"
+	} else if global.FullConnections != 0 && global.Connections >= global.FullConnections {
+		stats.Status = "full"
 	} else {
-		if global.Connections < global.MaxConnections {
-			stats.Status = "full"
-		} else {
-			stats.Status = "overload"
-		}
+		stats.Status = "ok"
 	}
 	stats.Connections = int(global.Connections)
 	stats.MaxConnections = int(global.MaxConnections)
