@@ -65,7 +65,7 @@ func main() {
 		configname = "restreamer.json"
 	}
 
-	config, err := restreamer.LoadConfiguration(configname)
+	config, err := streaming.LoadConfiguration(configname)
 	if err != nil {
 		log.Fatal("Error parsing configuration: ", err)
 	}
@@ -89,7 +89,7 @@ func main() {
 		logger.Logger = logbackend
 	}
 
-	clients := make(map[string]*restreamer.Client)
+	clients := make(map[string]*streaming.Client)
 
 	var stats api.Statistics
 	if config.NoStats {
@@ -98,7 +98,7 @@ func main() {
 		stats = api.NewStatistics(config.MaxConnections, config.FullConnections)
 	}
 
-	controller := restreamer.NewAccessController(config.MaxConnections)
+	controller := streaming.NewAccessController(config.MaxConnections)
 	controller.SetLogger(logbackend)
 
 	i := 0
@@ -115,7 +115,7 @@ func main() {
 
 			reg := stats.RegisterStream(streamdef.Serve)
 
-			streamer := restreamer.NewStreamer(config.OutputBuffer, controller)
+			streamer := streaming.NewStreamer(config.OutputBuffer, controller)
 			streamer.SetCollector(reg)
 			streamer.SetLogger(logbackend)
 
@@ -123,7 +123,7 @@ func main() {
 			// should give a bit more randomness
 			remotes := util.ShuffleStrings(rnd, streamdef.Remotes)
 
-			client, err := restreamer.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
+			client, err := streaming.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
 			if err == nil {
 				client.SetCollector(reg)
 				client.SetLogger(logbackend)
@@ -148,7 +148,7 @@ func main() {
 				"remote":  streamdef.Remote,
 				"message": fmt.Sprintf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote),
 			})
-			proxy, err := restreamer.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache)
+			proxy, err := streaming.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache)
 			if err != nil {
 				log.Print(err)
 			} else {

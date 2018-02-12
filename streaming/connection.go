@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package restreamer
+package streaming
 
 import (
 	"github.com/onitake/restreamer/mpegts"
@@ -66,9 +66,9 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 		AddTimestamp: true,
 	}
 	conn := &Connection{
-		Queue:   make(chan mpegts.Packet, qsize),
-		writer:  destination,
-		logger:  logger,
+		Queue:  make(chan mpegts.Packet, qsize),
+		writer: destination,
+		logger: logger,
 	}
 	return conn
 }

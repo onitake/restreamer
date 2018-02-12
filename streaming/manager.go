@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package restreamer
+package streaming
 
 // StateManager maintains a list of disconnectable objects, sending them
 // a notification whenever state changes.
