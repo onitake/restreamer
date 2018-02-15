@@ -125,7 +125,7 @@ func (stats *realCollector) clone() *realCollector {
 // value with the current one:
 // prev := realCollector{}
 // for {
-//   current := realCollector{}
+//   current := realCollector{...current values...}
 //   prev.invsub(current)
 //   doSomethingWithPrev(prev)
 //   prev = current
