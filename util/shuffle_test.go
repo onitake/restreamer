@@ -17,16 +17,26 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 )
 
 const (
 	randSeed int64 = 0xc01df00d
+	samples  int   = 10
+	tries          = 10
 )
 
 func TestShuffleStrings(t *testing.T) {
 	rnd := rand.New(rand.NewSource(randSeed))
-	values := []string{"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"}
+
+	values := make([]string, samples)
+	results := make([]map[string]int, len(values))
+	for i := 0; i < len(values); i++ {
+		values[i] = fmt.Sprintf("%d", i)
+		results[i] = make(map[string]int, len(values))
+	}
+
 	ShuffleStrings(rnd, values)
 }
