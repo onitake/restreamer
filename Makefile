@@ -49,9 +49,10 @@ clean:
 	rm -rf src
 
 test: $(PACKAGE_PATH)
-	go test $(PACKAGE_PREFIX)/$(PACKAGE)/util
-	go test $(PACKAGE_PREFIX)/$(PACKAGE)/streaming
-	go test $(PACKAGE_PREFIX)/$(PACKAGE)/api
+	go test $(PACKAGE_PREFIX)/$(PACKAGE)/util \
+		$(PACKAGE_PREFIX)/$(PACKAGE)/streaming \
+		$(PACKAGE_PREFIX)/$(PACKAGE)/api \
+		$(PACKAGE_PREFIX)/$(PACKAGE)/mpegts
 
 docker: bin/restreamer
 	docker build -t restreamer .
