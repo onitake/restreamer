@@ -21,7 +21,18 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"github.com/onitake/restreamer/util"
 )
+
+type mockProxyLogger struct {
+	t *testing.T
+}
+
+func (l *mockProxyLogger) Log(lines ...util.Dict) {
+	for _, line := range lines {
+		l.t.Logf("%v", line)
+	}
+}
 
 type Logger interface {
 	Log(args ...interface{})
@@ -70,8 +81,13 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 }
 
 func TestProxy(t *testing.T) {
+	logger := &mockProxyLogger{t}
+
 	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0)
+	direct.SetLogger(logger)
 	testWithProxy(t, direct)
+
 	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1)
+	cached.SetLogger(logger)
 	testWithProxy(t, cached)
 }
