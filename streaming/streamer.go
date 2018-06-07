@@ -22,6 +22,7 @@ import (
 	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/mpegts"
 	"github.com/onitake/restreamer/util"
+	"github.com/onitake/restreamer/event"
 	"net/http"
 	"sync"
 	"time"
@@ -106,6 +107,8 @@ type Streamer struct {
 	logger *util.ModuleLogger
 	// request is an unbuffered queue for requests to add or remove a connection
 	request chan ConnectionRequest
+	// events is an event receiver
+	events event.Notifiable
 }
 
 // ConnectionBroker represents a policy handler for new connections.
@@ -154,6 +157,11 @@ func (streamer *Streamer) SetLogger(logger util.JsonLogger) {
 // SetCollector assigns a stats collector
 func (streamer *Streamer) SetCollector(stats api.Collector) {
 	streamer.stats = stats
+}
+
+// SetNotifier assigns an event notifier
+func (streamer *Streamer) SetNotifier(events event.Notifiable) {
+	streamer.events = events
 }
 
 // eatCommands is started in the background to drain the command
@@ -319,6 +327,8 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	if conn != nil {
 		// connection will be handled, report
 		streamer.stats.ConnectionAdded()
+		// also notify the event queue
+		streamer.events.NotifyConnect(1)
 
 		streamer.logger.Log(util.Dict{
 			"event":   eventStreamerStreaming,
@@ -348,6 +358,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		})
 
 		// and report
+		streamer.events.NotifyConnect(-1)
 		streamer.stats.ConnectionRemoved()
 		streamer.stats.StreamDuration(duration)
 

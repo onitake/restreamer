@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/event"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
 	"log"
@@ -40,9 +41,10 @@ const (
 	eventMainStartMonitor = "start_monitor"
 	eventMainStartServer  = "start_server"
 	//
-	errorMainStreamNotFound  = "stream_notfound"
-	errorMainInvalidApi      = "invalid_api"
-	errorMainInvalidResource = "invalid_resource"
+	errorMainStreamNotFound      = "stream_notfound"
+	errorMainInvalidApi          = "invalid_api"
+	errorMainInvalidResource     = "invalid_resource"
+	errorMainInvalidNotification = "invalid_notification"
 )
 
 func main() {
@@ -101,6 +103,34 @@ func main() {
 	controller := streaming.NewAccessController(config.MaxConnections)
 	controller.SetLogger(logbackend)
 
+	queue := event.NewEventQueue(int(config.FullConnections))
+	queue.SetLogger(logbackend)
+	for _, note := range config.Notifications {
+		var typ event.EventType
+		switch note.Event {
+		case "limit_hit":
+			typ = event.EventLimitHit
+		case "limit_miss":
+			typ = event.EventLimitMiss
+		}
+		var handler event.Handler
+		var err error
+		switch note.Type {
+		case "url":
+			handler, err = event.NewUrlHandler(note.Url)
+		}
+		if err == nil {
+			queue.RegisterEventHandler(typ, handler)
+		} else {
+			logger.Log(util.Dict{
+				"event":   eventMainError,
+				"error":   errorMainInvalidNotification,
+				"message": fmt.Sprintf("Cannot configure notification: %v", err),
+			})
+		}
+	}
+	queue.Start()
+
 	i := 0
 	mux := http.NewServeMux()
 	for _, streamdef := range config.Resources {
@@ -116,8 +146,9 @@ func main() {
 			reg := stats.RegisterStream(streamdef.Serve)
 
 			streamer := streaming.NewStreamer(config.OutputBuffer, controller)
-			streamer.SetCollector(reg)
 			streamer.SetLogger(logbackend)
+			streamer.SetCollector(reg)
+			streamer.SetNotifier(queue)
 
 			// shuffle the list here, not later
 			// should give a bit more randomness
