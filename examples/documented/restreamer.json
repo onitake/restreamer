@@ -86,5 +86,21 @@
 			"remote": "http://localhost:10000/stats",
 			"cache": 60
 		}
+	],
+	"": "List of event handlers; currently only HTTP callbacks are supported.",
+	"notifications": [
+		{
+			"": "Event to watch for: limit_hit or limit_miss",
+			"": "limit_hit notifies when the soft limit (fullconnections) is reached",
+			"": "limit_miss notifies when the number of connections goes below this threshold",
+			"event": "limit_hit",
+			"type": "url",
+			"url": "http://localhost:8001/hit"
+		},
+		{
+			"event": "limit_miss",
+			"type": "url",
+			"url": "http://localhost:8001/miss"
+		}
 	]
 }
