@@ -228,7 +228,7 @@ func (reporter *EventQueue) handleConnect(connected int) {
 			"connections": reporter.connections,
 		})
 		newconn = 0
-	} else if connected > math.MaxUint32-reporter.connections {
+	} else if connected > math.MaxInt32-reporter.connections {
 		reporter.logger.Log(util.Dict{
 			"event":       queueEventError,
 			"error":       queueErrorOverflow,
@@ -236,7 +236,7 @@ func (reporter *EventQueue) handleConnect(connected int) {
 			"connected":   connected,
 			"connections": reporter.connections,
 		})
-		newconn = math.MaxUint32
+		newconn = math.MaxInt32
 	} else {
 		newconn = reporter.connections + connected
 	}
