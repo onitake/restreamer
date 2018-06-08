@@ -18,31 +18,31 @@ package event
 
 import (
 	"fmt"
+	"github.com/onitake/restreamer/util"
 	"math"
 	"sync"
-	"github.com/onitake/restreamer/util"
 )
 
 const (
 	moduleQueue = "queue"
 	//
-	queueEventError = "error"
-	queueEventLimitHit   = "hit"
-	queueEventLimitMiss  = "miss"
-	queueEventStarting = "starting"
-	queueEventStopping = "stopping"
-	queueEventStarted = "started"
-	queueEventReceived = "received"
-	queueEventDraining = "draining"
-	queueEventStopped = "stopped"
-	queueEventConnect = "connect"
+	queueEventError     = "error"
+	queueEventLimitHit  = "hit"
+	queueEventLimitMiss = "miss"
+	queueEventStarting  = "starting"
+	queueEventStopping  = "stopping"
+	queueEventStarted   = "started"
+	queueEventReceived  = "received"
+	queueEventDraining  = "draining"
+	queueEventStopped   = "stopped"
+	queueEventConnect   = "connect"
 	//
-	queueErrorAlreadyRunning = "already_running"
+	queueErrorAlreadyRunning      = "already_running"
 	queueErrorInvalidNotification = "invalid_notification"
-	queueErrorUnderflow = "underflow"
-	queueErrorOverflow = "overflow"
-	queueErrorRegister = "register"
-	queueErrorNotRegistered = "not_registered"
+	queueErrorUnderflow           = "underflow"
+	queueErrorOverflow            = "overflow"
+	queueErrorRegister            = "register"
+	queueErrorNotRegistered       = "not_registered"
 )
 
 const (
@@ -52,6 +52,7 @@ const (
 
 // changeType enumerates all possible state change notifications
 type changeType int
+
 const (
 	changeConnect changeType = iota
 )
@@ -85,7 +86,6 @@ type EventQueue struct {
 	running bool
 	// waiter allows waiting for shutdown
 	waiter *sync.WaitGroup
-	// running represents the current running state of the notifier
 	// logger is a json logger
 	logger *util.ModuleLogger
 }
@@ -105,10 +105,10 @@ func NewEventQueue(limit int) *EventQueue {
 		AddTimestamp: true,
 	}
 	return &EventQueue{
-		limit: limit,
+		limit:    limit,
 		handlers: make(map[EventType]map[Handler]bool),
-		logger:         logger,
-		waiter: &sync.WaitGroup{},
+		logger:   logger,
+		waiter:   &sync.WaitGroup{},
 	}
 }
 
@@ -122,14 +122,14 @@ func (reporter *EventQueue) SetLogger(logger util.JsonLogger) {
 // To stop the reporter, call Shutdown().
 func (reporter *EventQueue) Start() {
 	reporter.logger.Log(util.Dict{
-		"event":       "check_start",
-		"message":     "Checking if the handler can be started",
+		"event":   "check_start",
+		"message": "Checking if the handler can be started",
 	})
 	// check if we're running already
 	if !reporter.running {
 		reporter.logger.Log(util.Dict{
-			"event":       queueEventStarting,
-			"message":     "Starting notification handler",
+			"event":   queueEventStarting,
+			"message": "Starting notification handler",
 		})
 		// initialise the channels
 		reporter.shutdown = make(chan struct{})
@@ -141,9 +141,9 @@ func (reporter *EventQueue) Start() {
 		go reporter.run()
 	} else {
 		reporter.logger.Log(util.Dict{
-			"event":       queueEventError,
-			"error":       queueErrorAlreadyRunning,
-			"message":     "Notification handler already running, won't start again",
+			"event":   queueEventError,
+			"error":   queueErrorAlreadyRunning,
+			"message": "Notification handler already running, won't start again",
 		})
 	}
 }
@@ -153,8 +153,8 @@ func (reporter *EventQueue) Start() {
 // You must not send any notifications after calling this method.
 func (reporter *EventQueue) Shutdown() {
 	reporter.logger.Log(util.Dict{
-		"event":       queueEventStopping,
-		"message":     "Stopping notification handler",
+		"event":   queueEventStopping,
+		"message": "Stopping notification handler",
 	})
 	// signal shutdown
 	if reporter.running {
@@ -166,28 +166,29 @@ func (reporter *EventQueue) Shutdown() {
 // run is the notification handling loop
 func (reporter *EventQueue) run() {
 	reporter.logger.Log(util.Dict{
-		"event":       queueEventStarted,
-		"message":     "Notification handler started",
+		"event":   queueEventStarted,
+		"message": "Notification handler started",
 	})
 	running := true
 	for running {
 		select {
-			case <-reporter.shutdown:
-				running = false
-			case message := <-reporter.notifier:
-				reporter.handle(message)
+		case <-reporter.shutdown:
+			running = false
+		case message := <-reporter.notifier:
+			reporter.handle(message)
 		}
 	}
 	reporter.logger.Log(util.Dict{
-		"event":       queueEventDraining,
-		"message":     "Draining notification queue",
+		"event":   queueEventDraining,
+		"message": "Draining notification queue",
 	})
 	// drain the notification channel and close it
 	close(reporter.notifier)
-	for range reporter.notifier {}
+	for range reporter.notifier {
+	}
 	reporter.logger.Log(util.Dict{
-		"event":       queueEventStopped,
-		"message":     "Stopped notification handler",
+		"event":   queueEventStopped,
+		"message": "Stopped notification handler",
 	})
 	// and we're done
 	reporter.running = false
@@ -197,14 +198,14 @@ func (reporter *EventQueue) run() {
 // handle handles a single message
 func (reporter *EventQueue) handle(message *stateChange) {
 	switch message.typ {
-		case changeConnect:
-			reporter.handleConnect(message.connected)
-		default:
-			reporter.logger.Log(util.Dict{
-				"event":       queueEventError,
-				"error":     queueErrorInvalidNotification,
-				"type":        message.typ,
-			})
+	case changeConnect:
+		reporter.handleConnect(message.connected)
+	default:
+		reporter.logger.Log(util.Dict{
+			"event": queueEventError,
+			"error": queueErrorInvalidNotification,
+			"type":  message.typ,
+		})
 	}
 }
 
@@ -213,7 +214,7 @@ func (reporter *EventQueue) handleConnect(connected int) {
 	reporter.logger.Log(util.Dict{
 		"event":       queueEventConnect,
 		"message":     fmt.Sprintf("Number of connections changed by %d, new number of connections: %d", connected, reporter.connections),
-		"connected": connected,
+		"connected":   connected,
 		"connections": reporter.connections,
 	})
 	// calculate the new connection count
@@ -223,16 +224,16 @@ func (reporter *EventQueue) handleConnect(connected int) {
 			"event":       queueEventError,
 			"error":       queueErrorUnderflow,
 			"message":     "Number of disconnects exceeds number of connections, setting to 0",
-			"connected": connected,
+			"connected":   connected,
 			"connections": reporter.connections,
 		})
 		newconn = 0
-	} else if connected > math.MaxUint32 - reporter.connections {
+	} else if connected > math.MaxUint32-reporter.connections {
 		reporter.logger.Log(util.Dict{
 			"event":       queueEventError,
 			"error":       queueErrorOverflow,
 			"message":     "Number of connects exceeds counter range, clamping to limit",
-			"connected": connected,
+			"connected":   connected,
 			"connections": reporter.connections,
 		})
 		newconn = math.MaxUint32
@@ -249,8 +250,8 @@ func (reporter *EventQueue) handleConnect(connected int) {
 					"event":       queueEventLimitMiss,
 					"message":     "Limit missed",
 					"connections": reporter.connections,
-					"new": newconn,
-					"limit": reporter.limit,
+					"new":         newconn,
+					"limit":       reporter.limit,
 				})
 				for handler, ok := range reporter.handlers[EventLimitMiss] {
 					if ok {
@@ -265,8 +266,8 @@ func (reporter *EventQueue) handleConnect(connected int) {
 					"event":       queueEventLimitHit,
 					"message":     "Limit hit",
 					"connections": reporter.connections,
-					"new": newconn,
-					"limit": reporter.limit,
+					"new":         newconn,
+					"limit":       reporter.limit,
 				})
 				for handler, ok := range reporter.handlers[EventLimitHit] {
 					if ok {
@@ -283,9 +284,9 @@ func (reporter *EventQueue) handleConnect(connected int) {
 func (reporter *EventQueue) RegisterEventHandler(typ EventType, handler Handler) {
 	if reporter.running {
 		reporter.logger.Log(util.Dict{
-			"event":       queueEventError,
-			"error":       queueErrorRegister,
-			"message":     "Cannot register new handlers while the queue is running",
+			"event":   queueEventError,
+			"error":   queueErrorRegister,
+			"message": "Cannot register new handlers while the queue is running",
 		})
 	} else {
 		if _, ok := reporter.handlers[typ]; !ok {
@@ -298,18 +299,18 @@ func (reporter *EventQueue) RegisterEventHandler(typ EventType, handler Handler)
 func (reporter *EventQueue) UnregisterEventHandler(typ EventType, handler Handler) {
 	if reporter.running {
 		reporter.logger.Log(util.Dict{
-			"event":       queueEventError,
-			"error":       queueErrorRegister,
-			"message":     "Cannot unregister new handlers while the queue is running",
+			"event":   queueEventError,
+			"error":   queueErrorRegister,
+			"message": "Cannot unregister new handlers while the queue is running",
 		})
 	} else {
 		if _, ok := reporter.handlers[typ][handler]; ok {
 			delete(reporter.handlers[typ], handler)
 		} else {
 			reporter.logger.Log(util.Dict{
-				"event":       queueEventError,
-				"error":       queueErrorNotRegistered,
-				"message":     "Event handler wasn't registered",
+				"event":   queueEventError,
+				"error":   queueErrorNotRegistered,
+				"message": "Event handler wasn't registered",
 			})
 		}
 	}
@@ -318,8 +319,8 @@ func (reporter *EventQueue) UnregisterEventHandler(typ EventType, handler Handle
 func (reporter *EventQueue) NotifyConnect(connected int) {
 	// construct the notification message and pass it down the queue
 	message := &stateChange{
-		typ: changeConnect,
+		typ:       changeConnect,
 		connected: connected,
 	}
-	reporter.notifier<- message
+	reporter.notifier <- message
 }
