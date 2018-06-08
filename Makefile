@@ -52,7 +52,8 @@ test: $(PACKAGE_PATH)
 	go test $(PACKAGE_PREFIX)/$(PACKAGE)/util \
 		$(PACKAGE_PREFIX)/$(PACKAGE)/streaming \
 		$(PACKAGE_PREFIX)/$(PACKAGE)/api \
-		$(PACKAGE_PREFIX)/$(PACKAGE)/mpegts
+		$(PACKAGE_PREFIX)/$(PACKAGE)/mpegts \
+		$(PACKAGE_PREFIX)/$(PACKAGE)/event
 
 docker: bin/restreamer
 	docker build -t restreamer .
