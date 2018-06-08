@@ -117,7 +117,11 @@ func main() {
 		var err error
 		switch note.Type {
 		case "url":
-			handler, err = event.NewUrlHandler(note.Url)
+			urlhandler, err := event.NewUrlHandler(note.Url)
+			if err == nil {
+				urlhandler.SetLogger(logbackend)
+				handler = urlhandler
+			}
 		}
 		if err == nil {
 			queue.RegisterEventHandler(typ, handler)
