@@ -79,7 +79,7 @@ type Configuration struct {
 		Type string `json:"type"`
 		// Url is the remote to access (if Type is http).
 		Url string `json:"url"`
-	}
+	} `json:"notifications"`
 }
 
 // DefaultConfiguration creates and returns a configuration object
@@ -110,7 +110,7 @@ func LoadConfiguration(filename string) (Configuration, error) {
 		// add remote to remotes list, if given
 		if len(config.Resources[i].Remote) > 0 {
 			length := len(config.Resources[i].Remotes)
-			remotes := make([]string, length + 1)
+			remotes := make([]string, length+1)
 			remotes[0] = config.Resources[i].Remote
 			copy(remotes[1:], config.Resources[i].Remotes)
 			config.Resources[i].Remotes = remotes
