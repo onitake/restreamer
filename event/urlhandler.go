@@ -17,27 +17,72 @@
 package event
 
 import (
-	"net/url"
+	"fmt"
+	"github.com/onitake/restreamer/util"
 	"net/http"
+	"net/url"
 )
 
+const (
+	moduleUrlHandler = "urlhandler"
+	//
+	urlHandlerEventError  = "error"
+	urlHandlerEventNotify = "notify"
+	//
+	urlHandlerErrorGet = "get"
+)
+
+// UrlHandler is an event handler that can send GET requests to a preconfigured HTTP URL.
 type UrlHandler struct {
+	// Url is the parsed URL
 	Url *url.URL
+	// logger is a json logger
+	logger *util.ModuleLogger
 }
 
 func NewUrlHandler(urly string) (*UrlHandler, error) {
+	logger := &util.ModuleLogger{
+		Logger: &util.ConsoleLogger{},
+		Defaults: util.Dict{
+			"module": moduleUrlHandler,
+		},
+		AddTimestamp: true,
+	}
 	u, err := url.Parse(urly)
 	if err == nil {
-		return &UrlHandler{u}, nil
+		return &UrlHandler{
+			Url:    u,
+			logger: logger,
+		}, nil
 	} else {
 		return nil, err
 	}
 }
 
-func (handler *UrlHandler) HandleEvent(EventType, ...interface{}) {
+// SetLogger assigns a logger
+func (handler *UrlHandler) SetLogger(logger util.JsonLogger) {
+	handler.logger.Logger = logger
+}
+
+func (handler *UrlHandler) HandleEvent(typ EventType, args ...interface{}) {
+	handler.logger.Log(util.Dict{
+		"event":   urlHandlerEventNotify,
+		"message": fmt.Sprintf("Event received, notifying %s", handler.Url),
+		"url":     handler.Url.String(),
+		"type":    typ,
+	})
 	req := &http.Request{
 		Method: "GET",
-		URL: handler.Url,
+		URL:    handler.Url,
 	}
-	http.DefaultClient.Do(req)
+	_, err := http.DefaultClient.Do(req)
+	if err != nil {
+		handler.logger.Log(util.Dict{
+			"event":   urlHandlerEventError,
+			"error":   urlHandlerErrorGet,
+			"message": fmt.Sprintf("Error sending GET request: %v", err),
+			"url":     handler.Url.String(),
+			"type":    typ,
+		})
+	}
 }
