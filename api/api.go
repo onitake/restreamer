@@ -151,7 +151,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	}
 }
 
-// StreamStatApi provides an API for checking stream availability.
+// streamStatApi provides an API for checking stream availability.
 // The HTTP handler returns status code 200 if a stream is connected
 // and 404 if not.
 type streamStateApi struct {
@@ -177,5 +177,44 @@ func (stat *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 		writer.Write([]byte("404 not found"))
+	}
+}
+
+// inhibitor represents a type that can prevent or allow new connections.
+type inhibitor interface {
+	SetInhibit(inhibit bool)
+}
+
+// streamControlApi allows manipulation of a stream's state.
+// If this API is enabled for a stream, requests to start and stop it externally
+// can be sent. Useful for testing or as an emergency kill switch.
+type streamControlApi struct {
+	inhibit inhibitor
+}
+
+// NewStreamStateApi creates a new stream status API object,
+// serving the "connected" status of a stream connection.
+func NewStreamControlApi(inhibit inhibitor) http.Handler {
+	return &streamControlApi{
+		inhibit: inhibit,
+	}
+}
+
+// ServeHTTP is the http handler method.
+// It parses the query string and prohibits or allows new connections depending
+// on the existence of the "offline" or "online" parameter.
+// When the "offline" parameter is present, all existing downstream connections
+// are closed immediately. If both are present, the query is treated like
+// if there was only "offline".
+func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	query := request.URL.Query()
+	if len(query["offline"]) > 0 {
+		api.inhibit.SetInhibit(true)
+		writer.WriteHeader(http.StatusAccepted)
+	} else if len(query["online"]) > 0 {
+		api.inhibit.SetInhibit(false)
+		writer.WriteHeader(http.StatusAccepted)
+	} else {
+		writer.WriteHeader(http.StatusBadRequest)
 	}
 }

@@ -230,6 +230,25 @@ func main() {
 						"message": fmt.Sprintf("Error, stream not found: %s", streamdef.Remote),
 					})
 				}
+			case "control":
+				logger.Log(util.Dict{
+					"event":   eventMainConfigApi,
+					"api":     "control",
+					"serve":   streamdef.Serve,
+					"message": fmt.Sprintf("Registering stream control API on %s", streamdef.Serve),
+				})
+				client := clients[streamdef.Remote]
+				if client != nil {
+					mux.Handle(streamdef.Serve, api.NewStreamControlApi(client))
+				} else {
+					logger.Log(util.Dict{
+						"event":   eventMainError,
+						"error":   errorMainStreamNotFound,
+						"api":     "control",
+						"remote":  streamdef.Remote,
+						"message": fmt.Sprintf("Error, stream not found: %s", streamdef.Remote),
+					})
+				}
 			default:
 				logger.Log(util.Dict{
 					"event":   eventMainError,
