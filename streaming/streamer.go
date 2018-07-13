@@ -39,6 +39,8 @@ const (
 	eventStreamerClientRemove = "remove"
 	eventStreamerStreaming    = "streaming"
 	eventStreamerClosed       = "closed"
+	eventStreamerInhibit      = "inhibit"
+	eventStreamerAllow        = "allow"
 	//
 	errorStreamerInvalidCommand = "invalidcmd"
 	errorStreamerPoolFull       = "poolfull"
@@ -72,6 +74,11 @@ const (
 	StreamerCommandAdd
 	// StreamerCommandRemove signals a stream to remove a connection.
 	StreamerCommandRemove
+	// StreamerCommandInhibit signals that all connections should be closed
+	// and not further connections should be allowed
+	StreamerCommandInhibit
+	// StreamerCommandAllow signals that new connections should be allowed
+	StreamerCommandAllow
 )
 
 // ConnectionRequest encapsulates a request that new connection be added or removed.
@@ -95,9 +102,6 @@ type ConnectionRequest struct {
 // distributing received packets on the input queue to the output queues.
 // It also handles and manages HTTP connections when added to an HTTP server.
 type Streamer struct {
-	// input is the input queue, accepting packets.
-	// When closed, streamer is stopped and all outgoing queues along with it.
-	input <-chan mpegts.Packet
 	// lock is the outgoing connection pool lock
 	lock sync.Mutex
 	// broker is a global connection broker
@@ -171,6 +175,18 @@ func (streamer *Streamer) SetNotifier(events event.Notifiable) {
 	streamer.events = events
 }
 
+func (streamer *Streamer) SetInhibit(inhibit bool) {
+	if inhibit {
+		streamer.request<- &ConnectionRequest{
+			Command: StreamerCommandInhibit,
+		}
+	} else {
+		streamer.request<- &ConnectionRequest{
+			Command: StreamerCommandAllow,
+		}
+	}
+}
+
 // eatCommands is started in the background to drain the command
 // queue and wait for a start command, in which case it will exit.
 func (streamer *Streamer) eatCommands() {
@@ -217,6 +233,8 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 
 	// create the local outgoing connection pool
 	pool := make(map[*Connection]bool)
+	// prevent new connections if this is true
+	inhibit := false
 
 	// stop the eater process
 	streamer.request <- &ConnectionRequest{
@@ -273,7 +291,7 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 				delete(pool, request.Connection)
 			case StreamerCommandAdd:
 				// check if the connection can be accepted
-				if streamer.broker.Accept(request.Address, streamer) {
+				if !inhibit && streamer.broker.Accept(request.Address, streamer) {
 					streamer.logger.Log(util.Dict{
 						"event":   eventStreamerClientAdd,
 						"remote":  request.Address,
@@ -290,6 +308,24 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 					})
 					request.Ok = false
 				}
+			case StreamerCommandInhibit:
+				streamer.logger.Log(util.Dict{
+					"event":   eventStreamerInhibit,
+					"message": fmt.Sprintf("Turning stream offline"),
+				})
+				inhibit = true
+				// close all downstream connections
+				for conn, _ := range pool {
+					close(conn.Queue)
+				}
+				// TODO implement inhibit in the check api
+			case StreamerCommandAllow:
+				streamer.logger.Log(util.Dict{
+					"event":   eventStreamerAllow,
+					"message": fmt.Sprintf("Turning stream online"),
+				})
+				inhibit = false
+				// TODO implement inhibit in the check api
 			default:
 				streamer.logger.Log(util.Dict{
 					"event":   eventStreamerError,

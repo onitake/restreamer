@@ -237,6 +237,12 @@ func (client *Client) SetStateListener(listener connectCloser) {
 	client.listener = listener
 }
 
+// SetInhibit calls the SetInhibit function on the attached streamer.
+func (client *Client) SetInhibit(inhibit bool) {
+	// delegate to the streamer
+	client.streamer.SetInhibit(inhibit)
+}
+
 // Close closes the active upstream connection.
 //
 // This will cause the streaming thread to fail and try to reestablish
@@ -449,6 +455,8 @@ func (client *Client) pull(url *url.URL) error {
 	for util.LoadBool(&client.running) {
 		// somewhat hacky read timeout:
 		// close the connection when the timer fires.
+		// we need this because the Go I/O implementation does not support
+		// deadlines on reads or writes.
 		var timer *time.Timer
 		if client.ReadTimeout > 0 {
 			timer = time.AfterFunc(client.ReadTimeout, func() {
