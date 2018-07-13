@@ -78,10 +78,20 @@ func TestPacketScan(t *testing.T) {
 	}
 
 	b07 := makeRandomPacket(t, 189)
+	b07[0] = 0
 	b07[1] = 0x47
 	c07 := bytes.NewBuffer(b07)
 	r07, err := ReadPacket(c07)
-	if err != nil || !bytes.Equal(b07[1:188], r07) {
+	if err != nil || !bytes.Equal(b07[1:189], r07) {
 		t.Error("t07: Expected packet identical to tail of buffer, got an error or something else")
+	}
+
+	b08 := makeRandomPacket(t, 188)
+	b08[0] = 0
+	b08[1] = 0x47
+	c08 := bytes.NewBuffer(b08)
+	r08, err := ReadPacket(c08)
+	if err != io.EOF || r08 != nil {
+		t.Error("t08: Expected EOF on incomplete packet that didn't start at offset 0, got something else")
 	}
 }

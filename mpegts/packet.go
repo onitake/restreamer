@@ -18,7 +18,7 @@ package mpegts
 
 import (
 	"io"
-	"log"
+	//"log"
 )
 
 const (
@@ -53,7 +53,7 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 
 	// quick check if it starts with the sync byte 0x47
 	if garbage[0] != SyncByte {
-		log.Printf("Partial packet received, scanning for sync byte\n")
+		//log.Printf("Partial packet received, scanning for sync byte\n")
 
 		// nope, scan first
 		sync := -1
@@ -70,20 +70,21 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 		}
 		//log.Printf("Sync byte found at %d\n", sync)
 
-		offset = 0
 		// if the sync byte was not at the beginning,
 		// create a new packet and append the remaining data.
 		// this should happen only when the stream is out of sync,
 		// so performance impact is minimal
 		packet := make(Packet, PacketSize)
+		offset = len(packet) - sync
+		//log.Printf("Offset is %d\n", offset)
 		copy(packet, garbage[sync:])
 		for offset < PacketSize {
-			nbytes, err := reader.Read(packet[len(packet):PacketSize])
+			nbytes, err := reader.Read(packet[offset:])
 			if err != nil {
 				return nil, err
 			}
 			offset += nbytes
-			//log.Printf("Appended %d bytes\n", nbytes)
+			//log.Printf("Appended %d bytes, offset is now %d\n", nbytes, offset)
 		}
 		// return the assembled packet
 		return packet, nil
