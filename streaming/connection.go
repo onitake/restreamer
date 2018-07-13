@@ -45,10 +45,15 @@ const (
 type Connection struct {
 	// Queue is the per-connection packet queue
 	Queue chan mpegts.Packet
+	// ClientAddress is the remote client address
+	ClientAddress string
 	// the destination socket
 	writer http.ResponseWriter
 	// logger is a json logger
 	logger *util.ModuleLogger
+	// Closed is true if Serve was ended because of a closed channel.
+	// This is simply there to avoid a double close.
+	Closed bool
 }
 
 // NewConnection creates a new connection object.
@@ -67,6 +72,7 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 	}
 	conn := &Connection{
 		Queue:  make(chan mpegts.Packet, qsize),
+		ClientAddress: clientaddr,
 		writer: destination,
 		logger: logger,
 	}
@@ -145,6 +151,7 @@ func (conn *Connection) Serve() {
 					"message": "Shutting down client connection",
 				})
 				running = false
+				conn.Closed = true
 			}
 		case <-notifier.CloseNotify():
 			// connection closed while we were waiting for more data

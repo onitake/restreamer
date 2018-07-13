@@ -80,8 +80,15 @@ type ConnectionRequest struct {
 	Command Command
 	// Address is the remote client address
 	Address string
-	// Connection is the connection object
+	// Connection is the connection to add (if this is an Add command)
 	Connection *Connection
+	// Waiter is a WaitGroup that can be used to track handling of the connection
+	// in the streaming thread. If it is non-nil, the streamer will signal
+	// Done once the request has been handled.
+	Waiter *sync.WaitGroup
+	// Ok tells the caller if a connection was handled without error.
+	// You should always wait on the Waiter before checking it.
+	Ok bool
 }
 
 // Streamer implements a TS packet multiplier,
@@ -106,7 +113,7 @@ type Streamer struct {
 	// logger is a json logger
 	logger *util.ModuleLogger
 	// request is an unbuffered queue for requests to add or remove a connection
-	request chan ConnectionRequest
+	request chan *ConnectionRequest
 	// events is an event receiver
 	events event.Notifiable
 }
@@ -142,7 +149,7 @@ func NewStreamer(qsize uint, broker ConnectionBroker) *Streamer {
 		running:   util.AtomicFalse,
 		stats:     &api.DummyCollector{},
 		logger:    logger,
-		request:   make(chan ConnectionRequest),
+		request:   make(chan *ConnectionRequest),
 	}
 	// start the command eater
 	go streamer.eatCommands()
@@ -181,6 +188,10 @@ func (streamer *Streamer) eatCommands() {
 			default:
 				// Eating all other commands
 			}
+			// make sure the caller isn't waiting forever
+			if request.Waiter != nil {
+				request.Waiter.Done()
+			}
 		}
 	}
 }
@@ -208,7 +219,7 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 	pool := make(map[*Connection]bool)
 
 	// stop the eater process
-	streamer.request <- ConnectionRequest{
+	streamer.request <- &ConnectionRequest{
 		Command: streamerCommandStart,
 	}
 
@@ -256,20 +267,39 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 					"event":   eventStreamerClientRemove,
 					"message": fmt.Sprintf("Removing client %s from pool", request.Address),
 				})
-				close(request.Connection.Queue)
+				if !request.Connection.Closed {
+					close(request.Connection.Queue)
+				}
 				delete(pool, request.Connection)
 			case StreamerCommandAdd:
-				streamer.logger.Log(util.Dict{
-					"event":   eventStreamerClientAdd,
-					"message": fmt.Sprintf("Adding client %s to pool", request.Address),
-				})
-				pool[request.Connection] = true
+				// check if the connection can be accepted
+				if streamer.broker.Accept(request.Address, streamer) {
+					streamer.logger.Log(util.Dict{
+						"event":   eventStreamerClientAdd,
+						"remote":  request.Address,
+						"message": fmt.Sprintf("Adding client %s to pool", request.Address),
+					})
+					pool[request.Connection] = true
+					request.Ok = true
+				} else {
+					streamer.logger.Log(util.Dict{
+						"event":   eventStreamerError,
+						"error":   errorStreamerPoolFull,
+						"remote":  request.Address,
+						"message": fmt.Sprintf("Refusing connection from %s, pool is full or offline", request.Address),
+					})
+					request.Ok = false
+				}
 			default:
 				streamer.logger.Log(util.Dict{
 					"event":   eventStreamerError,
 					"error":   errorStreamerInvalidCommand,
 					"message": "Ignoring invalid command in started state",
 				})
+			}
+			// signal the caller that we have handled the message
+			if request.Waiter != nil {
+				request.Waiter.Done()
 			}
 		}
 	}
@@ -295,28 +325,26 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 // ServeHTTP handles an incoming HTTP connection.
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	var conn *Connection = nil
+	// create the connection object first
+	conn := NewConnection(writer, streamer.queueSize, request.RemoteAddr)
+	conn.SetLogger(streamer.logger.Logger)
+	// and pass it on
+	command := &ConnectionRequest{
+		Command:    StreamerCommandAdd,
+		Address:    request.RemoteAddr,
+		Connection: conn,
+		Waiter:     &sync.WaitGroup{},
+	}
+	command.Waiter.Add(1)
+	streamer.request <- command
 
-	// prevent race conditions first
-	if util.LoadBool(&streamer.running) {
-		// check if the connection can be accepted
-		if streamer.broker.Accept(request.RemoteAddr, streamer) {
-			conn = NewConnection(writer, streamer.queueSize, request.RemoteAddr)
-			conn.SetLogger(streamer.logger.Logger)
+	// wait for the handler
+	command.Waiter.Wait()
 
-			streamer.request <- ConnectionRequest{
-				Command:    StreamerCommandAdd,
-				Address:    request.RemoteAddr,
-				Connection: conn,
-			}
-		} else {
-			streamer.logger.Log(util.Dict{
-				"event":   eventStreamerError,
-				"error":   errorStreamerPoolFull,
-				"message": fmt.Sprintf("Refusing connection from %s, pool is full", request.RemoteAddr),
-			})
-		}
-	} else {
+	// verify that the connection was added
+	if !command.Ok {
+		// nope, destroy the connection
+		conn = nil
 		streamer.logger.Log(util.Dict{
 			"event":   eventStreamerError,
 			"error":   errorStreamerOffline,
@@ -341,7 +369,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		duration := time.Since(start)
 
 		// done, remove the stale connection
-		streamer.request <- ConnectionRequest{
+		streamer.request <- &ConnectionRequest{
 			Command:    StreamerCommandRemove,
 			Address:    request.RemoteAddr,
 			Connection: conn,
