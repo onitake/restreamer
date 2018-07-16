@@ -143,8 +143,8 @@ func main() {
 			logger.Log(util.Dict{
 				"event":   eventMainConfigStream,
 				"serve":   streamdef.Serve,
-				"remote":  streamdef.Remote,
-				"message": fmt.Sprintf("Connecting stream %s to %s", streamdef.Serve, streamdef.Remote),
+				"remote":  streamdef.Remotes,
+				"message": fmt.Sprintf("Connecting stream %s to %v", streamdef.Serve, streamdef.Remotes),
 			})
 
 			reg := stats.RegisterStream(streamdef.Serve)

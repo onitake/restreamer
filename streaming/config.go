@@ -126,8 +126,8 @@ func LoadConfiguration(reader io.Reader) (*Configuration, error) {
 
 	for i := range config.Resources {
 		resource := &config.Resources[i]
-		// add remote to remotes list, if given
-		if len(resource.Remote) > 0 {
+		// add remote to remotes list, if given - but only if this is a stream
+		if resource.Type == "stream" && len(resource.Remote) > 0 {
 			length := len(resource.Remotes)
 			remotes := make([]string, length+1)
 			remotes[0] = resource.Remote

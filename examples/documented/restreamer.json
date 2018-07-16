@@ -52,7 +52,7 @@
 			"remote": "http://localhost:10000/stream.ts",
 			"": "Instead of a single remote URL, a list of URLs can be specified with the remotes option.",
 			"": "The same rules as for remote apply.",
-			"": "If both are specified, both are used.",
+			"": "If both are specified, both are used. This does not apply to API and proxy endpoints, where only a single remote is supported.",
 			"remotes": [ ],
 			"": "Cache time in seconds, use 0 to disable caching.",
 			"": "Only supported for static content.",

@@ -81,6 +81,7 @@ func TestConfig04(t *testing.T) {
 	t04 := DefaultConfiguration()
 	t04.Resources = []Resource{
 		Resource{
+			Type: "stream",
 			Remotes: []string{
 				"t04",
 			},
@@ -89,6 +90,7 @@ func TestConfig04(t *testing.T) {
 	c04 := `{
 		"resources": [
 			{
+				"type": "stream",
 				"remote": "t04"
 			}
 		]
@@ -98,6 +100,29 @@ func TestConfig04(t *testing.T) {
 		t.Logf("t04: %v", t04)
 		t.Logf("r04: %v", r04)
 		t.Logf("e04: %v", e04)
-		t.Errorf("Remotes list not parsed correctly")
+		t.Errorf("Single remote for stream not parsed correctly")
+	}
+
+	t04b := DefaultConfiguration()
+	t04b.Resources = []Resource{
+		Resource{
+			Type:   "api",
+			Remote: "t04b",
+		},
+	}
+	c04b := `{
+		"resources": [
+			{
+				"type": "api",
+				"remote": "t04b"
+			}
+		]
+	}`
+	r04b, e04b := LoadConfigurationBytes([]byte(c04b))
+	if e04b != nil || !reflect.DeepEqual(t04b, r04b) {
+		t.Logf("t04b: %v", t04b)
+		t.Logf("r04b: %v", r04b)
+		t.Logf("e04b: %v", e04b)
+		t.Errorf("Single remote for API not parsed correctly")
 	}
 }
