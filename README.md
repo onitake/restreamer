@@ -134,7 +134,7 @@ mkfifo /tmp/pipe.ts
 ```
 Start feeding data into the pipe (note the -re parameter for real-time streaming):
 ```
-ffmpeg -re -i test.ts -c:a copy -c:v copy -y /tmp/pipe.ts
+ffmpeg -re -stream_loop -1 -i test.ts -fflags +genpts -c:a copy -c:v copy -y /tmp/pipe.ts
 ```
 Start the proxy:
 ```
