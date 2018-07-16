@@ -126,3 +126,65 @@ func TestConfig04(t *testing.T) {
 		t.Errorf("Single remote for API not parsed correctly")
 	}
 }
+
+func TestConfig05(t *testing.T) {
+	t05 := DefaultConfiguration()
+	t05.Resources = []Resource{
+		Resource{
+			Authentication: Authentication{
+				Type: "basic",
+				Users: []string{
+					"t05",
+				},
+			},
+		},
+	}
+	c05 := `{
+		"resources": [
+			{
+				"authentication": {
+					"type": "basic",
+					"user": "t05"
+				}
+			}
+		]
+	}`
+	r05, e05 := LoadConfigurationBytes([]byte(c05))
+	if e05 != nil || !reflect.DeepEqual(t05, r05) {
+		t.Logf("t05: %v", t05)
+		t.Logf("r05: %v", r05)
+		t.Logf("e05: %v", e05)
+		t.Errorf("User list not parsed correctly")
+	}
+}
+
+func TestConfig06(t *testing.T) {
+	t06 := DefaultConfiguration()
+	t06.Notifications = []Notification{
+		{
+			Authentication: Authentication{
+				Type: "basic",
+				User: "t06",
+			},
+		},
+	}
+	c06 := `{
+		"notifications": [
+			{
+				"authentication": {
+					"type": "basic",
+					"users": [
+						"t06"
+					]
+				}
+			}
+		]
+	}`
+	r06, e06 := LoadConfigurationBytes([]byte(c06))
+	if e06 != nil || !reflect.DeepEqual(t06, r06) {
+		t.Logf("t06: %v", t06)
+		t.Logf("r06: %v", r06)
+		t.Logf("e06: %v", e06)
+		t.Errorf("Notification user not parsed correctly")
+	}
+}

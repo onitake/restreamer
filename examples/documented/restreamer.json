@@ -30,6 +30,13 @@
 	"fullconnections": 90,
 	"": "The JSON access log file name. If this option is empty, access logs are disabled.",
 	"log": "",
+	"": "The user database used for authentication stanzas",
+	"userlist": {
+		"username": {
+			"": "The user's password",
+			"password": "secret_password"
+		}
+	},
 	"": "List of resources; can be streams, static content or APIs.",
 	"resources": [
 		{
@@ -58,7 +65,22 @@
 			"remotes": [ ],
 			"": "Cache time in seconds, use 0 to disable caching.",
 			"": "Only supported for static content.",
-			"cache": 0
+			"cache": 0,
+			"": "Access control for this resource. If not present, no authentication is necessary.",
+			"": "Otherwise, an authentication token that matches one of the users is required.",
+			"authentication": {
+				"": "The authentication type: basic or bearer",
+				"": "Basic authentication requires a valid Authorization: Basic base64(md5sum('user:password')) header.",
+				"": "Bearer authentication requires a valid Authorization: Bearer base64('password') header.",
+				"type": "",
+				"": "Realm specifies the realm that is sent back to the client if no Authorization header was present.",
+				"realm": "",
+				"": "A single user that is allowed to access this resource. Concatenated with users.",
+				"user": "",
+				"": "A list of users that may access this resource. prepended with user.",
+				"users": [ ]
+				
+			}
 		},
 		{
 			"type": "api",
@@ -102,8 +124,17 @@
 			"": "limit_hit notifies when the soft limit (fullconnections) is reached",
 			"": "limit_miss notifies when the number of connections goes below this threshold",
 			"event": "limit_hit",
+			"": "The kind of notification that is generated. Only url is supported.",
 			"type": "url",
-			"url": "http://localhost:8001/hit"
+			"": "A GET request is sent to this URL if type is url.",
+			"url": "http://localhost:8001/hit",
+			"": "Optional authentication settings to allow sending an Authorization header with the get request",
+			"authentication": {
+				"": "Authentication type: basic or bearer",
+				"type": "",
+				"": "The user account that is used with this notification. Must be contained in the userlist.",
+				"user": ""
+			}
 		},
 		{
 			"event": "limit_miss",
