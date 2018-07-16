@@ -67,7 +67,7 @@ func main() {
 		configname = "restreamer.json"
 	}
 
-	config, err := streaming.LoadConfiguration(configname)
+	config, err := streaming.LoadConfigurationFile(configname)
 	if err != nil {
 		log.Fatal("Error parsing configuration: ", err)
 	}

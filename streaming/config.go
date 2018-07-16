@@ -17,9 +17,38 @@
 package streaming
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"os"
 )
+
+// Resource is a single HTTP endpoint.
+type Resource struct {
+	// Type is the resource type.
+	Type string `json:"type"`
+	// Api is the API type.
+	Api string `json:"api"`
+	// Serve is the local URL to serve this stream under.
+	Serve string `json:"serve"`
+	// Remote is a single upstream URL or API argument;
+	// it will be added to Remotes during parsing.
+	Remote string `json:"remote"`
+	// Remotes is the upstream URLs.
+	Remotes []string `json:"remotes"`
+	// Cache the cache time in seconds.
+	Cache uint `json:"cache"`
+}
+
+// Notification is a single notification definition.
+type Notification struct {
+	// Event is the event to watch for.
+	Event string `json:"event"`
+	// Type is the kind of callback to send.
+	Type string `json:"type"`
+	// Url is the remote to access (if Type is http).
+	Url string `json:"url"`
+}
 
 // Configuration is a representation of the configurable settings.
 // These are normally read from a JSON file and deserialized by
@@ -56,36 +85,15 @@ type Configuration struct {
 	// Set to true to turn on the pprof web server.
 	Profile bool `json:"profile"`
 	// Resources is the list of streams.
-	Resources []struct {
-		// Type is the resource type.
-		Type string `json:"type"`
-		// Api is the API type.
-		Api string `json:"api"`
-		// Serve is the local URL to serve this stream under.
-		Serve string `json:"serve"`
-		// Remote is a single upstream URL or API argument;
-		// it will be added to Remotes during parsing.
-		Remote string `json:"remote"`
-		// Remotes is the upstream URLs.
-		Remotes []string `json:"remotes"`
-		// Cache the cache time in seconds.
-		Cache uint `json:"cache"`
-	} `json:"resources"`
+	Resources []Resource `json:"resources"`
 	// Notifications defines event callbacks.
-	Notifications []struct {
-		// Event is the event to watch for.
-		Event string `json:"event"`
-		// Type is the kind of callback to send.
-		Type string `json:"type"`
-		// Url is the remote to access (if Type is http).
-		Url string `json:"url"`
-	} `json:"notifications"`
+	Notifications []Notification `json:"notifications"`
 }
 
 // DefaultConfiguration creates and returns a configuration object
 // with default values.
-func DefaultConfiguration() Configuration {
-	return Configuration{
+func DefaultConfiguration() *Configuration {
+	return &Configuration{
 		Listen:       "localhost:http",
 		Timeout:      0,
 		Reconnect:    10,
@@ -95,27 +103,45 @@ func DefaultConfiguration() Configuration {
 	}
 }
 
-// LoadConfiguration loads a configuration in JSON format from "filename".
-func LoadConfiguration(filename string) (Configuration, error) {
-	config := DefaultConfiguration()
-
+// LoadConfigurationFile loads a configuration in JSON format from "filename".
+func LoadConfigurationFile(filename string) (*Configuration, error) {
 	fd, err := os.Open(filename)
 	if err == nil {
-		decoder := json.NewDecoder(fd)
-		err = decoder.Decode(&config)
-		fd.Close()
+		defer fd.Close()
+		return LoadConfiguration(fd)
+	} else {
+		return nil, err
+	}
+}
+
+// LoadConfiguration reads JSON data from the Reader argument and returns a parsed configuration from it.
+func LoadConfiguration(reader io.Reader) (*Configuration, error) {
+	config := DefaultConfiguration()
+
+	decoder := json.NewDecoder(reader)
+	err := decoder.Decode(&config)
+	if err != nil {
+		return nil, err
 	}
 
 	for i := range config.Resources {
+		resource := &config.Resources[i]
 		// add remote to remotes list, if given
-		if len(config.Resources[i].Remote) > 0 {
-			length := len(config.Resources[i].Remotes)
+		if len(resource.Remote) > 0 {
+			length := len(resource.Remotes)
 			remotes := make([]string, length+1)
-			remotes[0] = config.Resources[i].Remote
-			copy(remotes[1:], config.Resources[i].Remotes)
-			config.Resources[i].Remotes = remotes
+			remotes[0] = resource.Remote
+			copy(remotes[1:], resource.Remotes)
+			resource.Remotes = remotes
+			// reset
+			resource.Remote = ""
 		}
 	}
 
 	return config, err
+}
+
+// LoadConfigurationBytes parses the byte array argument as JSON and initialises a configuration from it.
+func LoadConfigurationBytes(json []byte) (*Configuration, error) {
+	return LoadConfiguration(bytes.NewReader(json))
 }
