@@ -18,10 +18,11 @@ package streaming
 
 import (
 	"encoding/hex"
+	"github.com/onitake/restreamer/configuration"
+	"github.com/onitake/restreamer/util"
 	"net/http"
 	"net/url"
 	"testing"
-	"github.com/onitake/restreamer/util"
 )
 
 type mockProxyLogger struct {
@@ -83,11 +84,13 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 func TestProxy(t *testing.T) {
 	logger := &mockProxyLogger{t}
 
-	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0)
+	auth := configuration.NewAuthenticator(configuration.Authentication{}, nil)
+
+	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0, auth)
 	direct.SetLogger(logger)
 	testWithProxy(t, direct)
 
-	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1)
+	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1, auth)
 	cached.SetLogger(logger)
 	testWithProxy(t, cached)
 }

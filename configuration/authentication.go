@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package streaming
+package configuration
 
 import (
 	"encoding/base64"
@@ -33,22 +33,66 @@ type Authenticator interface {
 	// Removes a user from the list.
 	// Implementations may interpret users differently.
 	RemoveUser(user string)
+	// GetLogin returns an authentication string that can be sent to a remote system.
+	GetLogin(user string) string
 }
 
-// NewAuthenticator creates an authentication service from a credential datavase and
+// NewAuthenticator creates an authentication service from a credential database and
 // an authentication specification. The implementation depends on the algorithm.
-// If an invalid authentication type is specified, nil is returned.
-// Empty whitelists allow no users at all!
-// Note that some authenticators allow modifying the user list.
+//
+// If an invalid authentication type is specified, an authenticator that will always
+// deny requests is returned.
+// If an empty authentication type is specified, an authenticator that will accept
+// all requests is returned.
+//
+// Note: Empty whitelists allow no users at all!
 func NewAuthenticator(auth Authentication, credentials map[string]UserCredentials) Authenticator {
 	switch auth.Type {
+	case "":
+		return newPassAuthenticator()
 	case "basic":
 		return newBasicAuthenticator(auth.Users, credentials)
 	case "bearer":
 		return newTokenAuthenticator(auth.Users, credentials)
 	default:
-		return nil
+		return newDenyAuthenticator()
 	}
+}
+
+type passAuthenticator struct{}
+
+func newPassAuthenticator() *passAuthenticator {
+	return &passAuthenticator{}
+}
+
+func (auth *passAuthenticator) Authenticate(authorization string) bool {
+	return true
+}
+
+func (auth *passAuthenticator) AddUser(user, password string) {}
+
+func (auth *passAuthenticator) RemoveUser(user string) {}
+
+func (auth *passAuthenticator) GetLogin(user string) string {
+	return ""
+}
+
+type denyAuthenticator struct{}
+
+func newDenyAuthenticator() *denyAuthenticator {
+	return &denyAuthenticator{}
+}
+
+func (auth *denyAuthenticator) Authenticate(authorization string) bool {
+	return false
+}
+
+func (auth *denyAuthenticator) AddUser(user, password string) {}
+
+func (auth *denyAuthenticator) RemoveUser(user string) {}
+
+func (auth *denyAuthenticator) GetLogin(user string) string {
+	return ""
 }
 
 type basicAuthenticator struct {
@@ -107,6 +151,13 @@ func (auth *basicAuthenticator) RemoveUser(user string) {
 	}
 }
 
+func (auth *basicAuthenticator) GetLogin(user string) string {
+	if token, ok := auth.users[user]; ok {
+		return "Basic " + token
+	}
+	return ""
+}
+
 type tokenAuthenticator struct {
 	// tokens maps valid authentication tokens to yes/no
 	tokens map[string]bool
@@ -160,4 +211,37 @@ func (auth *tokenAuthenticator) RemoveUser(user string) {
 		delete(auth.users, user)
 		delete(auth.tokens, token)
 	}
+}
+
+func (auth *tokenAuthenticator) GetLogin(user string) string {
+	if token, ok := auth.users[user]; ok {
+		return "Bearer " + token
+	}
+	return ""
+}
+
+
+// UserAuthenticator is an authenticator that is bound to a single user.
+// It does not implement the Authenticator interface because it doesn't support the user argument.
+type UserAuthenticator struct {
+	Auth Authenticator
+	User string
+}
+
+// NewUserAuthenticator creates a new user authenticator from an Authentication configuration and
+// and an authenticator.
+// If the Authentication does not contain any users, nil is returned. If it contains more than
+// one user, the first one is used.
+func NewUserAuthenticator(cred Authentication, auth Authenticator) *UserAuthenticator {
+	if len(cred.Users) < 1 {
+		return nil
+	}
+	return &UserAuthenticator{
+		Auth: auth,
+		User: cred.Users[0],
+	}
+}
+
+func (auth *UserAuthenticator) GetLogin() string {
+	return auth.Auth.GetLogin(auth.User)
 }

@@ -20,6 +20,7 @@ import (
 	//"encoding/hex"
 	"bytes"
 	"encoding/json"
+	"github.com/onitake/restreamer/configuration"
 	"net/http"
 	"testing"
 )
@@ -84,9 +85,10 @@ func testStatisticsConnections(t *testing.T, connections, full, max int64, statu
 	}
 	api := &statisticsApi{
 		stats: stats,
+		auth:  configuration.NewAuthenticator(configuration.Authentication{}, nil),
 	}
 	writer := newMockWriter(t)
-	api.ServeHTTP(writer, nil)
+	api.ServeHTTP(writer, &http.Request{Header: make(http.Header)})
 	var decoded map[string]interface{}
 	err := json.Unmarshal(writer.Bytes(), &decoded)
 	if err != nil {
@@ -111,9 +113,10 @@ func testHealthConnections(t *testing.T, connections, full, max int64, status st
 	}
 	api := &healthApi{
 		stats: stats,
+		auth:  configuration.NewAuthenticator(configuration.Authentication{}, nil),
 	}
 	writer := newMockWriter(t)
-	api.ServeHTTP(writer, nil)
+	api.ServeHTTP(writer, &http.Request{Header: make(http.Header)})
 	var decoded map[string]interface{}
 	err := json.Unmarshal(writer.Bytes(), &decoded)
 	if err != nil {

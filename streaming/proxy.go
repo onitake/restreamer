@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/util"
 	"hash/fnv"
 	"io"
@@ -108,6 +109,8 @@ type Proxy struct {
 	stats api.Statistics
 	// a json logger
 	logger *util.ModuleLogger
+	// auth is an authentication verifier for client requests
+	auth configuration.Authenticator
 }
 
 // NewProxy constructs a new HTTP proxy.
@@ -116,7 +119,7 @@ type Proxy struct {
 // number of seconds. If it is zero, the resource will be fetched from upstream
 // every time it is requested.
 // timeout sets the upstream HTTP connection timeout.
-func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
+func NewProxy(uri string, timeout uint, cache uint, auth configuration.Authenticator) (*Proxy, error) {
 	logger := &util.ModuleLogger{
 		Logger: &util.ConsoleLogger{},
 		Defaults: util.Dict{
@@ -143,6 +146,7 @@ func NewProxy(uri string, timeout uint, cache uint) (*Proxy, error) {
 		resource: nil,
 		stats:    &api.DummyStatistics{},
 		logger:   logger,
+		auth:     auth,
 	}, nil
 }
 
@@ -369,6 +373,13 @@ func (proxy *Proxy) cache() *fetchableResource {
 // ServeHTTP handles an incoming connection.
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// fail-fast: verify that this user can access this resource first
+	if !proxy.auth.Authenticate(request.Header.Get("Authorization")) {
+		// TODO send back WWW-Authenticate?
+		writer.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
 	// create a return channel for the fetcher
 	fetchable := make(chan *fetchableResource)
 
