@@ -16,30 +16,148 @@
 
 package streaming
 
-import ()
+import (
+	"encoding/base64"
+	"strings"
+	// 	"crypto/md5"
+)
 
-type UserTable struct {
-	credentials map[string]UserCredentials
-	whitelist   Authentication
+// Authenticator represents any type that can authenticate users.
+type Authenticator interface {
+	// Authenticate parses an Authorization header and tries to authenticate the request.
+	// Returns true if the authentication succeeded, false otherwise.
+	Authenticate(authorization string) bool
+	// Adds a new user to the list.
+	// Implementations may interpret users and passwords differently.
+	AddUser(user, password string)
+	// Removes a user from the list.
+	// Implementations may interpret users differently.
+	RemoveUser(user string)
 }
 
-// MakeUserTable creates a user verification table from user credentials and a whitelist.
-func MakeUserTable(credentials map[string]UserCredentials, whitelist Authentication) *UserTable {
-	table := &UserTable{
-		credentials: credentials,
-		whitelist:   whitelist,
+// NewAuthenticator creates an authentication service from a credential datavase and
+// an authentication specification. The implementation depends on the algorithm.
+// If an invalid authentication type is specified, nil is returned.
+// Empty whitelists allow no users at all!
+// Note that some authenticators allow modifying the user list.
+func NewAuthenticator(auth Authentication, credentials map[string]UserCredentials) Authenticator {
+	switch auth.Type {
+	case "basic":
+		return newBasicAuthenticator(auth.Users, credentials)
+	case "bearer":
+		return newTokenAuthenticator(auth.Users, credentials)
+	default:
+		return nil
 	}
-	return table
 }
 
-// Authenticate authenticates a user by parsing and matching an Authorization header
-// against the user table.
-// Returns true if the authentication succeeded, false otherwise.
-// If the whitelist is empty, authentication will always succeed.
-func (table *UserTable) Authenticate(authorization string) bool {
-	if len(table.whitelist.Users) == 0 {
-		return true
+type basicAuthenticator struct {
+	// tokens maps valid authentication strings to yes/no
+	tokens map[string]bool
+	// users maps user names to valid authentication strings
+	users map[string]string
+}
+
+// newBasicAuthenticator creates a new Authenticator that supports basic authentication.
+// If the whitelist is empty, all requests are allowed.
+func newBasicAuthenticator(whitelist []string, credentials map[string]UserCredentials) *basicAuthenticator {
+	auth := &basicAuthenticator{
+		tokens: make(map[string]bool),
+		users:  make(map[string]string),
 	}
-	// TODO
+	for _, user := range whitelist {
+		cred, ok := credentials[user]
+		if ok {
+			auth.AddUser(user, cred.Password)
+		}
+	}
+	return auth
+}
+
+func (auth *basicAuthenticator) Authenticate(authorization string) bool {
+	if strings.HasPrefix(authorization, "Basic") {
+		// cut off the hash at the end
+		hash := strings.SplitN(authorization, " ", 2)
+		if len(hash) >= 2 {
+			// check if the hash is allowed
+			return auth.tokens[hash[1]]
+		}
+	}
+	// not basic auth
 	return false
+}
+
+func (auth *basicAuthenticator) AddUser(user, password string) {
+	// remove the old token if the user exists already
+	if oldtoken, ok := auth.users[user]; ok {
+		delete(auth.tokens, oldtoken)
+	}
+	// base64(username + ':' + password)
+	// we only support UTF-8
+	token := base64.StdEncoding.EncodeToString([]byte(user + ":" + password))
+	auth.tokens[token] = true
+	auth.users[user] = token
+}
+
+func (auth *basicAuthenticator) RemoveUser(user string) {
+	token, ok := auth.users[user]
+	if ok {
+		delete(auth.users, user)
+		delete(auth.tokens, token)
+	}
+}
+
+type tokenAuthenticator struct {
+	// tokens maps valid authentication tokens to yes/no
+	tokens map[string]bool
+	// users maps user names to valid authentication tokens
+	users map[string]string
+}
+
+// newTokenAuthenticator creates a new Authenticator that supports bearer token authentication.
+// The user name is only used as a unique identifier for the token list
+func newTokenAuthenticator(whitelist []string, credentials map[string]UserCredentials) *tokenAuthenticator {
+	auth := &tokenAuthenticator{
+		tokens: make(map[string]bool),
+		users:  make(map[string]string),
+	}
+	for _, user := range whitelist {
+		cred, ok := credentials[user]
+		if ok {
+			auth.AddUser(user, cred.Password)
+		}
+	}
+	return auth
+}
+
+func (auth *tokenAuthenticator) Authenticate(authorization string) bool {
+	if strings.HasPrefix(authorization, "Bearer") {
+		// cut off the hash at the end
+		hash := strings.SplitN(authorization, " ", 2)
+		if len(hash) >= 2 {
+			// check if the hash is allowed
+			return auth.tokens[hash[1]]
+		}
+	}
+	// not basic auth
+	return false
+}
+
+func (auth *tokenAuthenticator) AddUser(user, password string) {
+	// remove the old token if the user exists already
+	if oldtoken, ok := auth.users[user]; ok {
+		delete(auth.tokens, oldtoken)
+	}
+	// base64(password)
+	// we expect that token is already base64 formatted - do nothing here
+	auth.tokens[password] = true
+	auth.users[user] = password
+}
+
+func (auth *tokenAuthenticator) RemoveUser(user string) {
+	token, ok := auth.users[user]
+	if ok {
+		delete(auth.users, user)
+		delete(auth.tokens, token)
+	}
 }
