@@ -122,18 +122,17 @@ func main() {
 		switch note.Type {
 		case "url":
 			auth := configuration.NewUserAuthenticator(note.Authentication, configuration.NewAuthenticator(note.Authentication, config.UserList))
-			if auth != nil {
-				urlhandler, err := event.NewUrlHandler(note.Url, auth)
-				if err == nil {
-					urlhandler.SetLogger(logbackend)
-					handler = urlhandler
-				}
-			} else {
+			if auth == nil {
 				logger.Log(util.Dict{
 					"event":   eventMainError,
 					"error":   errorMainInvalidAuthentication,
 					"message": fmt.Sprintf("Invalid authentication configuration, possibly a missing user"),
 				})
+			}
+			urlhandler, err := event.NewUrlHandler(note.Url, auth)
+			if err == nil {
+				urlhandler.SetLogger(logbackend)
+				handler = urlhandler
 			}
 		}
 		if err == nil {

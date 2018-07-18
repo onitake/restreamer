@@ -164,7 +164,9 @@ func TestConfig06(t *testing.T) {
 		{
 			Authentication: Authentication{
 				Type: "basic",
-				User: "t06",
+				Users: []string{
+					"t06",
+				},
 			},
 		},
 	}
@@ -173,9 +175,7 @@ func TestConfig06(t *testing.T) {
 			{
 				"authentication": {
 					"type": "basic",
-					"users": [
-						"t06"
-					]
+					"user": "t06"
 				}
 			}
 		]

@@ -188,10 +188,15 @@ func LoadConfiguration(reader io.Reader) (*Configuration, error) {
 	}
 	for i := range config.Notifications {
 		notification := &config.Notifications[i]
-		// assign to the single user if only a list was given
-		if len(notification.Authentication.Type) > 0 && len(notification.Authentication.User) == 0 && len(notification.Authentication.Users) > 0 {
-			notification.Authentication.User = notification.Authentication.Users[0]
-			notification.Authentication.Users = nil
+		// add user to users list, if given
+		if len(notification.Authentication.Type) > 0 && len(notification.Authentication.User) > 0 {
+			length := len(notification.Authentication.Users)
+			users := make([]string, length+1)
+			users[0] = notification.Authentication.User
+			copy(users[1:], notification.Authentication.Users)
+			notification.Authentication.Users = users
+			// reset
+			notification.Authentication.User = ""
 		}
 	}
 

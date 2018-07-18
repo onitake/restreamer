@@ -73,11 +73,16 @@ func (handler *UrlHandler) HandleEvent(typ EventType, args ...interface{}) {
 		"event":   urlHandlerEventNotify,
 		"message": fmt.Sprintf("Event received, notifying %s", handler.Url),
 		"url":     handler.Url.String(),
+		"auth":    handler.userauth != nil,
 		"type":    typ,
 	})
 	req := &http.Request{
 		Method: "GET",
 		URL:    handler.Url,
+		Header: make(http.Header),
+	}
+	if handler.userauth != nil {
+		req.Header.Add("Authorization", handler.userauth.GetLogin())
 	}
 	_, err := http.DefaultClient.Do(req)
 	if err != nil {
