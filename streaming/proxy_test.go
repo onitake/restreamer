@@ -19,6 +19,7 @@ package streaming
 import (
 	"encoding/hex"
 	"github.com/onitake/restreamer/configuration"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"net/http"
 	"net/url"
@@ -84,7 +85,7 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 func TestProxy(t *testing.T) {
 	logger := &mockProxyLogger{t}
 
-	auth := configuration.NewAuthenticator(configuration.Authentication{}, nil)
+	auth := protocol.NewAuthenticator(configuration.Authentication{}, nil)
 
 	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0, auth)
 	direct.SetLogger(logger)

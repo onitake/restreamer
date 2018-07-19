@@ -20,9 +20,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onitake/restreamer/api"
-	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/event"
 	"github.com/onitake/restreamer/mpegts"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"net/http"
 	"sync"
@@ -122,7 +122,7 @@ type Streamer struct {
 	// events is an event receiver
 	events event.Notifiable
 	// auth is an authentication verifier for client requests
-	auth configuration.Authenticator
+	auth protocol.Authenticator
 }
 
 // ConnectionBroker represents a policy handler for new connections.
@@ -142,7 +142,7 @@ type ConnectionBroker interface {
 // qsize is the length of each connection's queue (in packets).
 // broker handles policy enforcement
 // stats is a statistics collector object.
-func NewStreamer(qsize uint, broker ConnectionBroker, auth configuration.Authenticator) *Streamer {
+func NewStreamer(qsize uint, broker ConnectionBroker, auth protocol.Authenticator) *Streamer {
 	logger := &util.ModuleLogger{
 		Logger: &util.ConsoleLogger{},
 		Defaults: util.Dict{
@@ -366,9 +366,7 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	// fail-fast: verify that this user can access this resource first
-	if !streamer.auth.Authenticate(request.Header.Get("Authorization")) {
-		// TODO send back WWW-Authenticate?
-		writer.WriteHeader(http.StatusUnauthorized)
+	if !protocol.HandleHttpAuthentication(streamer.auth, request, writer) {
 		return
 	}
 

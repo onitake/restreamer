@@ -18,7 +18,7 @@ package event
 
 import (
 	"fmt"
-	"github.com/onitake/restreamer/configuration"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"net/http"
 	"net/url"
@@ -40,10 +40,10 @@ type UrlHandler struct {
 	// logger is a json logger
 	logger *util.ModuleLogger
 	// userauth will be used to generate credentials for client requests
-	userauth *configuration.UserAuthenticator
+	userauth *protocol.UserAuthenticator
 }
 
-func NewUrlHandler(urly string, userauth *configuration.UserAuthenticator) (*UrlHandler, error) {
+func NewUrlHandler(urly string, userauth *protocol.UserAuthenticator) (*UrlHandler, error) {
 	logger := &util.ModuleLogger{
 		Logger: &util.ConsoleLogger{},
 		Defaults: util.Dict{

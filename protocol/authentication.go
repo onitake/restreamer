@@ -14,12 +14,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package configuration
+package protocol
 
 import (
 	"encoding/base64"
 	"strings"
 	// 	"crypto/md5"
+	"github.com/onitake/restreamer/configuration"
 )
 
 // Authenticator represents any type that can authenticate users.
@@ -35,6 +36,8 @@ type Authenticator interface {
 	RemoveUser(user string)
 	// GetLogin returns an authentication string that can be sent to a remote system.
 	GetLogin(user string) string
+	// GetAuthenticateRequest returns a realm or other response that can be sent with a WWW-Authenticate header.
+	GetAuthenticateRequest() string
 }
 
 // NewAuthenticator creates an authentication service from a credential database and
@@ -46,12 +49,12 @@ type Authenticator interface {
 // all requests is returned.
 //
 // Note: Empty whitelists allow no users at all!
-func NewAuthenticator(auth Authentication, credentials map[string]UserCredentials) Authenticator {
+func NewAuthenticator(auth configuration.Authentication, credentials map[string]configuration.UserCredentials) Authenticator {
 	switch auth.Type {
 	case "":
 		return newPassAuthenticator()
 	case "basic":
-		return newBasicAuthenticator(auth.Users, credentials)
+		return newBasicAuthenticator(auth.Users, credentials, auth.Realm)
 	case "bearer":
 		return newTokenAuthenticator(auth.Users, credentials)
 	default:
@@ -76,6 +79,10 @@ func (auth *passAuthenticator) RemoveUser(user string) {}
 func (auth *passAuthenticator) GetLogin(user string) string {
 	return ""
 }
+func (auth *passAuthenticator) GetAuthenticateRequest() string {
+	return ""
+}
+
 
 type denyAuthenticator struct{}
 
@@ -94,20 +101,26 @@ func (auth *denyAuthenticator) RemoveUser(user string) {}
 func (auth *denyAuthenticator) GetLogin(user string) string {
 	return ""
 }
+func (auth *denyAuthenticator) GetAuthenticateRequest() string {
+	return ""
+}
 
 type basicAuthenticator struct {
 	// tokens maps valid authentication strings to yes/no
 	tokens map[string]bool
 	// users maps user names to valid authentication strings
 	users map[string]string
+	// the authentication realm (unique string sent back with an unauthorized response
+	realm string
 }
 
 // newBasicAuthenticator creates a new Authenticator that supports basic authentication.
 // If the whitelist is empty, no requests are allowed.
-func newBasicAuthenticator(whitelist []string, credentials map[string]UserCredentials) *basicAuthenticator {
+func newBasicAuthenticator(whitelist []string, credentials map[string]configuration.UserCredentials, realm string) *basicAuthenticator {
 	auth := &basicAuthenticator{
 		tokens: make(map[string]bool),
 		users:  make(map[string]string),
+		realm:  realm,
 	}
 	for _, user := range whitelist {
 		cred, ok := credentials[user]
@@ -158,6 +171,10 @@ func (auth *basicAuthenticator) GetLogin(user string) string {
 	return ""
 }
 
+func (auth *basicAuthenticator) GetAuthenticateRequest() string {
+	return "Basic realm=\"" + auth.realm + "\" charset=\"UTF-8\""
+}
+
 type tokenAuthenticator struct {
 	// tokens maps valid authentication tokens to yes/no
 	tokens map[string]bool
@@ -167,7 +184,7 @@ type tokenAuthenticator struct {
 
 // newTokenAuthenticator creates a new Authenticator that supports bearer token authentication.
 // The user name is only used as a unique identifier for the token list
-func newTokenAuthenticator(whitelist []string, credentials map[string]UserCredentials) *tokenAuthenticator {
+func newTokenAuthenticator(whitelist []string, credentials map[string]configuration.UserCredentials) *tokenAuthenticator {
 	auth := &tokenAuthenticator{
 		tokens: make(map[string]bool),
 		users:  make(map[string]string),
@@ -220,6 +237,11 @@ func (auth *tokenAuthenticator) GetLogin(user string) string {
 	return ""
 }
 
+func (auth *tokenAuthenticator) GetAuthenticateRequest() string {
+	// token-based auth doesn't support challenge-response or similar, as token are generated externally
+	// just send back a 403.
+	return ""
+}
 
 // UserAuthenticator is an authenticator that is bound to a single user.
 // It does not implement the Authenticator interface because it doesn't support the user argument.
@@ -232,7 +254,7 @@ type UserAuthenticator struct {
 // and an authenticator.
 // If the Authentication does not contain any users, nil is returned. If it contains more than
 // one user, the first one is used.
-func NewUserAuthenticator(cred Authentication, auth Authenticator) *UserAuthenticator {
+func NewUserAuthenticator(cred configuration.Authentication, auth Authenticator) *UserAuthenticator {
 	if len(cred.Users) < 1 {
 		return nil
 	}

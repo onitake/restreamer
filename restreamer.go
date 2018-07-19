@@ -21,6 +21,7 @@ import (
 	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/event"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
 	"log"
@@ -121,7 +122,7 @@ func main() {
 		var err error
 		switch note.Type {
 		case "url":
-			auth := configuration.NewUserAuthenticator(note.Authentication, configuration.NewAuthenticator(note.Authentication, config.UserList))
+			auth := protocol.NewUserAuthenticator(note.Authentication, protocol.NewAuthenticator(note.Authentication, config.UserList))
 			if auth == nil {
 				logger.Log(util.Dict{
 					"event":   eventMainError,
@@ -161,7 +162,7 @@ func main() {
 
 			reg := stats.RegisterStream(streamdef.Serve)
 
-			auth := configuration.NewAuthenticator(streamdef.Authentication, config.UserList)
+			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
 
 			streamer := streaming.NewStreamer(config.OutputBuffer, controller, auth)
 			streamer.SetLogger(logbackend)
@@ -197,7 +198,7 @@ func main() {
 				"remote":  streamdef.Remote,
 				"message": fmt.Sprintf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote),
 			})
-			auth := configuration.NewAuthenticator(streamdef.Authentication, config.UserList)
+			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
 			proxy, err := streaming.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache, auth)
 			if err != nil {
 				log.Print(err)
@@ -209,7 +210,7 @@ func main() {
 			}
 
 		case "api":
-			auth := configuration.NewAuthenticator(streamdef.Authentication, config.UserList)
+			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
 
 			switch streamdef.Api {
 			case "health":

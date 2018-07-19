@@ -14,12 +14,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package configuration
+package protocol
 
 import (
  	"encoding/base64"
 	"testing"
 	"math/rand"
+	"github.com/onitake/restreamer/configuration"
 )
 
 const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-+.:,;$!#@%&/()=?'[]{}_<>"
@@ -51,15 +52,16 @@ func TestDenyAuthenticator01(t *testing.T) {
 func TestBasicAuthenticator01(t *testing.T) {
 	user := "user"
 	password := randStringBytes(16)
+	realm := "Test Realm"
 	whitelist := []string{
 		user,
 	}
-	cred := map[string]UserCredentials{
-		user: UserCredentials{
+	cred := map[string]configuration.UserCredentials{
+		user: configuration.UserCredentials{
 			Password: password,
 		},
 	}
-	auth := newBasicAuthenticator(whitelist, cred)
+	auth := newBasicAuthenticator(whitelist, cred, realm)
 	str := base64.StdEncoding.EncodeToString([]byte(user + ":" + password))
 	if !auth.Authenticate("Basic " + str) {
 		t.Errorf("Basic authenticator didn't allow valid user")
@@ -69,13 +71,14 @@ func TestBasicAuthenticator01(t *testing.T) {
 func TestBasicAuthenticator02(t *testing.T) {
 	user := "user"
 	password := randStringBytes(16)
+	realm := "Test Realm"
 	whitelist := []string{}
-	cred := map[string]UserCredentials{
-		user: UserCredentials{
+	cred := map[string]configuration.UserCredentials{
+		user: configuration.UserCredentials{
 			Password: password,
 		},
 	}
-	auth := newBasicAuthenticator(whitelist, cred)
+	auth := newBasicAuthenticator(whitelist, cred, realm)
 	str := base64.StdEncoding.EncodeToString([]byte(user + ":" + password))
 	if auth.Authenticate("Basic " + str) {
 		t.Errorf("Basic authenticator allowed non-whitelisted user")
