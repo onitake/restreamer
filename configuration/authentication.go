@@ -103,7 +103,7 @@ type basicAuthenticator struct {
 }
 
 // newBasicAuthenticator creates a new Authenticator that supports basic authentication.
-// If the whitelist is empty, all requests are allowed.
+// If the whitelist is empty, no requests are allowed.
 func newBasicAuthenticator(whitelist []string, credentials map[string]UserCredentials) *basicAuthenticator {
 	auth := &basicAuthenticator{
 		tokens: make(map[string]bool),
