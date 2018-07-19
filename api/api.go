@@ -48,6 +48,9 @@ func NewHealthApi(stats Statistics, auth protocol.Authenticator) http.Handler {
 // ServeHTTP is the http handler method.
 // It sends back information about system health.
 func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "application/json")
+
 	// fail-fast: verify that this user can access this resource first
 	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
@@ -74,7 +77,6 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	stats.Max = int(global.MaxConnections)
 	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
 
-	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK)
@@ -106,6 +108,9 @@ func NewStatisticsApi(stats Statistics, auth protocol.Authenticator) http.Handle
 // ServeHTTP is the http handler method.
 // It sends back information about system health.
 func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "application/json")
+
 	// fail-fast: verify that this user can access this resource first
 	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
@@ -156,7 +161,6 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	stats.BytesPerSecondSent = global.BytesPerSecondSent
 	stats.BytesPerSecondDropped = global.BytesPerSecondDropped
 
-	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK)
@@ -190,12 +194,14 @@ func NewStreamStateApi(client connectChecker, auth protocol.Authenticator) http.
 // It sends back "200 ok" if the stream is connected and "404 not found" if not,
 // along with the corresponding HTTP status code.
 func (api *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "text/plain")
+
 	// fail-fast: verify that this user can access this resource first
 	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
-	writer.Header().Add("Content-Type", "text/plain")
 	if api.client.Connected() {
 		writer.WriteHeader(http.StatusOK)
 		writer.Write([]byte("200 ok"))
@@ -235,6 +241,9 @@ func NewStreamControlApi(inhibit inhibitor, auth protocol.Authenticator) http.Ha
 // are closed immediately. If both are present, the query is treated like
 // if there was only "offline".
 func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "text/plain")
+
 	// fail-fast: verify that this user can access this resource first
 	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
@@ -244,10 +253,13 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 	if len(query["offline"]) > 0 {
 		api.inhibit.SetInhibit(true)
 		writer.WriteHeader(http.StatusAccepted)
+		writer.Write([]byte("202 accepted"))
 	} else if len(query["online"]) > 0 {
 		api.inhibit.SetInhibit(false)
 		writer.WriteHeader(http.StatusAccepted)
+		writer.Write([]byte("202 accepted"))
 	} else {
 		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("400 bad request"))
 	}
 }
