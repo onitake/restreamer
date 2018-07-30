@@ -17,14 +17,14 @@
 package streaming
 
 import (
-	"testing"
 	"github.com/onitake/restreamer/util"
 	"sync"
 	"sync/atomic"
+	"testing"
 )
 
 type mockAclLogger struct {
-	t *testing.T
+	t     *testing.T
 	Stage string
 }
 

@@ -83,7 +83,6 @@ func (auth *passAuthenticator) GetAuthenticateRequest() string {
 	return ""
 }
 
-
 type denyAuthenticator struct{}
 
 func newDenyAuthenticator() *denyAuthenticator {

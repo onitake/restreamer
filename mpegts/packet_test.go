@@ -17,10 +17,10 @@
 package mpegts
 
 import (
-	"testing"
 	"bytes"
 	"io"
 	"math/rand"
+	"testing"
 )
 
 func makeRandomPacket(t *testing.T, bytes int) []byte {

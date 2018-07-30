@@ -71,10 +71,10 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 		AddTimestamp: true,
 	}
 	conn := &Connection{
-		Queue:  make(chan mpegts.Packet, qsize),
+		Queue:         make(chan mpegts.Packet, qsize),
 		ClientAddress: clientaddr,
-		writer: destination,
-		logger: logger,
+		writer:        destination,
+		logger:        logger,
 	}
 	return conn
 }

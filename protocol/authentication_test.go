@@ -17,20 +17,21 @@
 package protocol
 
 import (
- 	"encoding/base64"
-	"testing"
-	"math/rand"
+	"encoding/base64"
 	"github.com/onitake/restreamer/configuration"
+	"math/rand"
+	"testing"
 )
 
 const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-+.:,;$!#@%&/()=?'[]{}_<>"
+
 // https://stackoverflow.com/a/31832326
 func randStringBytes(n int) string {
-    b := make([]byte, n)
-    for i := range b {
-        b[i] = alphabet[rand.Intn(len(alphabet))]
-    }
-    return string(b)
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = alphabet[rand.Intn(len(alphabet))]
+	}
+	return string(b)
 }
 
 func TestPassAuthenticator01(t *testing.T) {
