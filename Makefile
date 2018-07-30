@@ -29,14 +29,10 @@ PACKAGE_PREFIX=github.com/onitake
 PACKAGE=restreamer
 PACKAGE_PATH=src/$(PACKAGE_PREFIX)/$(PACKAGE)
 RESTREAMER_SOURCES=restreamer.go profile.go
-UTIL_SOURCES=util/log.go util/set.go util/atomic.go util/shuffle.go
-API_SOURCES=api/api.go api/stats.go
-MPEGTS_SOURCES=mpegts/packet.go
-STREAMING_SOURCES=streaming/connection.go streaming/client.go streaming/streamer.go streaming/proxy.go streaming/acl.go streaming/config.go streaming/manager.go
-LIB_SOURCES=$(UTIL_SOURCES) $(API_SOURCES) $(MPEGTS_SOURCES) $(STREAMING_SOURCES)
 RESTREAMER_EXE=restreamer$(PACKAGE_OS)$(PACKAGE_ARCH)$(EXE_SUFFIX)
 
-.PHONY: all clean test
+# always force a rebuild of the main binary
+.PHONY: all clean test docker bin/$(RESTREAMER_EXE)
 
 all: bin/$(RESTREAMER_EXE)
 
@@ -53,10 +49,11 @@ test: $(PACKAGE_PATH)
 		$(PACKAGE_PREFIX)/$(PACKAGE)/streaming \
 		$(PACKAGE_PREFIX)/$(PACKAGE)/api \
 		$(PACKAGE_PREFIX)/$(PACKAGE)/mpegts \
-		$(PACKAGE_PREFIX)/$(PACKAGE)/event
+		$(PACKAGE_PREFIX)/$(PACKAGE)/event \
+		$(PACKAGE_PREFIX)/$(PACKAGE)/configuration
 
 docker: bin/restreamer
 	docker build -t restreamer .
 
-bin/$(RESTREAMER_EXE): $(PACKAGE_PATH) $(RESTREAMER_SOURCES) $(LIB_SOURCES)
+bin/$(RESTREAMER_EXE): $(PACKAGE_PATH) $(RESTREAMER_SOURCES)
 	go build -o $@ $(RESTREAMER_SOURCES)

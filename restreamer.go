@@ -19,7 +19,9 @@ package main
 import (
 	"fmt"
 	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/event"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
 	"log"
@@ -41,10 +43,13 @@ const (
 	eventMainStartMonitor = "start_monitor"
 	eventMainStartServer  = "start_server"
 	//
-	errorMainStreamNotFound      = "stream_notfound"
-	errorMainInvalidApi          = "invalid_api"
-	errorMainInvalidResource     = "invalid_resource"
-	errorMainInvalidNotification = "invalid_notification"
+	errorMainStreamNotFound          = "stream_notfound"
+	errorMainInvalidApi              = "invalid_api"
+	errorMainInvalidResource         = "invalid_resource"
+	errorMainInvalidNotification     = "invalid_notification"
+	errorMainMissingNotificationUser = "missing_notification_user"
+	errorMainMissingStreamUser       = "missing_stream_user"
+	errorMainInvalidAuthentication   = "invalid_authentication"
 )
 
 func main() {
@@ -67,7 +72,7 @@ func main() {
 		configname = "restreamer.json"
 	}
 
-	config, err := streaming.LoadConfigurationFile(configname)
+	config, err := configuration.LoadConfigurationFile(configname)
 	if err != nil {
 		log.Fatal("Error parsing configuration: ", err)
 	}
@@ -117,7 +122,15 @@ func main() {
 		var err error
 		switch note.Type {
 		case "url":
-			urlhandler, err := event.NewUrlHandler(note.Url)
+			auth := protocol.NewUserAuthenticator(note.Authentication, protocol.NewAuthenticator(note.Authentication, config.UserList))
+			if auth == nil {
+				logger.Log(util.Dict{
+					"event":   eventMainError,
+					"error":   errorMainInvalidAuthentication,
+					"message": fmt.Sprintf("Invalid authentication configuration, possibly a missing user"),
+				})
+			}
+			urlhandler, err := event.NewUrlHandler(note.Url, auth)
 			if err == nil {
 				urlhandler.SetLogger(logbackend)
 				handler = urlhandler
@@ -149,7 +162,9 @@ func main() {
 
 			reg := stats.RegisterStream(streamdef.Serve)
 
-			streamer := streaming.NewStreamer(config.OutputBuffer, controller)
+			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
+
+			streamer := streaming.NewStreamer(config.OutputBuffer, controller, auth)
 			streamer.SetLogger(logbackend)
 			streamer.SetCollector(reg)
 			streamer.SetNotifier(queue)
@@ -183,7 +198,8 @@ func main() {
 				"remote":  streamdef.Remote,
 				"message": fmt.Sprintf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote),
 			})
-			proxy, err := streaming.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache)
+			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
+			proxy, err := streaming.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache, auth)
 			if err != nil {
 				log.Print(err)
 			} else {
@@ -194,6 +210,8 @@ func main() {
 			}
 
 		case "api":
+			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
+
 			switch streamdef.Api {
 			case "health":
 				logger.Log(util.Dict{
@@ -202,7 +220,7 @@ func main() {
 					"serve":   streamdef.Serve,
 					"message": fmt.Sprintf("Registering global health API on %s", streamdef.Serve),
 				})
-				mux.Handle(streamdef.Serve, api.NewHealthApi(stats))
+				mux.Handle(streamdef.Serve, api.NewHealthApi(stats, auth))
 			case "statistics":
 				logger.Log(util.Dict{
 					"event":   eventMainConfigApi,
@@ -210,7 +228,7 @@ func main() {
 					"serve":   streamdef.Serve,
 					"message": fmt.Sprintf("Registering global statistics API on %s", streamdef.Serve),
 				})
-				mux.Handle(streamdef.Serve, api.NewStatisticsApi(stats))
+				mux.Handle(streamdef.Serve, api.NewStatisticsApi(stats, auth))
 			case "check":
 				logger.Log(util.Dict{
 					"event":   eventMainConfigApi,
@@ -220,12 +238,31 @@ func main() {
 				})
 				client := clients[streamdef.Remote]
 				if client != nil {
-					mux.Handle(streamdef.Serve, api.NewStreamStateApi(client))
+					mux.Handle(streamdef.Serve, api.NewStreamStateApi(client, auth))
 				} else {
 					logger.Log(util.Dict{
 						"event":   eventMainError,
 						"error":   errorMainStreamNotFound,
 						"api":     "check",
+						"remote":  streamdef.Remote,
+						"message": fmt.Sprintf("Error, stream not found: %s", streamdef.Remote),
+					})
+				}
+			case "control":
+				logger.Log(util.Dict{
+					"event":   eventMainConfigApi,
+					"api":     "control",
+					"serve":   streamdef.Serve,
+					"message": fmt.Sprintf("Registering stream control API on %s", streamdef.Serve),
+				})
+				client := clients[streamdef.Remote]
+				if client != nil {
+					mux.Handle(streamdef.Serve, api.NewStreamControlApi(client, auth))
+				} else {
+					logger.Log(util.Dict{
+						"event":   eventMainError,
+						"error":   errorMainStreamNotFound,
+						"api":     "control",
 						"remote":  streamdef.Remote,
 						"message": fmt.Sprintf("Error, stream not found: %s", streamdef.Remote),
 					})

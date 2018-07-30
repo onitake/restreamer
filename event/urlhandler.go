@@ -18,6 +18,7 @@ package event
 
 import (
 	"fmt"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"net/http"
 	"net/url"
@@ -38,9 +39,11 @@ type UrlHandler struct {
 	Url *url.URL
 	// logger is a json logger
 	logger *util.ModuleLogger
+	// userauth will be used to generate credentials for client requests
+	userauth *protocol.UserAuthenticator
 }
 
-func NewUrlHandler(urly string) (*UrlHandler, error) {
+func NewUrlHandler(urly string, userauth *protocol.UserAuthenticator) (*UrlHandler, error) {
 	logger := &util.ModuleLogger{
 		Logger: &util.ConsoleLogger{},
 		Defaults: util.Dict{
@@ -51,8 +54,9 @@ func NewUrlHandler(urly string) (*UrlHandler, error) {
 	u, err := url.Parse(urly)
 	if err == nil {
 		return &UrlHandler{
-			Url:    u,
-			logger: logger,
+			Url:      u,
+			logger:   logger,
+			userauth: userauth,
 		}, nil
 	} else {
 		return nil, err
@@ -69,11 +73,16 @@ func (handler *UrlHandler) HandleEvent(typ EventType, args ...interface{}) {
 		"event":   urlHandlerEventNotify,
 		"message": fmt.Sprintf("Event received, notifying %s", handler.Url),
 		"url":     handler.Url.String(),
+		"auth":    handler.userauth != nil,
 		"type":    typ,
 	})
 	req := &http.Request{
 		Method: "GET",
 		URL:    handler.Url,
+		Header: make(http.Header),
+	}
+	if handler.userauth != nil {
+		req.Header.Add("Authorization", handler.userauth.GetLogin())
 	}
 	_, err := http.DefaultClient.Do(req)
 	if err != nil {

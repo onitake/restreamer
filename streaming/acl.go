@@ -45,6 +45,8 @@ type AccessController struct {
 	connections uint
 	// logger is a json logger
 	logger *util.ModuleLogger
+	// inhibit is a global connection inhibitor flag.
+	inhibit bool
 }
 
 // NewAccessController creates a connection broker object that
@@ -68,14 +70,24 @@ func (control *AccessController) SetLogger(logger util.JsonLogger) {
 	control.logger.Logger = logger
 }
 
+// SetInhibit allows setting and clearing the inhibit flag.
+// If it is set, no further connections are accepted, irrespective of the
+// maxconnections limit.
+func (control *AccessController) SetInhibit(inhibit bool) {
+	// protect concurrent access
+	control.lock.Lock()
+	control.inhibit = inhibit
+	control.lock.Unlock()
+}
+
 // Accept accepts an incoming connection when the maximum number of open connections
 // has not been reached yet.
 func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) bool {
 	accept := false
 	// protect concurrent access
 	control.lock.Lock()
-	// check if the limit is disabled or unreached
-	if control.maxconnections == 0 || control.connections < control.maxconnections {
+	// check if the limit is disabled or unreached, and no inhibit is set
+	if !control.inhibit && (control.maxconnections == 0 || control.connections < control.maxconnections) {
 		// and increase the counter
 		control.connections++
 		accept = true

@@ -30,6 +30,13 @@
 	"fullconnections": 90,
 	"": "The JSON access log file name. If this option is empty, access logs are disabled.",
 	"log": "",
+	"": "The user database used for authentication stanzas",
+	"userlist": {
+		"username": {
+			"": "The user's password",
+			"password": "secret_password"
+		}
+	},
 	"": "List of resources; can be streams, static content or APIs.",
 	"resources": [
 		{
@@ -42,6 +49,7 @@
 			"": "health = reports system health.",
 			"": "statistics = reports detailed system statistics.",
 			"": "check = reports the status of a stream. remote contains the serve path of the stream.",
+			"": "control = allows setting a stream offline or online. The state is controlled by the presence of the query parameters 'offline' or 'online', respectively.",
 			"api": "",
 			"": "Path under which a resource is made available.",
 			"serve": "/stream.ts",
@@ -49,6 +57,7 @@
 			"": "file must specify the URL in host-compatible format.",
 			"": "For tcp, a port is mandatory. Literal IPv6 addresses must be enclosed in []",
 			"": "unix will autodetect the type of domain socket, but you can also be explicit with unixgram and unixpacket.",
+			"": "This parameter is also required for API types 'check' and 'control', setting the stream they refer to.",
 			"remote": "http://localhost:10000/stream.ts",
 			"": "Instead of a single remote URL, a list of URLs can be specified with the remotes option.",
 			"": "The same rules as for remote apply.",
@@ -56,12 +65,33 @@
 			"remotes": [ ],
 			"": "Cache time in seconds, use 0 to disable caching.",
 			"": "Only supported for static content.",
-			"cache": 0
+			"cache": 0,
+			"": "Access control for this resource. If not present, no authentication is necessary.",
+			"": "Otherwise, an authentication token that matches one of the users is required.",
+			"authentication": {
+				"": "The authentication type: basic or bearer",
+				"": "Basic authentication requires a valid Authorization: Basic base64(md5sum('user:password')) header.",
+				"": "Bearer authentication requires a valid Authorization: Bearer base64('password') header.",
+				"type": "",
+				"": "Realm specifies the realm that is sent back to the client if no Authorization header was present.",
+				"realm": "",
+				"": "A single user that is allowed to access this resource. Concatenated with users.",
+				"user": "",
+				"": "A list of users that may access this resource. prepended with user.",
+				"users": [ ]
+				
+			}
 		},
 		{
 			"type": "api",
 			"api": "check",
 			"serve": "/check/stream.ts",
+			"remote": "/stream.ts"
+		},
+		{
+			"type": "api",
+			"api": "control",
+			"serve": "/control/stream.ts",
 			"remote": "/stream.ts"
 		},
 		{
@@ -94,8 +124,17 @@
 			"": "limit_hit notifies when the soft limit (fullconnections) is reached",
 			"": "limit_miss notifies when the number of connections goes below this threshold",
 			"event": "limit_hit",
+			"": "The kind of notification that is generated. Only url is supported.",
 			"type": "url",
-			"url": "http://localhost:8001/hit"
+			"": "A GET request is sent to this URL if type is url.",
+			"url": "http://localhost:8001/hit",
+			"": "Optional authentication settings to allow sending an Authorization header with the get request",
+			"authentication": {
+				"": "Authentication type: basic or bearer",
+				"type": "",
+				"": "The user account that is used with this notification. Must be contained in the userlist.",
+				"user": ""
+			}
 		},
 		{
 			"event": "limit_miss",

@@ -14,7 +14,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package streaming
+package configuration
 
 import (
 	"bytes"
@@ -22,6 +22,29 @@ import (
 	"io"
 	"os"
 )
+
+// Authentication configures authentication for a resource.
+// The exact semantics depend on the resource.
+type Authentication struct {
+	// Type specifies the authentication type.
+	// Only the empty string, 'basic' and 'bearer' are currently supported.
+	// The interpretation of the type is as follows:
+	// '': Disable authentication and allow all requests to succeed.
+	// 'basic': compare the string after the 'Authorization: Basic' header with
+	// base64(md5sum(username + ':' + passwords[username])) and allow the request if they match.
+	// 'bearer': compare the string after 'Authentication: Bearer' with
+	// base64(passwords[username]) and allow the request if they match.
+	Type string `json:"type"`
+	// Realm specifies the authentication realm that is sent
+	// back to the client if the authentication header was missing.
+	Realm string `json:"realm"`
+	// User specifies a valid user who can access the resource.
+	// This is merged with Users.
+	User string `json:"user"`
+	// Users specifies the list of valid user names.
+	// User is merged into this list.
+	Users []string `json:"users"`
+}
 
 // Resource is a single HTTP endpoint.
 type Resource struct {
@@ -38,6 +61,15 @@ type Resource struct {
 	Remotes []string `json:"remotes"`
 	// Cache the cache time in seconds.
 	Cache uint `json:"cache"`
+	// Authentication specifies credentials required to access this resource.
+	// If the authentication type is unset, no authentication is required.
+	Authentication Authentication `json:"authentication"`
+}
+
+// UserCredentials is a set of credentials for a single user
+type UserCredentials struct {
+	// Password is the key or password of this user.
+	Password string `json:"password"`
 }
 
 // Notification is a single notification definition.
@@ -48,6 +80,10 @@ type Notification struct {
 	Type string `json:"type"`
 	// Url is the remote to access (if Type is http).
 	Url string `json:"url"`
+	// Authentication specifies credentials to be sent with the notification.
+	// If the authentication type is unset, no authentication is sent.
+	// Only the first user from the list (or the single 'User') is used, all others are ignored.
+	Authentication Authentication `json:"authentication"`
 }
 
 // Configuration is a representation of the configurable settings.
@@ -84,6 +120,9 @@ type Configuration struct {
 	// Profile determines if profiling should be enabled.
 	// Set to true to turn on the pprof web server.
 	Profile bool `json:"profile"`
+	// UserList is the built-in list of user accounts, to be used with authentication stanzas.
+	// It maps user names to authentication credentials.
+	UserList map[string]UserCredentials `json:"userlist"`
 	// Resources is the list of streams.
 	Resources []Resource `json:"resources"`
 	// Notifications defines event callbacks.
@@ -135,6 +174,29 @@ func LoadConfiguration(reader io.Reader) (*Configuration, error) {
 			resource.Remotes = remotes
 			// reset
 			resource.Remote = ""
+		}
+		// add user to users list, if given
+		if len(resource.Authentication.Type) > 0 && len(resource.Authentication.User) > 0 {
+			length := len(resource.Authentication.Users)
+			users := make([]string, length+1)
+			users[0] = resource.Authentication.User
+			copy(users[1:], resource.Authentication.Users)
+			resource.Authentication.Users = users
+			// reset
+			resource.Authentication.User = ""
+		}
+	}
+	for i := range config.Notifications {
+		notification := &config.Notifications[i]
+		// add user to users list, if given
+		if len(notification.Authentication.Type) > 0 && len(notification.Authentication.User) > 0 {
+			length := len(notification.Authentication.Users)
+			users := make([]string, length+1)
+			users[0] = notification.Authentication.User
+			copy(users[1:], notification.Authentication.Users)
+			notification.Authentication.Users = users
+			// reset
+			notification.Authentication.User = ""
 		}
 	}
 

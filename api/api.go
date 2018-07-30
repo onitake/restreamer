@@ -18,6 +18,7 @@ package api
 
 import (
 	"encoding/json"
+	"github.com/onitake/restreamer/protocol"
 	"log"
 	"net/http"
 )
@@ -31,19 +32,30 @@ type connectChecker interface {
 // provides an HTTP/JSON handler for reporting system health.
 type healthApi struct {
 	stats Statistics
+	// auth is an authentication verifier for client requests
+	auth protocol.Authenticator
 }
 
 // NewHealthApi creates a new health API object,
 // serving data from a system Statistics object.
-func NewHealthApi(stats Statistics) http.Handler {
+func NewHealthApi(stats Statistics, auth protocol.Authenticator) http.Handler {
 	return &healthApi{
 		stats: stats,
+		auth:  auth,
 	}
 }
 
 // ServeHTTP is the http handler method.
 // It sends back information about system health.
 func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "application/json")
+
+	// fail-fast: verify that this user can access this resource first
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+		return
+	}
+
 	global := api.stats.GetGlobalStatistics()
 	var stats struct {
 		Status    string `json:"status"`
@@ -65,7 +77,6 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	stats.Max = int(global.MaxConnections)
 	stats.Bandwidth = int(global.BytesPerSecondSent * 8 / 1024) // kbit/s
 
-	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK)
@@ -81,19 +92,30 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 // provides an HTTP/JSON handler for reporting total system statistics.
 type statisticsApi struct {
 	stats Statistics
+	// auth is an authentication verifier for client requests
+	auth protocol.Authenticator
 }
 
 // NewStatisticsApi creates a new statistics API object,
 // serving data from a system Statistics object.
-func NewStatisticsApi(stats Statistics) http.Handler {
+func NewStatisticsApi(stats Statistics, auth protocol.Authenticator) http.Handler {
 	return &statisticsApi{
 		stats: stats,
+		auth:  auth,
 	}
 }
 
 // ServeHTTP is the http handler method.
 // It sends back information about system health.
 func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "application/json")
+
+	// fail-fast: verify that this user can access this resource first
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+		return
+	}
+
 	global := api.stats.GetGlobalStatistics()
 	var stats struct {
 		Status                   string `json:"status"`
@@ -139,7 +161,6 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	stats.BytesPerSecondSent = global.BytesPerSecondSent
 	stats.BytesPerSecondDropped = global.BytesPerSecondDropped
 
-	writer.Header().Add("Content-Type", "application/json")
 	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK)
@@ -151,31 +172,94 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	}
 }
 
-// StreamStatApi provides an API for checking stream availability.
+// streamStatApi provides an API for checking stream availability.
 // The HTTP handler returns status code 200 if a stream is connected
 // and 404 if not.
 type streamStateApi struct {
 	client connectChecker
+	// auth is an authentication verifier for client requests
+	auth protocol.Authenticator
 }
 
 // NewStreamStateApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
-func NewStreamStateApi(client connectChecker) http.Handler {
+func NewStreamStateApi(client connectChecker, auth protocol.Authenticator) http.Handler {
 	return &streamStateApi{
 		client: client,
+		auth:   auth,
 	}
 }
 
 // ServeHTTP is the http handler method.
 // It sends back "200 ok" if the stream is connected and "404 not found" if not,
 // along with the corresponding HTTP status code.
-func (stat *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+func (api *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
 	writer.Header().Add("Content-Type", "text/plain")
-	if stat.client.Connected() {
+
+	// fail-fast: verify that this user can access this resource first
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+		return
+	}
+
+	if api.client.Connected() {
 		writer.WriteHeader(http.StatusOK)
 		writer.Write([]byte("200 ok"))
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
 		writer.Write([]byte("404 not found"))
+	}
+}
+
+// inhibitor represents a type that can prevent or allow new connections.
+type inhibitor interface {
+	SetInhibit(inhibit bool)
+}
+
+// streamControlApi allows manipulation of a stream's state.
+// If this API is enabled for a stream, requests to start and stop it externally
+// can be sent. Useful for testing or as an emergency kill switch.
+type streamControlApi struct {
+	inhibit inhibitor
+	// auth is an authentication verifier for client requests
+	auth protocol.Authenticator
+}
+
+// NewStreamStateApi creates a new stream status API object,
+// serving the "connected" status of a stream connection.
+func NewStreamControlApi(inhibit inhibitor, auth protocol.Authenticator) http.Handler {
+	return &streamControlApi{
+		inhibit: inhibit,
+		auth:    auth,
+	}
+}
+
+// ServeHTTP is the http handler method.
+// It parses the query string and prohibits or allows new connections depending
+// on the existence of the "offline" or "online" parameter.
+// When the "offline" parameter is present, all existing downstream connections
+// are closed immediately. If both are present, the query is treated like
+// if there was only "offline".
+func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// set the content type for all responses
+	writer.Header().Add("Content-Type", "text/plain")
+
+	// fail-fast: verify that this user can access this resource first
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+		return
+	}
+
+	query := request.URL.Query()
+	if len(query["offline"]) > 0 {
+		api.inhibit.SetInhibit(true)
+		writer.WriteHeader(http.StatusAccepted)
+		writer.Write([]byte("202 accepted"))
+	} else if len(query["online"]) > 0 {
+		api.inhibit.SetInhibit(false)
+		writer.WriteHeader(http.StatusAccepted)
+		writer.Write([]byte("202 accepted"))
+	} else {
+		writer.WriteHeader(http.StatusBadRequest)
+		writer.Write([]byte("400 bad request"))
 	}
 }
