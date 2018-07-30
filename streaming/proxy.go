@@ -374,7 +374,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(proxy.auth, request, writer) {
+	if !protocol.HandleHttpAuthentication(proxy.auth, request, writer, proxy.logger) {
 		return
 	}
 

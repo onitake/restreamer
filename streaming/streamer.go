@@ -366,7 +366,7 @@ func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(streamer.auth, request, writer) {
+	if !protocol.HandleHttpAuthentication(streamer.auth, request, writer, streamer.logger) {
 		return
 	}
 

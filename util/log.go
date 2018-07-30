@@ -39,6 +39,15 @@ const (
 	shutdownSignal internalSignal = internalSignal("SDN")
 )
 
+var (
+	globalStandardLogger MultiLogger = MultiLogger{
+		&ModuleLogger{
+			Logger:       &ConsoleLogger{},
+			AddTimestamp: true,
+		},
+	}
+)
+
 type internalSignal string
 
 func (s internalSignal) Signal() {}
@@ -70,6 +79,36 @@ type JsonLogger interface {
 	// Example usage:
 	//   logger.Log(Dict{ "key": "value" }, Dict{ "key": "value2" })
 	Log(lines ...Dict)
+}
+
+// NewGlobalModuleLogger creates a global logger for the current package and
+// connects it to the global standard logger.
+//
+// The default output for standard logger is a JSON log with added timestamps,
+// but this can be changed by calling SetGlobalStandardLogger.
+//
+// An optional dictionary argument allows specifying additional keys that are
+// added to every log line. Can be nil if you don't need it.
+func NewGlobalModuleLogger(module string, dict Dict) JsonLogger {
+	more := make(Dict)
+	for k, v := range dict {
+		more[k] = v
+	}
+	more["module"] = module
+	logger := &ModuleLogger{
+		Logger:   globalStandardLogger,
+		Defaults: more,
+	}
+	return logger
+}
+
+// SetGlobalStandardLogger assigns a new backing logger to the global standard logger
+//
+// A reference to the old logger is returned.
+func SetGlobalStandardLogger(logger JsonLogger) JsonLogger {
+	old := globalStandardLogger[0]
+	globalStandardLogger[0] = logger
+	return old
 }
 
 // ModuleLogger encapsulates default values for a JSON log.
@@ -125,13 +164,11 @@ type DummyLogger struct{}
 func (*DummyLogger) Log(lines ...Dict) {}
 
 // Multilogger logs to several backend loggers at once.
-type MultiLogger struct {
-	Loggers []JsonLogger
-}
+type MultiLogger []JsonLogger
 
 // Log writes the same log lines to all backing loggers.
-func (logger *MultiLogger) Log(lines ...Dict) {
-	for _, backer := range logger.Loggers {
+func (logger MultiLogger) Log(lines ...Dict) {
+	for _, backer := range logger {
 		backer.Log(lines...)
 	}
 }

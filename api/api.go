@@ -19,7 +19,7 @@ package api
 import (
 	"encoding/json"
 	"github.com/onitake/restreamer/protocol"
-	"log"
+	"github.com/onitake/restreamer/util"
 	"net/http"
 )
 
@@ -52,7 +52,7 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	writer.Header().Add("Content-Type", "application/json")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
 		return
 	}
 
@@ -84,7 +84,11 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
-		log.Print(err)
+		logger.Log(util.Dict{
+			"event":   eventApiError,
+			"error":   errorApiJsonEncode,
+			"message": err.Error(),
+		})
 	}
 }
 
@@ -112,7 +116,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	writer.Header().Add("Content-Type", "application/json")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
 		return
 	}
 
@@ -167,8 +171,12 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		writer.Write(response)
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte("500 internal server error"))
-		log.Print(err)
+		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+		logger.Log(util.Dict{
+			"event":   eventApiError,
+			"error":   errorApiJsonEncode,
+			"message": err.Error(),
+		})
 	}
 }
 
@@ -198,7 +206,7 @@ func (api *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.R
 	writer.Header().Add("Content-Type", "text/plain")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
 		return
 	}
 
@@ -245,7 +253,7 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 	writer.Header().Add("Content-Type", "text/plain")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
 		return
 	}
 

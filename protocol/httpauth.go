@@ -17,25 +17,61 @@
 package protocol
 
 import (
+	"github.com/onitake/restreamer/util"
 	"net/http"
+)
+
+const (
+	eventProtocolError          = "error"
+	eventProtocolAuthenticating = "authenticating"
+	eventProtocolAuthenticated  = "authenticated"
+	//
+	errorProtocolForbidden = "forbidden"
 )
 
 // HandleHttpAuthentication handles authentication headers and responses.
 // If it returns false, authenticaten has failed, an appropriate response was sent and the caller should immediately return.
 // A true return value indicates that authentication has succeeded and the caller should proceed with handling the request.
-func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer http.ResponseWriter) bool {
+func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer http.ResponseWriter, logger util.JsonLogger) bool {
 	// fail-fast: verify that this user can access this resource first
 	if !auth.Authenticate(request.Header.Get("Authorization")) {
 		realm := auth.GetAuthenticateRequest()
 		if len(realm) > 0 {
+			if logger != nil {
+				logger.Log(util.Dict{
+					"event":      eventProtocolAuthenticating,
+					"statuscode": 401,
+					"message":    "Requesting user authentication",
+					"url":        request.URL.Path,
+					"client":     request.RemoteAddr,
+				})
+			}
 			// if the authenticator supports responses to invalid authentication headers, send
 			writer.Header().Add("WWW-Authenticate", realm)
 			writer.WriteHeader(http.StatusUnauthorized)
 		} else {
+			if logger != nil {
+				logger.Log(util.Dict{
+					"event":      eventProtocolError,
+					"error":      errorProtocolForbidden,
+					"statuscode": 403,
+					"message":    "Denying user access",
+					"url":        request.URL.Path,
+					"client":     request.RemoteAddr,
+				})
+			}
 			// otherwise, just respond with a 403
 			writer.WriteHeader(http.StatusForbidden)
 		}
 		return false
+	}
+	if logger != nil {
+		logger.Log(util.Dict{
+			"event":   eventProtocolAuthenticated,
+			"message": "Request authenticated",
+			"url":     request.URL.Path,
+			"client":  request.RemoteAddr,
+		})
 	}
 	return true
 }

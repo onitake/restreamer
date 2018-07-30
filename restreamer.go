@@ -54,6 +54,7 @@ const (
 
 func main() {
 	var logbackend util.JsonLogger = &util.ConsoleLogger{}
+	util.SetGlobalStandardLogger(logbackend)
 
 	logger := &util.ModuleLogger{
 		Logger: logbackend,
