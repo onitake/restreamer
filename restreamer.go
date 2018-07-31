@@ -31,38 +31,11 @@ import (
 	"time"
 )
 
-const (
-	moduleMain = "main"
-	//
-	eventMainError        = "error"
-	eventMainConfig       = "config"
-	eventMainConfigStream = "stream"
-	eventMainConfigStatic = "static"
-	eventMainConfigApi    = "api"
-	eventMainHandled      = "handled"
-	eventMainStartMonitor = "start_monitor"
-	eventMainStartServer  = "start_server"
-	//
-	errorMainStreamNotFound          = "stream_notfound"
-	errorMainInvalidApi              = "invalid_api"
-	errorMainInvalidResource         = "invalid_resource"
-	errorMainInvalidNotification     = "invalid_notification"
-	errorMainMissingNotificationUser = "missing_notification_user"
-	errorMainMissingStreamUser       = "missing_stream_user"
-	errorMainInvalidAuthentication   = "invalid_authentication"
-)
-
 func main() {
-	var logbackend util.JsonLogger = &util.ConsoleLogger{}
-	util.SetGlobalStandardLogger(logbackend)
-
-	logger := &util.ModuleLogger{
-		Logger: logbackend,
-		Defaults: util.Dict{
-			"module": moduleMain,
-		},
-		AddTimestamp: true,
+	logbackend := util.MultiLogger{
+		&util.ConsoleLogger{},
 	}
+	util.SetGlobalStandardLogger(logbackend)
 
 	rnd := rand.New(rand.NewSource(time.Now().Unix()))
 
@@ -93,8 +66,7 @@ func main() {
 		if err != nil {
 			log.Fatal("Error opening log: ", err)
 		}
-		logbackend = flogger
-		logger.Logger = logbackend
+		logbackend[0] = flogger
 	}
 
 	clients := make(map[string]*streaming.Client)
