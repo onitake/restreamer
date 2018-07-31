@@ -39,14 +39,14 @@ func TestAccessController(t *testing.T) {
 
 	l.Stage = "t00"
 	c00 := NewAccessController(1)
-	c00.SetLogger(l)
+	logger = l
 	if !c00.Accept("c00b", nil) {
 		t.Error("t00: Incorrectly refused connection on free access controller")
 	}
 
 	l.Stage = "t01"
 	c01 := NewAccessController(1)
-	c01.SetLogger(l)
+	logger = l
 	c01.Accept("", nil)
 	if c01.Accept("", nil) {
 		t.Error("t01: Incorrectly accepted connection on full access controller")
@@ -54,7 +54,7 @@ func TestAccessController(t *testing.T) {
 
 	l.Stage = "t02"
 	c02 := NewAccessController(1)
-	c02.SetLogger(l)
+	logger = l
 	c02.Accept("c02a", nil)
 	c02.Release(nil)
 	if !c02.Accept("c02b", nil) {
@@ -63,7 +63,7 @@ func TestAccessController(t *testing.T) {
 
 	l.Stage = "t03"
 	c03 := NewAccessController(100)
-	c03.SetLogger(l)
+	logger = l
 	w03 := &sync.WaitGroup{}
 	w03.Add(100)
 	var a03 int32

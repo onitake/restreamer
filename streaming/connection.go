@@ -23,21 +23,6 @@ import (
 	"time"
 )
 
-const (
-	moduleConnection = "connection"
-	//
-	eventConnectionDebug      = "debug"
-	eventConnectionError      = "error"
-	eventHeaderSent           = "headersent"
-	eventConnectionClosed     = "closed"
-	eventConnectionClosedWait = "closedwait"
-	eventConnectionShutdown   = "shutdown"
-	eventConnectionDone       = "done"
-	//
-	errorConnectionNotFlushable  = "noflush"
-	errorConnectionNoCloseNotify = "noclosenotify"
-)
-
 // Connection is a single active client connection.
 //
 // This is meant to be called directly from a ServeHTTP handler.
@@ -49,8 +34,6 @@ type Connection struct {
 	ClientAddress string
 	// the destination socket
 	writer http.ResponseWriter
-	// logger is a json logger
-	logger *util.ModuleLogger
 	// Closed is true if Serve was ended because of a closed channel.
 	// This is simply there to avoid a double close.
 	Closed bool
@@ -62,26 +45,12 @@ type Connection struct {
 // clientaddr should point to the remote address of the connecting client
 // and will be used for logging.
 func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) *Connection {
-	logger := &util.ModuleLogger{
-		Logger: &util.ConsoleLogger{},
-		Defaults: util.Dict{
-			"module": moduleConnection,
-			"remote": clientaddr,
-		},
-		AddTimestamp: true,
-	}
 	conn := &Connection{
 		Queue:         make(chan mpegts.Packet, qsize),
 		ClientAddress: clientaddr,
 		writer:        destination,
-		logger:        logger,
 	}
 	return conn
-}
-
-// SetLogger assigns a logger
-func (conn *Connection) SetLogger(logger util.JsonLogger) {
-	conn.logger.Logger = logger
 }
 
 // Serve starts serving data to a client, continuously feeding packets from the queue.
@@ -100,7 +69,7 @@ func (conn *Connection) Serve() {
 	// try to flush the header
 	flusher, ok := conn.writer.(http.Flusher)
 	if !ok {
-		conn.logger.Log(util.Dict{
+		logger.Log(util.Dict{
 			"event":   eventConnectionError,
 			"error":   errorConnectionNotFlushable,
 			"message": "ResponseWriter is not flushable!",
@@ -108,7 +77,7 @@ func (conn *Connection) Serve() {
 	} else {
 		flusher.Flush()
 	}
-	conn.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventHeaderSent,
 		"message": "Sent header",
 	})
@@ -116,7 +85,7 @@ func (conn *Connection) Serve() {
 	// see if can get notified about connection closure
 	notifier, ok := conn.writer.(http.CloseNotifier)
 	if !ok {
-		conn.logger.Log(util.Dict{
+		logger.Log(util.Dict{
 			"event":   eventConnectionError,
 			"error":   errorConnectionNoCloseNotify,
 			"message": "Writer does not support CloseNotify",
@@ -137,7 +106,7 @@ func (conn *Connection) Serve() {
 				// see https://golang.org/pkg/net/http/?m=all#response.Write for details
 				// on how Go buffers HTTP responses (hint: a 2KiB bufio and a 4KiB bufio)
 				if err != nil {
-					conn.logger.Log(util.Dict{
+					logger.Log(util.Dict{
 						"event":   eventConnectionClosed,
 						"message": "Downstream connection closed",
 					})
@@ -146,7 +115,7 @@ func (conn *Connection) Serve() {
 				//log.Printf("Wrote packet of %d bytes\n", bytes)
 			} else {
 				// channel closed, exit
-				conn.logger.Log(util.Dict{
+				logger.Log(util.Dict{
 					"event":   eventConnectionShutdown,
 					"message": "Shutting down client connection",
 				})
@@ -155,7 +124,7 @@ func (conn *Connection) Serve() {
 			}
 		case <-notifier.CloseNotify():
 			// connection closed while we were waiting for more data
-			conn.logger.Log(util.Dict{
+			logger.Log(util.Dict{
 				"event":   eventConnectionClosedWait,
 				"message": "Downstream connection closed (while waiting)",
 			})
@@ -166,7 +135,7 @@ func (conn *Connection) Serve() {
 	// we cannot drain the channel here, as it might not be closed yet.
 	// better let our caller handle closure and draining.
 
-	conn.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventConnectionDone,
 		"message": "Streaming finished",
 	})

@@ -107,7 +107,6 @@ func main() {
 	}
 
 	controller := streaming.NewAccessController(config.MaxConnections)
-	controller.SetLogger(logbackend)
 
 	queue := event.NewEventQueue(int(config.FullConnections))
 	for _, note := range config.Notifications {
@@ -164,7 +163,6 @@ func main() {
 			auth := protocol.NewAuthenticator(streamdef.Authentication, config.UserList)
 
 			streamer := streaming.NewStreamer(config.OutputBuffer, controller, auth)
-			streamer.SetLogger(logbackend)
 			streamer.SetCollector(reg)
 			streamer.SetNotifier(queue)
 
@@ -175,7 +173,6 @@ func main() {
 			client, err := streaming.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
 			if err == nil {
 				client.SetCollector(reg)
-				client.SetLogger(logbackend)
 				client.Connect()
 				clients[streamdef.Serve] = client
 				mux.Handle(streamdef.Serve, streamer)
@@ -203,7 +200,6 @@ func main() {
 				log.Print(err)
 			} else {
 				proxy.SetStatistics(stats)
-				proxy.SetLogger(logbackend)
 				proxy.Start()
 				mux.Handle(streamdef.Serve, proxy)
 			}

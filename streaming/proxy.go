@@ -38,28 +38,6 @@ const (
 	proxyDefaultLimit = 10 * 1024 * 1024
 	proxyDefaultMime  = "application/octet-stream"
 	proxyFetchQueue   = 10
-	//
-	moduleProxy = "proxy"
-	//
-	eventProxyError           = "error"
-	eventProxyStart           = "start"
-	eventProxyShutdown        = "shutdown"
-	eventProxyRequest         = "request"
-	eventProxyOffline         = "offline"
-	eventProxyFetch           = "fetch"
-	eventProxyFetched         = "fetched"
-	eventProxyRequesting      = "requesting"
-	eventProxyRequestDone     = "requestdone"
-	eventProxyReplyNotChanged = "replynotchanged"
-	eventProxyReplyContent    = "replycontent"
-	eventProxyStale           = "stale"
-	eventProxyReturn          = "return"
-	//
-	errorProxyInvalidUrl    = "invalidurl"
-	errorProxyNoLength      = "nolength"
-	errorProxyLimitExceeded = "limitexceeded"
-	errorProxyShortRead     = "shortread"
-	errorProxyGet           = "get"
 )
 
 var (
@@ -107,8 +85,6 @@ type Proxy struct {
 	shutdown chan struct{}
 	// the global stats collector
 	stats api.Statistics
-	// a json logger
-	logger *util.ModuleLogger
 	// auth is an authentication verifier for client requests
 	auth protocol.Authenticator
 }
@@ -120,15 +96,6 @@ type Proxy struct {
 // every time it is requested.
 // timeout sets the upstream HTTP connection timeout.
 func NewProxy(uri string, timeout uint, cache uint, auth protocol.Authenticator) (*Proxy, error) {
-	logger := &util.ModuleLogger{
-		Logger: &util.ConsoleLogger{},
-		Defaults: util.Dict{
-			"module": moduleProxy,
-			"uri":    uri,
-		},
-		AddTimestamp: true,
-	}
-
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -145,14 +112,8 @@ func NewProxy(uri string, timeout uint, cache uint, auth protocol.Authenticator)
 		shutdown: make(chan struct{}),
 		resource: nil,
 		stats:    &api.DummyStatistics{},
-		logger:   logger,
 		auth:     auth,
 	}, nil
-}
-
-// SetLogger assigns a logger.
-func (proxy *Proxy) SetLogger(logger util.JsonLogger) {
-	proxy.logger.Logger = logger
 }
 
 // SetStatistics assigns a stats collector.
@@ -219,7 +180,7 @@ func Get(url *url.URL, timeout time.Duration) (reader io.Reader, header http.Hea
 // Start launches the fetcher thread.
 // This should only be called once.
 func (proxy *Proxy) Start() {
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyStart,
 		"message": "Starting fetcher",
 	})
@@ -228,7 +189,7 @@ func (proxy *Proxy) Start() {
 
 // Shutdown stops the fetcher thread.
 func (proxy *Proxy) Shutdown() {
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyShutdown,
 		"message": "Shutting down fetcher",
 	})
@@ -246,7 +207,7 @@ func (proxy *Proxy) fetch() {
 		case <-proxy.shutdown:
 			running = false
 		case request := <-proxy.fetcher:
-			proxy.logger.Log(util.Dict{
+			logger.Log(util.Dict{
 				"event":    eventProxyRequest,
 				"message":  "Handling request",
 				"resource": proxy.resource,
@@ -255,21 +216,21 @@ func (proxy *Proxy) fetch() {
 			now := time.Now()
 			if proxy.resource == nil || now.Sub(proxy.resource.updated) > proxy.stale {
 				// stale, cache first
-				proxy.logger.Log(util.Dict{
+				logger.Log(util.Dict{
 					"event":   eventProxyStale,
 					"message": "Resource is stale",
 				})
 				proxy.resource = proxy.cache()
 			}
 			// and return
-			proxy.logger.Log(util.Dict{
+			logger.Log(util.Dict{
 				"event":   eventProxyReturn,
 				"message": "Returning resource",
 			})
 			request <- proxy.resource
 		}
 	}
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyOffline,
 		"message": "Fetcher is offline",
 	})
@@ -287,7 +248,7 @@ func Etag(data []byte) string {
 // cache fetches the remote resource into memory.
 // Does not return errors. Instead, the cached resource contains a suitable return code and error content.
 func (proxy *Proxy) cache() *fetchableResource {
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyFetch,
 		"message": "Fetching resource from upstream",
 	})
@@ -295,7 +256,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 	// fetch from upstream
 	getter, header, status, length, err := Get(proxy.url, proxy.timeout)
 	if err != nil {
-		proxy.logger.Log(util.Dict{
+		logger.Log(util.Dict{
 			"event":   eventProxyError,
 			"error":   errorProxyGet,
 			"message": err.Error(),
@@ -313,7 +274,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 		if length < 0 {
 			// TODO maybe allow caching of resources without length?
 			err = ErrNoLength
-			proxy.logger.Log(util.Dict{
+			logger.Log(util.Dict{
 				"event":   eventProxyError,
 				"error":   errorProxyNoLength,
 				"message": ErrNoLength,
@@ -323,7 +284,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 			res.header = make(http.Header)
 		} else if length > proxy.limit {
 			err = ErrLimitExceeded
-			proxy.logger.Log(util.Dict{
+			logger.Log(util.Dict{
 				"event":   eventProxyError,
 				"error":   errorProxyLimitExceeded,
 				"message": ErrLimitExceeded,
@@ -344,7 +305,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 
 		if err == nil && int64(bytes) != length {
 			err = ErrShortRead
-			proxy.logger.Log(util.Dict{
+			logger.Log(util.Dict{
 				"event":    eventProxyError,
 				"error":    errorProxyShortRead,
 				"message":  ErrShortRead,
@@ -359,7 +320,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 	// calculate the content hash
 	res.etag = Etag(res.data)
 
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyFetched,
 		"message": "Fetched resource from upstream",
 		"etag":    res.etag,
@@ -374,7 +335,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(proxy.auth, request, writer, proxy.logger) {
+	if !protocol.HandleHttpAuthentication(proxy.auth, request, writer) {
 		return
 	}
 
@@ -384,18 +345,18 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	// request and wait for completion
 	// since the channels are unbuffered, they will block on read/write
 	// timeout must happen in the fetcher!
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyRequesting,
 		"message": "Handling incoming request",
 	})
 	proxy.fetcher <- fetchable
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   "waiting",
 		"message": "Waiting for response",
 	})
 	res := <-fetchable
 	close(fetchable)
-	proxy.logger.Log(util.Dict{
+	logger.Log(util.Dict{
 		"event":   eventProxyRequestDone,
 		"message": "Request complete",
 	})
@@ -416,7 +377,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 
 	// verify if ETag has matched
 	if res.etag != "" && request.Header.Get("If-None-Match") == res.etag {
-		proxy.logger.Log(util.Dict{
+		logger.Log(util.Dict{
 			"event":   eventProxyReplyNotChanged,
 			"message": "Returning 304",
 		})
@@ -424,7 +385,7 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		writer.WriteHeader(http.StatusNotModified)
 		// no content here
 	} else {
-		proxy.logger.Log(util.Dict{
+		logger.Log(util.Dict{
 			"event":   eventProxyReplyContent,
 			"message": "Returning updated content",
 			"updated": res.updated,
