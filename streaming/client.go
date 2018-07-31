@@ -137,11 +137,11 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 			urls[count] = parsed
 			count++
 		} else {
-			logger.Log(util.Dict{
-				"event":   eventClientError,
-				"error":   errorClientParse,
-				"message": fmt.Sprintf("Error parsing URL %s: %s", uri, err),
-			})
+			logger.Logkv(
+				"event", eventClientError,
+				"error", errorClientParse,
+				"message", fmt.Sprintf("Error parsing URL %s: %s", uri, err),
+			)
 		}
 	}
 	if count < 1 {
@@ -261,11 +261,11 @@ func (client *Client) loop() {
 			now := time.Now()
 			if now.Before(deadline) {
 				wait := deadline.Sub(now)
-				logger.Log(util.Dict{
-					"event":   eventClientRetry,
-					"retry":   wait.Seconds(),
-					"message": fmt.Sprintf("Retrying after %0.0f seconds.", wait.Seconds()),
-				})
+				logger.Logkv(
+					"event", eventClientRetry,
+					"retry", wait.Seconds(),
+					"message", fmt.Sprintf("Retrying after %0.0f seconds.", wait.Seconds()),
+				)
 				time.Sleep(wait)
 			}
 			// update the deadline
@@ -277,49 +277,49 @@ func (client *Client) loop() {
 		next = (next + 1) % len(client.urls)
 
 		// connect
-		logger.Log(util.Dict{
-			"event": eventClientConnecting,
-			"url":   url.String(),
-		})
+		logger.Logkv(
+			"event", eventClientConnecting,
+			"url", url.String(),
+		)
 		err := client.start(url)
 		if err != nil {
 			// not handled, log
-			logger.Log(util.Dict{
-				"event":   eventClientError,
-				"error":   errorClientConnect,
-				"url":     url.String(),
-				"message": err.Error(),
-			})
+			logger.Logkv(
+				"event", eventClientError,
+				"error", errorClientConnect,
+				"url", url.String(),
+				"message", err.Error(),
+			)
 		}
 
 		if client.Wait == 0 {
-			logger.Log(util.Dict{
-				"event":   eventClientOffline,
-				"url":     url.String(),
-				"message": "Reconnecting disabled. Stream will stay offline.",
-			})
+			logger.Logkv(
+				"event", eventClientOffline,
+				"url", url.String(),
+				"message", "Reconnecting disabled. Stream will stay offline.",
+			)
 		}
 	}
 }
 
 // start connects the socket, sends the HTTP request and starts streaming.
 func (client *Client) start(url *url.URL) error {
-	/*client.logger.Log(util.Dict{
-		"event": eventClientDebug,
-		"debug": util.Dict{
+	/*client.logger.Logkv(
+		"event", eventClientDebug,
+		"debug", map[string]interface{}{
 			"timeout": client.Timeout,
 		},
 		"url": url.String(),
-	})*/
+	)*/
 	if client.input == nil {
 		switch url.Scheme {
 		// handled by os.Open
 		case "file":
-			logger.Log(util.Dict{
-				"event":   eventClientOpenPath,
-				"path":    url.Path,
-				"message": fmt.Sprintf("Opening %s.", url.Path),
-			})
+			logger.Logkv(
+				"event", eventClientOpenPath,
+				"path", url.Path,
+				"message", fmt.Sprintf("Opening %s.", url.Path),
+			)
 			file, err := os.Open(url.Path)
 			if err != nil {
 				return err
@@ -329,11 +329,11 @@ func (client *Client) start(url *url.URL) error {
 		case "http":
 			fallthrough
 		case "https":
-			logger.Log(util.Dict{
-				"event":   eventClientOpenHttp,
-				"url":     url.String(),
-				"message": fmt.Sprintf("Connecting to %s.", url),
-			})
+			logger.Logkv(
+				"event", eventClientOpenHttp,
+				"url", url.String(),
+				"message", fmt.Sprintf("Connecting to %s.", url),
+			)
 			request, err := http.NewRequest("GET", url.String(), nil)
 			if err != nil {
 				return err
@@ -346,11 +346,11 @@ func (client *Client) start(url *url.URL) error {
 			client.input = response.Body
 		// handled directly by net.Dialer
 		case "tcp":
-			logger.Log(util.Dict{
-				"event":   eventClientOpenTcp,
-				"host":    url.Host,
-				"message": fmt.Sprintf("Connecting TCP socket to %s.", url.Host),
-			})
+			logger.Logkv(
+				"event", eventClientOpenTcp,
+				"host", url.Host,
+				"message", fmt.Sprintf("Connecting TCP socket to %s.", url.Host),
+			)
 			conn, err := client.connector.Dial(url.Scheme, url.Host)
 			if err != nil {
 				return err
@@ -362,11 +362,11 @@ func (client *Client) start(url *url.URL) error {
 		case "unixgram":
 			fallthrough
 		case "unixpacket":
-			logger.Log(util.Dict{
-				"event":   eventClientOpenDomain,
-				"path":    url.Path,
-				"message": fmt.Sprintf("Connecting domain socket to %s.", url.Path),
-			})
+			logger.Logkv(
+				"event", eventClientOpenDomain,
+				"path", url.Path,
+				"message", fmt.Sprintf("Connecting domain socket to %s.", url.Path),
+			)
 			conn, err := client.connector.Dial(url.Scheme, url.Path)
 			if err != nil {
 				return err
@@ -378,17 +378,17 @@ func (client *Client) start(url *url.URL) error {
 
 		// start streaming
 		util.StoreBool(&client.running, true)
-		logger.Log(util.Dict{
-			"event":   eventClientPull,
-			"url":     url.String(),
-			"message": fmt.Sprintf("Starting to pull stream %s.", url),
-		})
+		logger.Logkv(
+			"event", eventClientPull,
+			"url", url.String(),
+			"message", fmt.Sprintf("Starting to pull stream %s.", url),
+		)
 		err := client.pull(url)
-		logger.Log(util.Dict{
-			"event":   eventClientClosed,
-			"url":     url.String(),
-			"message": fmt.Sprintf("Socket for stream %s closed", url),
-		})
+		logger.Logkv(
+			"event", eventClientClosed,
+			"url", url.String(),
+			"message", fmt.Sprintf("Socket for stream %s closed", url),
+		)
 
 		// cleanup
 		client.Close()
@@ -417,10 +417,10 @@ func (client *Client) pull(url *url.URL) error {
 		var timer *time.Timer
 		if client.ReadTimeout > 0 {
 			timer = time.AfterFunc(client.ReadTimeout, func() {
-				logger.Log(util.Dict{
-					"event":   eventClientReadTimeout,
-					"message": "Read timeout exceeded, closing connection",
-				})
+				logger.Logkv(
+					"event", eventClientReadTimeout,
+					"message", "Read timeout exceeded, closing connection",
+				)
 				client.input.Close()
 			})
 		}
@@ -429,20 +429,20 @@ func (client *Client) pull(url *url.URL) error {
 		packet, err = mpegts.ReadPacket(client.input)
 		// we got a packet, stop the timer and drain it
 		if timer != nil && !timer.Stop() {
-			logger.Log(util.Dict{
-				"event":   eventClientTimerStop,
-				"url":     url.String(),
-				"message": fmt.Sprintf("Stopping timer on %s", url),
-			})
+			logger.Logkv(
+				"event", eventClientTimerStop,
+				"url", url.String(),
+				"message", fmt.Sprintf("Stopping timer on %s", url),
+			)
 			select {
 			case <-timer.C:
 			default:
 			}
-			logger.Log(util.Dict{
-				"event":   eventClientTimerStopped,
-				"url":     url.String(),
-				"message": fmt.Sprintf("Stopped timer on %s", url),
-			})
+			logger.Logkv(
+				"event", eventClientTimerStopped,
+				"url", url.String(),
+				"message", fmt.Sprintf("Stopped timer on %s", url),
+			)
 		}
 		//log.Printf("Packet read complete, packet=%p, err=%p\n", packet, err)
 		if err != nil {
@@ -453,10 +453,10 @@ func (client *Client) pull(url *url.URL) error {
 				if queue == nil {
 					client.listener.Connect()
 					client.stats.SourceConnected()
-					logger.Log(util.Dict{
-						"event": eventClientStarted,
-						"url":   url.String(),
-					})
+					logger.Logkv(
+						"event", eventClientStarted,
+						"url", url.String(),
+					)
 					queue = make(chan mpegts.Packet, client.queueSize)
 					go client.streamer.Stream(queue)
 				}
@@ -468,28 +468,28 @@ func (client *Client) pull(url *url.URL) error {
 				//log.Printf("Got a packet (length %d)\n", len(packet))
 				queue <- packet
 			} else {
-				logger.Log(util.Dict{
-					"event":   eventClientNoPacket,
-					"url":     url.String(),
-					"message": "No packet received",
-				})
+				logger.Logkv(
+					"event", eventClientNoPacket,
+					"url", url.String(),
+					"message", "No packet received",
+				)
 			}
 		}
 	}
 
 	// and the connection is gone
 	if queue != nil {
-		logger.Log(util.Dict{
-			"event":   eventClientTimerKill,
-			"url":     url.String(),
-			"message": fmt.Sprintf("Killing queue on %s", url),
-		})
+		logger.Logkv(
+			"event", eventClientTimerKill,
+			"url", url.String(),
+			"message", fmt.Sprintf("Killing queue on %s", url),
+		)
 		close(queue)
 		client.stats.SourceDisconnected()
-		logger.Log(util.Dict{
-			"event": eventClientStopped,
-			"url":   url.String(),
-		})
+		logger.Logkv(
+			"event", eventClientStopped,
+			"url", url.String(),
+		)
 	}
 
 	return err

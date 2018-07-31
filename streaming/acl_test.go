@@ -28,13 +28,17 @@ type mockAclLogger struct {
 	Stage string
 }
 
-func (l *mockAclLogger) Log(lines ...util.Dict) {
+func (l *mockAclLogger) Logd(lines ...util.Dict) {
 	for _, line := range lines {
 		l.t.Logf("%s: %v", l.Stage, line)
 	}
 }
 
-func TestAccessController(t *testing.T) {
+func (l *mockAclLogger) Logkv(keyValues ...interface{}) {
+	l.Logd(util.LogFunnel(keyValues))
+}
+
+func TestAccessController00(t *testing.T) {
 	l := &mockAclLogger{t, ""}
 
 	l.Stage = "t00"
@@ -43,6 +47,10 @@ func TestAccessController(t *testing.T) {
 	if !c00.Accept("c00b", nil) {
 		t.Error("t00: Incorrectly refused connection on free access controller")
 	}
+}
+
+func TestAccessController01(t *testing.T) {
+	l := &mockAclLogger{t, ""}
 
 	l.Stage = "t01"
 	c01 := NewAccessController(1)
@@ -51,6 +59,10 @@ func TestAccessController(t *testing.T) {
 	if c01.Accept("", nil) {
 		t.Error("t01: Incorrectly accepted connection on full access controller")
 	}
+}
+
+func TestAccessController02(t *testing.T) {
+	l := &mockAclLogger{t, ""}
 
 	l.Stage = "t02"
 	c02 := NewAccessController(1)

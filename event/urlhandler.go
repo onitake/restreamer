@@ -19,7 +19,6 @@ package event
 import (
 	"fmt"
 	"github.com/onitake/restreamer/protocol"
-	"github.com/onitake/restreamer/util"
 	"net/http"
 	"net/url"
 )
@@ -45,13 +44,13 @@ func NewUrlHandler(urly string, userauth *protocol.UserAuthenticator) (*UrlHandl
 }
 
 func (handler *UrlHandler) HandleEvent(typ EventType, args ...interface{}) {
-	logger.Log(util.Dict{
-		"event":   urlHandlerEventNotify,
-		"message": fmt.Sprintf("Event received, notifying %s", handler.Url),
-		"url":     handler.Url.String(),
-		"auth":    handler.userauth != nil,
-		"type":    typ,
-	})
+	logger.Logkv(
+		"event", urlHandlerEventNotify,
+		"message", fmt.Sprintf("Event received, notifying %s", handler.Url),
+		"url", handler.Url.String(),
+		"auth", handler.userauth != nil,
+		"type", typ,
+	)
 	req := &http.Request{
 		Method: "GET",
 		URL:    handler.Url,
@@ -62,12 +61,12 @@ func (handler *UrlHandler) HandleEvent(typ EventType, args ...interface{}) {
 	}
 	_, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Log(util.Dict{
-			"event":   urlHandlerEventError,
-			"error":   urlHandlerErrorGet,
-			"message": fmt.Sprintf("Error sending GET request: %v", err),
-			"url":     handler.Url.String(),
-			"type":    typ,
-		})
+		logger.Logkv(
+			"event", urlHandlerEventError,
+			"error", urlHandlerErrorGet,
+			"message", fmt.Sprintf("Error sending GET request: %v", err),
+			"url", handler.Url.String(),
+			"type", typ,
+		)
 	}
 }

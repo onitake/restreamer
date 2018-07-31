@@ -19,7 +19,6 @@ package api
 import (
 	"encoding/json"
 	"github.com/onitake/restreamer/protocol"
-	"github.com/onitake/restreamer/util"
 	"net/http"
 )
 
@@ -84,11 +83,11 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
-		logger.Log(util.Dict{
-			"event":   eventApiError,
-			"error":   errorApiJsonEncode,
-			"message": err.Error(),
-		})
+		logger.Logkv(
+			"event", eventApiError,
+			"error", errorApiJsonEncode,
+			"message", err.Error(),
+		)
 	}
 }
 
@@ -172,11 +171,11 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
-		logger.Log(util.Dict{
-			"event":   eventApiError,
-			"error":   errorApiJsonEncode,
-			"message": err.Error(),
-		})
+		logger.Logkv(
+			"event", eventApiError,
+			"error", errorApiJsonEncode,
+			"message", err.Error(),
+		)
 	}
 }
 

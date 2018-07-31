@@ -1,0 +1,2 @@
+// Timeout to avoid failing tests that block forever
+-timeout=3s

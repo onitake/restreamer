@@ -27,10 +27,14 @@ type mockLogger struct {
 	Stage string
 }
 
-func (l *mockLogger) Log(lines ...util.Dict) {
+func (l *mockLogger) Logd(lines ...util.Dict) {
 	for _, line := range lines {
 		l.t.Logf("%s: %v", l.Stage, line)
 	}
+}
+
+func (l *mockLogger) Logkv(keyValues ...interface{}) {
+	l.Logd(util.LogFunnel(keyValues))
 }
 
 type mockLogConnectable struct {
@@ -39,7 +43,7 @@ type mockLogConnectable struct {
 	Waiter *sync.WaitGroup
 }
 
-func (l *mockLogConnectable) Log(lines ...util.Dict) {
+func (l *mockLogConnectable) Logd(lines ...util.Dict) {
 	for _, line := range lines {
 		l.t.Logf("%s: %v", l.Stage, line)
 		if line["event"] == queueEventConnect {
@@ -48,19 +52,27 @@ func (l *mockLogConnectable) Log(lines ...util.Dict) {
 	}
 }
 
+func (l *mockLogConnectable) Logkv(keyValues ...interface{}) {
+	l.Logd(util.LogFunnel(keyValues))
+}
+
 type mockLogDisconnectable struct {
 	t      *testing.T
 	Stage  string
 	Waiter *sync.WaitGroup
 }
 
-func (l *mockLogDisconnectable) Log(lines ...util.Dict) {
+func (l *mockLogDisconnectable) Logd(lines ...util.Dict) {
 	for _, line := range lines {
 		l.t.Logf("%s: %v", l.Stage, line)
 		if line["event"] == queueEventStopped {
 			l.Waiter.Done()
 		}
 	}
+}
+
+func (l *mockLogDisconnectable) Logkv(keyValues ...interface{}) {
+	l.Logd(util.LogFunnel(keyValues))
 }
 
 type mockHandler struct {
@@ -78,16 +90,18 @@ func (h *mockHandler) HandleEvent(t EventType, args ...interface{}) {
 	}
 }
 
-func TestCreateLoadReporter(t *testing.T) {
+func TestCreateLoadReporter00(t *testing.T) {
 	l := &mockLogger{t, ""}
-
-	// TODO should have timeouts...
 
 	l.Stage = "t00"
 	c00 := NewEventQueue(0)
 	logger = l
 	c00.Start()
 	c00.Shutdown()
+}
+
+func TestCreateLoadReporter01(t *testing.T) {
+	l := &mockLogger{t, ""}
 
 	l.Stage = "t01"
 	c01 := NewEventQueue(0)
@@ -95,7 +109,9 @@ func TestCreateLoadReporter(t *testing.T) {
 	c01.Start()
 	c01.Start()
 	c01.Shutdown()
+}
 
+func TestCreateLoadReporter02(t *testing.T) {
 	c02 := NewEventQueue(0)
 	l02 := &mockLogConnectable{
 		t,
@@ -108,6 +124,10 @@ func TestCreateLoadReporter(t *testing.T) {
 	c02.NotifyConnect(1)
 	l02.Waiter.Wait()
 	c02.Shutdown()
+}
+
+func TestCreateLoadReporter03(t *testing.T) {
+	l := &mockLogger{t, ""}
 
 	l.Stage = "t03"
 	c03 := NewEventQueue(0)
@@ -116,7 +136,9 @@ func TestCreateLoadReporter(t *testing.T) {
 	c03.Shutdown()
 	c03.Start()
 	c03.Shutdown()
+}
 
+func TestCreateLoadReporter04(t *testing.T) {
 	c04 := NewEventQueue(0)
 	l04 := &mockLogConnectable{
 		t,
@@ -134,6 +156,10 @@ func TestCreateLoadReporter(t *testing.T) {
 	c04.NotifyConnect(1)
 	l04.Waiter.Wait()
 	c04.Shutdown()
+}
+
+func TestCreateLoadReporter05(t *testing.T) {
+	l := &mockLogger{t, ""}
 
 	c05 := NewEventQueue(10)
 	l.Stage = "t05"

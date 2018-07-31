@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/protocol"
-	"github.com/onitake/restreamer/util"
 	"hash/fnv"
 	"io"
 	"mime"
@@ -180,19 +179,19 @@ func Get(url *url.URL, timeout time.Duration) (reader io.Reader, header http.Hea
 // Start launches the fetcher thread.
 // This should only be called once.
 func (proxy *Proxy) Start() {
-	logger.Log(util.Dict{
-		"event":   eventProxyStart,
-		"message": "Starting fetcher",
-	})
+	logger.Logkv(
+		"event", eventProxyStart,
+		"message", "Starting fetcher",
+	)
 	go proxy.fetch()
 }
 
 // Shutdown stops the fetcher thread.
 func (proxy *Proxy) Shutdown() {
-	logger.Log(util.Dict{
-		"event":   eventProxyShutdown,
-		"message": "Shutting down fetcher",
-	})
+	logger.Logkv(
+		"event", eventProxyShutdown,
+		"message", "Shutting down fetcher",
+	)
 	close(proxy.shutdown)
 }
 
@@ -207,33 +206,33 @@ func (proxy *Proxy) fetch() {
 		case <-proxy.shutdown:
 			running = false
 		case request := <-proxy.fetcher:
-			logger.Log(util.Dict{
-				"event":    eventProxyRequest,
-				"message":  "Handling request",
-				"resource": proxy.resource,
-			})
+			logger.Logkv(
+				"event", eventProxyRequest,
+				"message", "Handling request",
+				"resource", proxy.resource,
+			)
 			// verify if we need to refetch
 			now := time.Now()
 			if proxy.resource == nil || now.Sub(proxy.resource.updated) > proxy.stale {
 				// stale, cache first
-				logger.Log(util.Dict{
-					"event":   eventProxyStale,
-					"message": "Resource is stale",
-				})
+				logger.Logkv(
+					"event", eventProxyStale,
+					"message", "Resource is stale",
+				)
 				proxy.resource = proxy.cache()
 			}
 			// and return
-			logger.Log(util.Dict{
-				"event":   eventProxyReturn,
-				"message": "Returning resource",
-			})
+			logger.Logkv(
+				"event", eventProxyReturn,
+				"message", "Returning resource",
+			)
 			request <- proxy.resource
 		}
 	}
-	logger.Log(util.Dict{
-		"event":   eventProxyOffline,
-		"message": "Fetcher is offline",
-	})
+	logger.Logkv(
+		"event", eventProxyOffline,
+		"message", "Fetcher is offline",
+	)
 }
 
 // eTag calculates a hash value of data and returns it as a hex string.
@@ -248,19 +247,19 @@ func Etag(data []byte) string {
 // cache fetches the remote resource into memory.
 // Does not return errors. Instead, the cached resource contains a suitable return code and error content.
 func (proxy *Proxy) cache() *fetchableResource {
-	logger.Log(util.Dict{
-		"event":   eventProxyFetch,
-		"message": "Fetching resource from upstream",
-	})
+	logger.Logkv(
+		"event", eventProxyFetch,
+		"message", "Fetching resource from upstream",
+	)
 
 	// fetch from upstream
 	getter, header, status, length, err := Get(proxy.url, proxy.timeout)
 	if err != nil {
-		logger.Log(util.Dict{
-			"event":   eventProxyError,
-			"error":   errorProxyGet,
-			"message": err.Error(),
-		})
+		logger.Logkv(
+			"event", eventProxyError,
+			"error", errorProxyGet,
+			"message", err.Error(),
+		)
 	}
 
 	// construct the return value
@@ -274,21 +273,21 @@ func (proxy *Proxy) cache() *fetchableResource {
 		if length < 0 {
 			// TODO maybe allow caching of resources without length?
 			err = ErrNoLength
-			logger.Log(util.Dict{
-				"event":   eventProxyError,
-				"error":   errorProxyNoLength,
-				"message": ErrNoLength,
-			})
+			logger.Logkv(
+				"event", eventProxyError,
+				"error", errorProxyNoLength,
+				"message", ErrNoLength,
+			)
 			res.statusCode = http.StatusBadGateway
 			res.data = []byte(http.StatusText(res.statusCode))
 			res.header = make(http.Header)
 		} else if length > proxy.limit {
 			err = ErrLimitExceeded
-			logger.Log(util.Dict{
-				"event":   eventProxyError,
-				"error":   errorProxyLimitExceeded,
-				"message": ErrLimitExceeded,
-			})
+			logger.Logkv(
+				"event", eventProxyError,
+				"error", errorProxyLimitExceeded,
+				"message", ErrLimitExceeded,
+			)
 			res.statusCode = http.StatusBadGateway
 			res.data = []byte(http.StatusText(res.statusCode))
 			res.header = make(http.Header)
@@ -305,13 +304,13 @@ func (proxy *Proxy) cache() *fetchableResource {
 
 		if err == nil && int64(bytes) != length {
 			err = ErrShortRead
-			logger.Log(util.Dict{
-				"event":    eventProxyError,
-				"error":    errorProxyShortRead,
-				"message":  ErrShortRead,
-				"length":   length,
-				"received": bytes,
-			})
+			logger.Logkv(
+				"event", eventProxyError,
+				"error", errorProxyShortRead,
+				"message", ErrShortRead,
+				"length", length,
+				"received", bytes,
+			)
 			res.data = res.data[:bytes]
 		}
 	}
@@ -320,13 +319,13 @@ func (proxy *Proxy) cache() *fetchableResource {
 	// calculate the content hash
 	res.etag = Etag(res.data)
 
-	logger.Log(util.Dict{
-		"event":   eventProxyFetched,
-		"message": "Fetched resource from upstream",
-		"etag":    res.etag,
-		"length":  len(res.data),
-		"status":  res.statusCode,
-	})
+	logger.Logkv(
+		"event", eventProxyFetched,
+		"message", "Fetched resource from upstream",
+		"etag", res.etag,
+		"length", len(res.data),
+		"status", res.statusCode,
+	)
 
 	return res
 }
@@ -345,21 +344,21 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 	// request and wait for completion
 	// since the channels are unbuffered, they will block on read/write
 	// timeout must happen in the fetcher!
-	logger.Log(util.Dict{
-		"event":   eventProxyRequesting,
-		"message": "Handling incoming request",
-	})
+	logger.Logkv(
+		"event", eventProxyRequesting,
+		"message", "Handling incoming request",
+	)
 	proxy.fetcher <- fetchable
-	logger.Log(util.Dict{
-		"event":   "waiting",
-		"message": "Waiting for response",
-	})
+	logger.Logkv(
+		"event", "waiting",
+		"message", "Waiting for response",
+	)
 	res := <-fetchable
 	close(fetchable)
-	logger.Log(util.Dict{
-		"event":   eventProxyRequestDone,
-		"message": "Request complete",
-	})
+	logger.Logkv(
+		"event", eventProxyRequestDone,
+		"message", "Request complete",
+	)
 
 	// copy (appropriate) headers
 	for _, key := range headerList {
@@ -377,19 +376,19 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 
 	// verify if ETag has matched
 	if res.etag != "" && request.Header.Get("If-None-Match") == res.etag {
-		logger.Log(util.Dict{
-			"event":   eventProxyReplyNotChanged,
-			"message": "Returning 304",
-		})
+		logger.Logkv(
+			"event", eventProxyReplyNotChanged,
+			"message", "Returning 304",
+		)
 		// send only a 304
 		writer.WriteHeader(http.StatusNotModified)
 		// no content here
 	} else {
-		logger.Log(util.Dict{
-			"event":   eventProxyReplyContent,
-			"message": "Returning updated content",
-			"updated": res.updated,
-		})
+		logger.Logkv(
+			"event", eventProxyReplyContent,
+			"message", "Returning updated content",
+			"updated", res.updated,
+		)
 		// otherwise, send updated data
 		writer.Header().Set("Content-Length", strconv.Itoa(len(res.data)))
 		writer.WriteHeader(res.statusCode)

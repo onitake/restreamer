@@ -30,10 +30,14 @@ type mockProxyLogger struct {
 	t *testing.T
 }
 
-func (l *mockProxyLogger) Log(lines ...util.Dict) {
+func (l *mockProxyLogger) Logd(lines ...util.Dict) {
 	for _, line := range lines {
 		l.t.Logf("%v", line)
 	}
+}
+
+func (l *mockProxyLogger) Logkv(keyValues ...interface{}) {
+	l.Logd(util.LogFunnel(keyValues))
 }
 
 type Logger interface {

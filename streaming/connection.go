@@ -18,7 +18,6 @@ package streaming
 
 import (
 	"github.com/onitake/restreamer/mpegts"
-	"github.com/onitake/restreamer/util"
 	"net/http"
 	"time"
 )
@@ -69,27 +68,27 @@ func (conn *Connection) Serve() {
 	// try to flush the header
 	flusher, ok := conn.writer.(http.Flusher)
 	if !ok {
-		logger.Log(util.Dict{
-			"event":   eventConnectionError,
-			"error":   errorConnectionNotFlushable,
-			"message": "ResponseWriter is not flushable!",
-		})
+		logger.Logkv(
+			"event", eventConnectionError,
+			"error", errorConnectionNotFlushable,
+			"message", "ResponseWriter is not flushable!",
+		)
 	} else {
 		flusher.Flush()
 	}
-	logger.Log(util.Dict{
-		"event":   eventHeaderSent,
-		"message": "Sent header",
-	})
+	logger.Logkv(
+		"event", eventHeaderSent,
+		"message", "Sent header",
+	)
 
 	// see if can get notified about connection closure
 	notifier, ok := conn.writer.(http.CloseNotifier)
 	if !ok {
-		logger.Log(util.Dict{
-			"event":   eventConnectionError,
-			"error":   errorConnectionNoCloseNotify,
-			"message": "Writer does not support CloseNotify",
-		})
+		logger.Logkv(
+			"event", eventConnectionError,
+			"error", errorConnectionNoCloseNotify,
+			"message", "Writer does not support CloseNotify",
+		)
 	}
 
 	// start reading packets
@@ -106,28 +105,28 @@ func (conn *Connection) Serve() {
 				// see https://golang.org/pkg/net/http/?m=all#response.Write for details
 				// on how Go buffers HTTP responses (hint: a 2KiB bufio and a 4KiB bufio)
 				if err != nil {
-					logger.Log(util.Dict{
-						"event":   eventConnectionClosed,
-						"message": "Downstream connection closed",
-					})
+					logger.Logkv(
+						"event", eventConnectionClosed,
+						"message", "Downstream connection closed",
+					)
 					running = false
 				}
 				//log.Printf("Wrote packet of %d bytes\n", bytes)
 			} else {
 				// channel closed, exit
-				logger.Log(util.Dict{
-					"event":   eventConnectionShutdown,
-					"message": "Shutting down client connection",
-				})
+				logger.Logkv(
+					"event", eventConnectionShutdown,
+					"message", "Shutting down client connection",
+				)
 				running = false
 				conn.Closed = true
 			}
 		case <-notifier.CloseNotify():
 			// connection closed while we were waiting for more data
-			logger.Log(util.Dict{
-				"event":   eventConnectionClosedWait,
-				"message": "Downstream connection closed (while waiting)",
-			})
+			logger.Logkv(
+				"event", eventConnectionClosedWait,
+				"message", "Downstream connection closed (while waiting)",
+			)
 			running = false
 		}
 	}
@@ -135,10 +134,10 @@ func (conn *Connection) Serve() {
 	// we cannot drain the channel here, as it might not be closed yet.
 	// better let our caller handle closure and draining.
 
-	logger.Log(util.Dict{
-		"event":   eventConnectionDone,
-		"message": "Streaming finished",
-	})
+	logger.Logkv(
+		"event", eventConnectionDone,
+		"message", "Streaming finished",
+	)
 }
 
 // ServeStreamError returns an appropriate error response to the client.

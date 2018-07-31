@@ -18,7 +18,6 @@ package streaming
 
 import (
 	"fmt"
-	"github.com/onitake/restreamer/util"
 	"sync"
 )
 
@@ -69,21 +68,21 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 	control.lock.Unlock()
 	// print some info
 	if accept {
-		logger.Log(util.Dict{
-			"event":       eventAclAccepted,
-			"remote":      remoteaddr,
-			"connections": control.connections,
-			"max":         control.maxconnections,
-			"message":     fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
-		})
+		logger.Logkv(
+			"event", eventAclAccepted,
+			"remote", remoteaddr,
+			"connections", control.connections,
+			"max", control.maxconnections,
+			"message", fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
+		)
 	} else {
-		logger.Log(util.Dict{
-			"event":       eventAclDenied,
-			"remote":      remoteaddr,
-			"connections": control.connections,
-			"max":         control.maxconnections,
-			"message":     fmt.Sprintf("Denied connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
-		})
+		logger.Logkv(
+			"event", eventAclDenied,
+			"remote", remoteaddr,
+			"connections", control.connections,
+			"max", control.maxconnections,
+			"message", fmt.Sprintf("Denied connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
+		)
 	}
 	// return the result
 	return accept
@@ -101,17 +100,17 @@ func (control *AccessController) Release(streamer *Streamer) {
 	}
 	control.lock.Unlock()
 	if remove {
-		logger.Log(util.Dict{
-			"event":       eventAclRemoved,
-			"connections": control.connections,
-			"max":         control.maxconnections,
-			"message":     fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
-		})
+		logger.Logkv(
+			"event", eventAclRemoved,
+			"connections", control.connections,
+			"max", control.maxconnections,
+			"message", fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
+		)
 	} else {
-		logger.Log(util.Dict{
-			"event":   eventAclError,
-			"error":   errorAclNoConnection,
-			"message": fmt.Sprintf("Error, no connection to remove"),
-		})
+		logger.Logkv(
+			"event", eventAclError,
+			"error", errorAclNoConnection,
+			"message", fmt.Sprintf("Error, no connection to remove"),
+		)
 	}
 }

@@ -17,7 +17,6 @@
 package protocol
 
 import (
-	"github.com/onitake/restreamer/util"
 	"net/http"
 )
 
@@ -30,27 +29,27 @@ func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer 
 		realm := auth.GetAuthenticateRequest()
 		if len(realm) > 0 {
 			if logger != nil {
-				logger.Log(util.Dict{
-					"event":      eventProtocolAuthenticating,
-					"statuscode": 401,
-					"message":    "Requesting user authentication",
-					"url":        request.URL.Path,
-					"client":     request.RemoteAddr,
-				})
+				logger.Logkv(
+					"event", eventProtocolAuthenticating,
+					"statuscode", 401,
+					"message", "Requesting user authentication",
+					"url", request.URL.Path,
+					"client", request.RemoteAddr,
+				)
 			}
 			// if the authenticator supports responses to invalid authentication headers, send
 			writer.Header().Add("WWW-Authenticate", realm)
 			writer.WriteHeader(http.StatusUnauthorized)
 		} else {
 			if logger != nil {
-				logger.Log(util.Dict{
-					"event":      eventProtocolError,
-					"error":      errorProtocolForbidden,
-					"statuscode": 403,
-					"message":    "Denying user access",
-					"url":        request.URL.Path,
-					"client":     request.RemoteAddr,
-				})
+				logger.Logkv(
+					"event", eventProtocolError,
+					"error", errorProtocolForbidden,
+					"statuscode", 403,
+					"message", "Denying user access",
+					"url", request.URL.Path,
+					"client", request.RemoteAddr,
+				)
 			}
 			// otherwise, just respond with a 403
 			writer.WriteHeader(http.StatusForbidden)
@@ -58,12 +57,12 @@ func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer 
 		return false
 	}
 	if logger != nil {
-		logger.Log(util.Dict{
-			"event":   eventProtocolAuthenticated,
-			"message": "Request authenticated",
-			"url":     request.URL.Path,
-			"client":  request.RemoteAddr,
-		})
+		logger.Logkv(
+			"event", eventProtocolAuthenticated,
+			"message", "Request authenticated",
+			"url", request.URL.Path,
+			"client", request.RemoteAddr,
+		)
 	}
 	return true
 }
