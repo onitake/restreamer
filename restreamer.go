@@ -110,7 +110,6 @@ func main() {
 	controller.SetLogger(logbackend)
 
 	queue := event.NewEventQueue(int(config.FullConnections))
-	queue.SetLogger(logbackend)
 	for _, note := range config.Notifications {
 		var typ event.EventType
 		switch note.Event {
@@ -133,7 +132,6 @@ func main() {
 			}
 			urlhandler, err := event.NewUrlHandler(note.Url, auth)
 			if err == nil {
-				urlhandler.SetLogger(logbackend)
 				handler = urlhandler
 			}
 		}

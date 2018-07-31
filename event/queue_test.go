@@ -17,13 +17,13 @@
 package event
 
 import (
+	"github.com/onitake/restreamer/util"
 	"sync"
 	"testing"
-	"github.com/onitake/restreamer/util"
 )
 
 type mockLogger struct {
-	t *testing.T
+	t     *testing.T
 	Stage string
 }
 
@@ -34,8 +34,8 @@ func (l *mockLogger) Log(lines ...util.Dict) {
 }
 
 type mockLogConnectable struct {
-	t *testing.T
-	Stage string
+	t      *testing.T
+	Stage  string
 	Waiter *sync.WaitGroup
 }
 
@@ -49,8 +49,8 @@ func (l *mockLogConnectable) Log(lines ...util.Dict) {
 }
 
 type mockLogDisconnectable struct {
-	t *testing.T
-	Stage string
+	t      *testing.T
+	Stage  string
 	Waiter *sync.WaitGroup
 }
 
@@ -64,17 +64,17 @@ func (l *mockLogDisconnectable) Log(lines ...util.Dict) {
 }
 
 type mockHandler struct {
-	t *testing.T
-	Hit *sync.WaitGroup
+	t    *testing.T
+	Hit  *sync.WaitGroup
 	Miss *sync.WaitGroup
 }
 
 func (h *mockHandler) HandleEvent(t EventType, args ...interface{}) {
 	switch t {
-		case EventLimitHit:
-			h.Hit.Done()
-		case EventLimitMiss:
-			h.Miss.Done()
+	case EventLimitHit:
+		h.Hit.Done()
+	case EventLimitMiss:
+		h.Miss.Done()
 	}
 }
 
@@ -85,13 +85,13 @@ func TestCreateLoadReporter(t *testing.T) {
 
 	l.Stage = "t00"
 	c00 := NewEventQueue(0)
-	c00.SetLogger(l)
+	logger = l
 	c00.Start()
 	c00.Shutdown()
 
 	l.Stage = "t01"
 	c01 := NewEventQueue(0)
-	c01.SetLogger(l)
+	logger = l
 	c01.Start()
 	c01.Start()
 	c01.Shutdown()
@@ -102,7 +102,7 @@ func TestCreateLoadReporter(t *testing.T) {
 		"t02",
 		&sync.WaitGroup{},
 	}
-	c02.SetLogger(l02)
+	logger = l02
 	c02.Start()
 	l02.Waiter.Add(1)
 	c02.NotifyConnect(1)
@@ -111,7 +111,7 @@ func TestCreateLoadReporter(t *testing.T) {
 
 	l.Stage = "t03"
 	c03 := NewEventQueue(0)
-	c03.SetLogger(l)
+	logger = l
 	c03.Start()
 	c03.Shutdown()
 	c03.Start()
@@ -123,7 +123,7 @@ func TestCreateLoadReporter(t *testing.T) {
 		"t04",
 		&sync.WaitGroup{},
 	}
-	c04.SetLogger(l04)
+	logger = l04
 	c04.Start()
 	l04.Waiter.Add(1)
 	c04.NotifyConnect(1)
@@ -137,10 +137,10 @@ func TestCreateLoadReporter(t *testing.T) {
 
 	c05 := NewEventQueue(10)
 	l.Stage = "t05"
-	c05.SetLogger(l)
+	logger = l
 	h05 := &mockHandler{
-		t: t,
-		Hit: &sync.WaitGroup{},
+		t:    t,
+		Hit:  &sync.WaitGroup{},
 		Miss: &sync.WaitGroup{},
 	}
 	h05.Hit.Add(3)
