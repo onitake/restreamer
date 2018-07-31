@@ -21,18 +21,10 @@ import (
 	"net/http"
 )
 
-const (
-	eventProtocolError          = "error"
-	eventProtocolAuthenticating = "authenticating"
-	eventProtocolAuthenticated  = "authenticated"
-	//
-	errorProtocolForbidden = "forbidden"
-)
-
 // HandleHttpAuthentication handles authentication headers and responses.
 // If it returns false, authenticaten has failed, an appropriate response was sent and the caller should immediately return.
 // A true return value indicates that authentication has succeeded and the caller should proceed with handling the request.
-func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer http.ResponseWriter, logger util.JsonLogger) bool {
+func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer http.ResponseWriter) bool {
 	// fail-fast: verify that this user can access this resource first
 	if !auth.Authenticate(request.Header.Get("Authorization")) {
 		realm := auth.GetAuthenticateRequest()

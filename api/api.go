@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017 Gregor Riepl
+/* Copyright (c) 2016-2018 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	writer.Header().Add("Content-Type", "application/json")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
@@ -116,7 +116,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	writer.Header().Add("Content-Type", "application/json")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
@@ -206,7 +206,7 @@ func (api *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.R
 	writer.Header().Add("Content-Type", "text/plain")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
@@ -253,7 +253,7 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 	writer.Header().Add("Content-Type", "text/plain")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer, logger) {
+	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
