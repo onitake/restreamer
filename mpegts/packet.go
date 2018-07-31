@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017 Gregor Riepl
+/* Copyright (c) 2016-2018 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +18,6 @@ package mpegts
 
 import (
 	"io"
-	//"log"
 )
 
 const (
@@ -48,12 +47,12 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 			return nil, err
 		}
 		offset += nbytes
-		//log.Printf("Read %d bytes\n", nbytes)
+		//logger.Logkv("event", "read", "bytes", nbytes)
 	}
 
 	// quick check if it starts with the sync byte 0x47
 	if garbage[0] != SyncByte {
-		//log.Printf("Partial packet received, scanning for sync byte\n")
+		//logger.Logkv("event", "partial")
 
 		// nope, scan first
 		sync := -1
@@ -68,7 +67,7 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 		if sync == -1 {
 			return nil, nil
 		}
-		//log.Printf("Sync byte found at %d\n", sync)
+		//logger.Logkv("event", "sync", "position", sync)
 
 		// if the sync byte was not at the beginning,
 		// create a new packet and append the remaining data.
@@ -76,7 +75,7 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 		// so performance impact is minimal
 		packet := make(Packet, PacketSize)
 		offset = len(packet) - sync
-		//log.Printf("Offset is %d\n", offset)
+		//logger.Logkv("event", "offset", "offset", offset)
 		copy(packet, garbage[sync:])
 		for offset < PacketSize {
 			nbytes, err := reader.Read(packet[offset:])
@@ -84,7 +83,7 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 				return nil, err
 			}
 			offset += nbytes
-			//log.Printf("Appended %d bytes, offset is now %d\n", nbytes, offset)
+			//logger.Logkv("event", "append", "bytes", nbytes, "position", offset)
 		}
 		// return the assembled packet
 		return packet, nil
