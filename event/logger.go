@@ -47,4 +47,4 @@ const (
 	urlHandlerErrorGet = "get"
 )
 
-var logger util.JsonLogger = util.NewGlobalModuleLogger(moduleEvent, nil)
+var logger util.Logger = util.NewGlobalModuleLogger(moduleEvent, nil)

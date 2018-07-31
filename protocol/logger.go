@@ -30,4 +30,4 @@ const (
 	errorProtocolForbidden = "forbidden"
 )
 
-var logger util.JsonLogger = util.NewGlobalModuleLogger(moduleProtocol, nil)
+var logger util.Logger = util.NewGlobalModuleLogger(moduleProtocol, nil)

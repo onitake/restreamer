@@ -100,4 +100,4 @@ const (
 	errorStreamerOffline        = "offline"
 )
 
-var logger util.JsonLogger = util.NewGlobalModuleLogger(moduleStreaming, nil)
+var logger util.Logger = util.NewGlobalModuleLogger(moduleStreaming, nil)

@@ -55,7 +55,7 @@ func (s internalSignal) String() string {
 // when creating structured logs.
 type Dict map[string]interface{}
 
-// JsonLogger is an interface for loggers that can generate JSON-formatted logs
+// Logger is an interface for loggers that can generate JSON-formatted logs
 // from structured data.
 //
 // It is recommended that logs follow some general guidelines, like adding
@@ -68,7 +68,7 @@ type Dict map[string]interface{}
 // { "module": "client", "type": "connect", "stream": "http://test.url/" }
 // { "module": "connection", "type": "connect", "source": "1.2.3.4:49999", "url": "/stream" }
 // { "module": "connection", "type": "disconnect", "source": "1.2.3.4:49999", "url": "/stream", "duration": 61, "bytes": 12087832 }
-type JsonLogger interface {
+type Logger interface {
 	// Logd writes one or multiple data structures to the log represented by this logger.
 	// Each argument is processed through json.Marshal and generates one line in the log.
 	//
@@ -107,7 +107,7 @@ func LogFunnel(keyValues []interface{}) Dict {
 //
 // An optional dictionary argument allows specifying additional keys that are
 // added to every log line. Can be nil if you don't need it.
-func NewGlobalModuleLogger(module string, dict Dict) JsonLogger {
+func NewGlobalModuleLogger(module string, dict Dict) Logger {
 	more := make(Dict)
 	for k, v := range dict {
 		more[k] = v
@@ -123,7 +123,7 @@ func NewGlobalModuleLogger(module string, dict Dict) JsonLogger {
 // SetGlobalStandardLogger assigns a new backing logger to the global standard logger
 //
 // A reference to the old logger is returned.
-func SetGlobalStandardLogger(logger JsonLogger) JsonLogger {
+func SetGlobalStandardLogger(logger Logger) Logger {
 	old := globalStandardLogger[0]
 	globalStandardLogger[0] = logger
 	return old
@@ -143,7 +143,7 @@ func SetGlobalStandardLogger(logger JsonLogger) JsonLogger {
 // so the logging module can be identified.
 type ModuleLogger struct {
 	// Logger is the backing logger to send log lines to.
-	Logger JsonLogger
+	Logger Logger
 	// Defaults is a dictionary containing default keys.
 	// It is highly recommended to add any immutable data here,
 	// in particular the key 'module' with a unique name for the module sending the log
@@ -185,7 +185,7 @@ func (*DummyLogger) Logd(lines ...Dict)             {}
 func (*DummyLogger) Logkv(keyValues ...interface{}) {}
 
 // Multilogger logs to several backend loggers at once.
-type MultiLogger []JsonLogger
+type MultiLogger []Logger
 
 // Log writes the same log lines to all backing loggers.
 func (logger MultiLogger) Logd(lines ...Dict) {

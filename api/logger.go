@@ -28,4 +28,4 @@ const (
 	errorApiJsonEncode = "json_encode"
 )
 
-var logger util.JsonLogger = util.NewGlobalModuleLogger(moduleApi, nil)
+var logger util.Logger = util.NewGlobalModuleLogger(moduleApi, nil)

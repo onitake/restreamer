@@ -24,4 +24,4 @@ const (
 	moduleMpegts = "api"
 )
 
-var logger util.JsonLogger = util.NewGlobalModuleLogger(moduleMpegts, nil)
+var logger util.Logger = util.NewGlobalModuleLogger(moduleMpegts, nil)
