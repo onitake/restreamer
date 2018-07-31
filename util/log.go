@@ -19,7 +19,6 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"time"
@@ -37,6 +36,12 @@ const (
 	hupSignal internalSignal = internalSignal("HUP")
 	// shutdownSignal is a signal identifier for a "stop logging" notification.
 	shutdownSignal internalSignal = internalSignal("SDN")
+)
+
+var (
+	globalStandardLogger MultiLogger = MultiLogger{
+		&ConsoleLogger{},
+	}
 )
 
 type internalSignal string
@@ -64,12 +69,64 @@ type Dict map[string]interface{}
 // { "module": "connection", "type": "connect", "source": "1.2.3.4:49999", "url": "/stream" }
 // { "module": "connection", "type": "disconnect", "source": "1.2.3.4:49999", "url": "/stream", "duration": 61, "bytes": 12087832 }
 type JsonLogger interface {
-	// Log writes one or multiple data structures to the log represented by this logger.
+	// Logd writes one or multiple data structures to the log represented by this logger.
 	// Each argument is processed through json.Marshal and generates one line in the log.
 	//
 	// Example usage:
-	//   logger.Log(Dict{ "key": "value" }, Dict{ "key": "value2" })
-	Log(lines ...Dict)
+	//   logger.Logd(Dict{ "key": "value" }, Dict{ "key": "value2" })
+	Logd(lines ...Dict)
+	// Log is a convenience function that sends a single log line to the logger.
+	// The arguments are alternating key -> value pairs that are assembled into a dictionary.
+	//
+	// This function is slightliy easier to use in many cases, because it doesn't require
+	// in-place creation of data structures. But it's usually also slower.
+	// Simply call:
+	//   logger.Log("key", "value", "key2", 10)
+	Logkv(keyValues ...interface{})
+}
+
+// LogFunnel is a simple helper for converting variadic key-value pairs into a dictionary
+func LogFunnel(keyValues []interface{}) Dict {
+	d := make(Dict)
+	// we need an even number of additional args
+	for i := 0; i+1 < len(keyValues); i += 2 {
+		k, ok := keyValues[i].(string)
+		// ignore if the key is not a string
+		if ok {
+			d[k] = keyValues[i+1]
+		}
+	}
+	return d
+}
+
+// NewGlobalModuleLogger creates a global logger for the current package and
+// connects it to the global standard logger.
+//
+// The default output for standard logger is a JSON log with added timestamps,
+// but this can be changed by calling SetGlobalStandardLogger.
+//
+// An optional dictionary argument allows specifying additional keys that are
+// added to every log line. Can be nil if you don't need it.
+func NewGlobalModuleLogger(module string, dict Dict) JsonLogger {
+	more := make(Dict)
+	for k, v := range dict {
+		more[k] = v
+	}
+	more["module"] = module
+	logger := &ModuleLogger{
+		Logger:   globalStandardLogger,
+		Defaults: more,
+	}
+	return logger
+}
+
+// SetGlobalStandardLogger assigns a new backing logger to the global standard logger
+//
+// A reference to the old logger is returned.
+func SetGlobalStandardLogger(logger JsonLogger) JsonLogger {
+	old := globalStandardLogger[0]
+	globalStandardLogger[0] = logger
+	return old
 }
 
 // ModuleLogger encapsulates default values for a JSON log.
@@ -98,7 +155,7 @@ type ModuleLogger struct {
 }
 
 // Log adds predefined values to each log line and writes it to the encapsulated log.
-func (logger *ModuleLogger) Log(lines ...Dict) {
+func (logger *ModuleLogger) Logd(lines ...Dict) {
 	proclines := make([]Dict, len(lines))
 	for i, line := range lines {
 		processed := make(Dict)
@@ -113,27 +170,32 @@ func (logger *ModuleLogger) Log(lines ...Dict) {
 		}
 		proclines[i] = processed
 	}
-	logger.Logger.Log(proclines...)
+	logger.Logger.Logd(proclines...)
+}
+
+func (logger *ModuleLogger) Logkv(keyValues ...interface{}) {
+	logger.Logd(LogFunnel(keyValues))
 }
 
 // DummyLogger is a logger placeholder that doesn't actually log anything.
+// Just a placeholder for the real big boy loggers.
 type DummyLogger struct{}
 
-// Log does nothing.
-//
-// Just a placeholder for a real big boy loggers.
-func (*DummyLogger) Log(lines ...Dict) {}
+func (*DummyLogger) Logd(lines ...Dict)             {}
+func (*DummyLogger) Logkv(keyValues ...interface{}) {}
 
 // Multilogger logs to several backend loggers at once.
-type MultiLogger struct {
-	Loggers []JsonLogger
-}
+type MultiLogger []JsonLogger
 
 // Log writes the same log lines to all backing loggers.
-func (logger *MultiLogger) Log(lines ...Dict) {
-	for _, backer := range logger.Loggers {
-		backer.Log(lines...)
+func (logger MultiLogger) Logd(lines ...Dict) {
+	for _, backer := range logger {
+		backer.Logd(lines...)
 	}
+}
+
+func (logger MultiLogger) Logkv(keyValues ...interface{}) {
+	logger.Logd(LogFunnel(keyValues))
 }
 
 // ConsoleLogger is a simple logger that prints to stdout.
@@ -143,14 +205,18 @@ type ConsoleLogger struct{}
 //
 // Your best bet if you don't want/need a full-blown file logging queue with
 // signal-initiated reopening or a central logging server.
-func (*ConsoleLogger) Log(lines ...Dict) {
+func (*ConsoleLogger) Logd(lines ...Dict) {
 	encoder := json.NewEncoder(os.Stdout)
 	for _, line := range lines {
 		err := encoder.Encode(line)
 		if err != nil {
-			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":%s}\n", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%s\"}\n", line)
 		}
 	}
+}
+
+func (logger *ConsoleLogger) Logkv(keyValues ...interface{}) {
+	logger.Logd(LogFunnel(keyValues))
 }
 
 // A FileLogger writes JSON-formatted log lines to a file.
@@ -203,17 +269,21 @@ func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 }
 
 // Log writes a series of log lines, prefixed by a time stamp in RFC3339 format.
-func (logger *FileLogger) Log(lines ...Dict) {
+func (logger *FileLogger) Logd(lines ...Dict) {
 	// send these down the queue
 	for _, line := range lines {
 		select {
 		case logger.messages <- line:
 			// ok
 		default:
-			log.Printf("Log queue is full, message dropped!")
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Log queue is full, message dropped\",\"line\":\"%s\"}\n", line)
 			logger.drops++
 		}
 	}
+}
+
+func (logger *FileLogger) Logkv(keyValues ...interface{}) {
+	logger.Logd(LogFunnel(keyValues))
 }
 
 // Writes a single log line
@@ -226,24 +296,24 @@ func (logger *FileLogger) writeLog(line interface{}) {
 			logger.log.Write([]byte(format))
 			logger.lines++
 		} else {
-			log.Printf("Cannot encode log line %s", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%s\"}\n", line)
 			logger.errors++
 		}
 	} else {
-		log.Printf("Output is closed, dropping line %s", line)
+		fmt.Printf("{\"event\":\"error\",\"message\":\"Output is closed, dropping line\",\"line\":\"%s\"}\n", line)
 		logger.errors++
 	}
 }
 
 // Closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
-	log.Printf("Closing log")
+	fmt.Printf("{\"event\":\"close_signal\",\"message\":\"Closing log\"}\n")
 	logger.signals <- hupSignal
 }
 
 // Closes the log and stops/removes the signal handler
 func (logger *FileLogger) closeLog() error {
-	log.Printf("Really closing log")
+	fmt.Printf("{\"event\":\"close\",\"message\":\"Really closing log\"}\n")
 
 	// uninstall the singal handler
 	signal.Stop(logger.signals)
@@ -259,7 +329,7 @@ func (logger *FileLogger) closeLog() error {
 
 // (Re-)opens the log file.
 func (logger *FileLogger) reopenLog() error {
-	log.Printf("Reopening log")
+	fmt.Printf("{\"event\":\"reopen\",\"message\":\"Reopening log\"}\n")
 
 	var err error = nil
 
@@ -290,19 +360,19 @@ func (logger *FileLogger) handle() {
 				err := logger.reopenLog()
 				if err != nil {
 					// if this fails, print a message to the standard log
-					log.Printf("Error reopening log: %s", err)
+					fmt.Printf("{\"event\":\"error\",\"message\":\"Error reopening log\",\"error\":\"reopen\",\"errmsg\":\"%s\"}\n", err.Error())
 				}
 			case hupSignal:
 				// reopen the log file
 				err := logger.closeLog()
 				if err != nil {
 					// if this fails, print a message to the standard log
-					log.Printf("Error reopening log: %s", err)
+					fmt.Printf("{\"event\":\"error\",\"message\":\"Error reopening log\",\"error\":\"reopen\",\"errmsg\":\"%s\"}\n", err.Error())
 				}
 			case shutdownSignal:
 				// shutdown requested
 				running = false
-				log.Printf("Shutting down logger")
+				fmt.Printf("{\"event\":\"shutdown\",\"message\":\"Shutting down logger\"}\n")
 			}
 		case line := <-logger.messages:
 			// encode and write the next line

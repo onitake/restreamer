@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017 Gregor Riepl
+/* Copyright (c) 2016-2018 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,6 @@ package api
 import (
 	"encoding/json"
 	"github.com/onitake/restreamer/protocol"
-	"log"
 	"net/http"
 )
 
@@ -84,7 +83,11 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
 		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
-		log.Print(err)
+		logger.Logkv(
+			"event", eventApiError,
+			"error", errorApiJsonEncode,
+			"message", err.Error(),
+		)
 	}
 }
 
@@ -167,8 +170,12 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		writer.Write(response)
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte("500 internal server error"))
-		log.Print(err)
+		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+		logger.Logkv(
+			"event", eventApiError,
+			"error", errorApiJsonEncode,
+			"message", err.Error(),
+		)
 	}
 }
 

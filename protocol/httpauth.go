@@ -28,14 +28,41 @@ func HandleHttpAuthentication(auth Authenticator, request *http.Request, writer 
 	if !auth.Authenticate(request.Header.Get("Authorization")) {
 		realm := auth.GetAuthenticateRequest()
 		if len(realm) > 0 {
+			if logger != nil {
+				logger.Logkv(
+					"event", eventProtocolAuthenticating,
+					"statuscode", 401,
+					"message", "Requesting user authentication",
+					"url", request.URL.Path,
+					"client", request.RemoteAddr,
+				)
+			}
 			// if the authenticator supports responses to invalid authentication headers, send
 			writer.Header().Add("WWW-Authenticate", realm)
 			writer.WriteHeader(http.StatusUnauthorized)
 		} else {
+			if logger != nil {
+				logger.Logkv(
+					"event", eventProtocolError,
+					"error", errorProtocolForbidden,
+					"statuscode", 403,
+					"message", "Denying user access",
+					"url", request.URL.Path,
+					"client", request.RemoteAddr,
+				)
+			}
 			// otherwise, just respond with a 403
 			writer.WriteHeader(http.StatusForbidden)
 		}
 		return false
+	}
+	if logger != nil {
+		logger.Logkv(
+			"event", eventProtocolAuthenticated,
+			"message", "Request authenticated",
+			"url", request.URL.Path,
+			"client", request.RemoteAddr,
+		)
 	}
 	return true
 }

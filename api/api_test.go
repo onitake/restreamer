@@ -23,6 +23,7 @@ import (
 	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/protocol"
 	"net/http"
+	"net/url"
 	"testing"
 )
 
@@ -89,7 +90,8 @@ func testStatisticsConnections(t *testing.T, connections, full, max int64, statu
 		auth:  protocol.NewAuthenticator(configuration.Authentication{}, nil),
 	}
 	writer := newMockWriter(t)
-	api.ServeHTTP(writer, &http.Request{Header: make(http.Header)})
+	testurl, _ := url.Parse("http://localhost/statistics")
+	api.ServeHTTP(writer, &http.Request{Header: make(http.Header), URL: testurl})
 	var decoded map[string]interface{}
 	err := json.Unmarshal(writer.Bytes(), &decoded)
 	if err != nil {
@@ -117,7 +119,8 @@ func testHealthConnections(t *testing.T, connections, full, max int64, status st
 		auth:  protocol.NewAuthenticator(configuration.Authentication{}, nil),
 	}
 	writer := newMockWriter(t)
-	api.ServeHTTP(writer, &http.Request{Header: make(http.Header)})
+	testurl, _ := url.Parse("http://localhost/health")
+	api.ServeHTTP(writer, &http.Request{Header: make(http.Header), URL: testurl})
 	var decoded map[string]interface{}
 	err := json.Unmarshal(writer.Bytes(), &decoded)
 	if err != nil {

@@ -18,19 +18,7 @@ package streaming
 
 import (
 	"fmt"
-	"github.com/onitake/restreamer/util"
 	"sync"
-)
-
-const (
-	moduleAcl = "acl"
-	//
-	eventAclError    = "error"
-	eventAclAccepted = "accepted"
-	eventAclDenied   = "denied"
-	eventAclRemoved  = "removed"
-	//
-	errorAclNoConnection = "noconnection"
 )
 
 // AccessController implements a connection broker that limits
@@ -43,8 +31,6 @@ type AccessController struct {
 	// connections contains the number of active connections.
 	// must be accessed atomically.
 	connections uint
-	// logger is a json logger
-	logger *util.ModuleLogger
 	// inhibit is a global connection inhibitor flag.
 	inhibit bool
 }
@@ -52,22 +38,9 @@ type AccessController struct {
 // NewAccessController creates a connection broker object that
 // handles access control according to the number of connected clients.
 func NewAccessController(maxconnections uint) *AccessController {
-	logger := &util.ModuleLogger{
-		Logger: &util.ConsoleLogger{},
-		Defaults: util.Dict{
-			"module": moduleAcl,
-		},
-		AddTimestamp: true,
-	}
 	return &AccessController{
 		maxconnections: maxconnections,
-		logger:         logger,
 	}
-}
-
-// SetLogger assigns a logger
-func (control *AccessController) SetLogger(logger util.JsonLogger) {
-	control.logger.Logger = logger
 }
 
 // SetInhibit allows setting and clearing the inhibit flag.
@@ -95,21 +68,21 @@ func (control *AccessController) Accept(remoteaddr string, streamer *Streamer) b
 	control.lock.Unlock()
 	// print some info
 	if accept {
-		control.logger.Log(util.Dict{
-			"event":       eventAclAccepted,
-			"remote":      remoteaddr,
-			"connections": control.connections,
-			"max":         control.maxconnections,
-			"message":     fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
-		})
+		logger.Logkv(
+			"event", eventAclAccepted,
+			"remote", remoteaddr,
+			"connections", control.connections,
+			"max", control.maxconnections,
+			"message", fmt.Sprintf("Accepted connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
+		)
 	} else {
-		control.logger.Log(util.Dict{
-			"event":       eventAclDenied,
-			"remote":      remoteaddr,
-			"connections": control.connections,
-			"max":         control.maxconnections,
-			"message":     fmt.Sprintf("Denied connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
-		})
+		logger.Logkv(
+			"event", eventAclDenied,
+			"remote", remoteaddr,
+			"connections", control.connections,
+			"max", control.maxconnections,
+			"message", fmt.Sprintf("Denied connection from %s, active=%d, max=%d", remoteaddr, control.connections, control.maxconnections),
+		)
 	}
 	// return the result
 	return accept
@@ -127,17 +100,17 @@ func (control *AccessController) Release(streamer *Streamer) {
 	}
 	control.lock.Unlock()
 	if remove {
-		control.logger.Log(util.Dict{
-			"event":       eventAclRemoved,
-			"connections": control.connections,
-			"max":         control.maxconnections,
-			"message":     fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
-		})
+		logger.Logkv(
+			"event", eventAclRemoved,
+			"connections", control.connections,
+			"max", control.maxconnections,
+			"message", fmt.Sprintf("Removed connection, active=%d, max=%d", control.connections, control.maxconnections),
+		)
 	} else {
-		control.logger.Log(util.Dict{
-			"event":   eventAclError,
-			"error":   errorAclNoConnection,
-			"message": fmt.Sprintf("Error, no connection to remove"),
-		})
+		logger.Logkv(
+			"event", eventAclError,
+			"error", errorAclNoConnection,
+			"message", fmt.Sprintf("Error, no connection to remove"),
+		)
 	}
 }

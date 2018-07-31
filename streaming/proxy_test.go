@@ -30,10 +30,14 @@ type mockProxyLogger struct {
 	t *testing.T
 }
 
-func (l *mockProxyLogger) Log(lines ...util.Dict) {
+func (l *mockProxyLogger) Logd(lines ...util.Dict) {
 	for _, line := range lines {
 		l.t.Logf("%v", line)
 	}
+}
+
+func (l *mockProxyLogger) Logkv(keyValues ...interface{}) {
+	l.Logd(util.LogFunnel(keyValues))
 }
 
 type Logger interface {
@@ -83,15 +87,15 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 }
 
 func TestProxy(t *testing.T) {
-	logger := &mockProxyLogger{t}
+	l := &mockProxyLogger{t}
 
 	auth := protocol.NewAuthenticator(configuration.Authentication{}, nil)
 
 	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0, auth)
-	direct.SetLogger(logger)
+	logger = l
 	testWithProxy(t, direct)
 
 	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1, auth)
-	cached.SetLogger(logger)
+	logger = l
 	testWithProxy(t, cached)
 }
