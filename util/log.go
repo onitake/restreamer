@@ -19,7 +19,6 @@ package util
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"time"
@@ -185,7 +184,7 @@ func (*ConsoleLogger) Log(lines ...Dict) {
 	for _, line := range lines {
 		err := encoder.Encode(line)
 		if err != nil {
-			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":%s}\n", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%s\"}\n", line)
 		}
 	}
 }
@@ -247,7 +246,7 @@ func (logger *FileLogger) Log(lines ...Dict) {
 		case logger.messages <- line:
 			// ok
 		default:
-			log.Printf("Log queue is full, message dropped!")
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Log queue is full, message dropped\",\"line\":\"%s\"}\n", line)
 			logger.drops++
 		}
 	}
@@ -263,24 +262,24 @@ func (logger *FileLogger) writeLog(line interface{}) {
 			logger.log.Write([]byte(format))
 			logger.lines++
 		} else {
-			log.Printf("Cannot encode log line %s", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%s\"}\n", line)
 			logger.errors++
 		}
 	} else {
-		log.Printf("Output is closed, dropping line %s", line)
+		fmt.Printf("{\"event\":\"error\",\"message\":\"Output is closed, dropping line\",\"line\":\"%s\"}\n", line)
 		logger.errors++
 	}
 }
 
 // Closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
-	log.Printf("Closing log")
+	fmt.Printf("{\"event\":\"close_signal\",\"message\":\"Closing log\"}\n")
 	logger.signals <- hupSignal
 }
 
 // Closes the log and stops/removes the signal handler
 func (logger *FileLogger) closeLog() error {
-	log.Printf("Really closing log")
+	fmt.Printf("{\"event\":\"close\",\"message\":\"Really closing log\"}\n")
 
 	// uninstall the singal handler
 	signal.Stop(logger.signals)
@@ -296,7 +295,7 @@ func (logger *FileLogger) closeLog() error {
 
 // (Re-)opens the log file.
 func (logger *FileLogger) reopenLog() error {
-	log.Printf("Reopening log")
+	fmt.Printf("{\"event\":\"reopen\",\"message\":\"Reopening log\"}\n")
 
 	var err error = nil
 
@@ -327,19 +326,19 @@ func (logger *FileLogger) handle() {
 				err := logger.reopenLog()
 				if err != nil {
 					// if this fails, print a message to the standard log
-					log.Printf("Error reopening log: %s", err)
+					fmt.Printf("{\"event\":\"error\",\"message\":\"Error reopening log\",\"error\":\"reopen\",\"errmsg\":\"%s\"}\n", err.Error())
 				}
 			case hupSignal:
 				// reopen the log file
 				err := logger.closeLog()
 				if err != nil {
 					// if this fails, print a message to the standard log
-					log.Printf("Error reopening log: %s", err)
+					fmt.Printf("{\"event\":\"error\",\"message\":\"Error reopening log\",\"error\":\"reopen\",\"errmsg\":\"%s\"}\n", err.Error())
 				}
 			case shutdownSignal:
 				// shutdown requested
 				running = false
-				log.Printf("Shutting down logger")
+				fmt.Printf("{\"event\":\"shutdown\",\"message\":\"Shutting down logger\"}\n")
 			}
 		case line := <-logger.messages:
 			// encode and write the next line
