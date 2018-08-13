@@ -240,7 +240,7 @@ type FileLogger struct {
 	// log file name
 	name string
 	// log file handle
-	log *os.File
+	log io.WriteCloser
 	// message queue
 	messages chan interface{}
 	// log line counter
