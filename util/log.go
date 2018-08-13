@@ -220,7 +220,7 @@ func (*ConsoleLogger) Logd(lines ...Dict) {
 	for _, line := range lines {
 		err := encoder.Encode(line)
 		if err != nil {
-			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%s\"}\n", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%v\"}\n", line)
 		}
 	}
 }
@@ -286,7 +286,7 @@ func (logger *FileLogger) Logd(lines ...Dict) {
 		case logger.messages <- line:
 			// ok
 		default:
-			fmt.Printf("{\"event\":\"error\",\"message\":\"Log queue is full, message dropped\",\"line\":\"%s\"}\n", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Log queue is full, message dropped\",\"line\":\"%v\"}\n", line)
 			logger.drops++
 		}
 	}
@@ -306,11 +306,11 @@ func (logger *FileLogger) writeLog(line interface{}) {
 			logger.log.Write([]byte(format))
 			logger.lines++
 		} else {
-			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%s\"}\n", line)
+			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%v\"}\n", line)
 			logger.errors++
 		}
 	} else {
-		fmt.Printf("{\"event\":\"error\",\"message\":\"Output is closed, dropping line\",\"line\":\"%s\"}\n", line)
+		fmt.Printf("{\"event\":\"error\",\"message\":\"Output is closed, dropping line\",\"line\":\"%v\"}\n", line)
 		logger.errors++
 	}
 }
