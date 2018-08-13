@@ -19,6 +19,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"time"
@@ -36,6 +37,15 @@ const (
 	hupSignal internalSignal = internalSignal("HUP")
 	// shutdownSignal is a signal identifier for a "stop logging" notification.
 	shutdownSignal internalSignal = internalSignal("SDN")
+	// srcFileUnknown is the string stored in KeySrcFile when the caller's file name cannot be determined
+	srcFileUnknown string = "<UNKNOWN>"
+	// srcLineUnknown is the number stored in KeySrcLine when the caller's source code line number cannot be determined
+	srcLineUnknown int = 0
+	//
+	// KeyModule is the standard key for a user-defined module name
+	KeyModule string = "module"
+	// KeyTime is the standard key for the time stamp when the log entry was generated
+	KeyTime string = "time"
 )
 
 var (
@@ -112,7 +122,7 @@ func NewGlobalModuleLogger(module string, dict Dict) Logger {
 	for k, v := range dict {
 		more[k] = v
 	}
-	more["module"] = module
+	more[KeyModule] = module
 	logger := &ModuleLogger{
 		Logger:   globalStandardLogger,
 		Defaults: more,
@@ -163,7 +173,7 @@ func (logger *ModuleLogger) Logd(lines ...Dict) {
 			processed[key] = value
 		}
 		if logger.AddTimestamp {
-			processed["time"] = time.Now().Format(timeFormat)
+			processed[KeyTime] = time.Now().Format(timeFormat)
 		}
 		for key, value := range line {
 			processed[key] = value
