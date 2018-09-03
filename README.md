@@ -122,7 +122,7 @@ It is highly recommended to log to stdout and collect logs using journald
 or a similar logging engine.
 
 
-## Testing
+## Optimisation
 
 ### Test Stream
 
@@ -144,6 +144,52 @@ Start playing:
 ```
 cvlc http://localhost:8000/pipe.ts
 ```
+
+### File Descriptors
+
+Continuous streaming services require a lot of open file descriptors,
+particularly when running a lot of low-bandwidth streams on a powerful
+streaming node.
+
+Many operating systems limit the number of file descriptors a single
+process can use, so care must be taken that servers aren't starved by
+this artificial limit.
+
+As a rough guideline, determine the maximum downstream bandwidth your
+server can handle, then divide by the bandwidth of each stream and
+add the number of upstream connections.
+Reserve some file descriptors for reconnects and fluctuations.
+
+For example, if your server has a dedicated 10Gbit/s downstream network
+connection and it serves 10 streams at 8Mbit/s, the required number
+of file descriptors would be:
+
+```
+descriptor_count = streams_count + downstream_bandwidth / stream_bandwidth * 200%
+=> (10 + 10 Gbit/s / 8 Mbit/s) * 2 = 2520
+```
+
+On many Linux systems, the default is very low, at 1024 file
+descriptors, so restreamer would not be able to saturate all bandwidth.
+With the following systemd unit file, this would be remedied:
+```
+[Unit]
+Description=restreamer HTTP streaming proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/restreamer
+Restart=always
+KillMode=mixed
+LimitNOFILE=3000
+
+[Install]
+WantedBy=multi-user.target
+```
+
+In most cases, it's safe to set a high value, so something like
+64000 (or more) would be fine.
 
 ### Memory/CPU/Network Usage
 
