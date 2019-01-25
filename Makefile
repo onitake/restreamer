@@ -28,7 +28,7 @@ endif
 PACKAGE_PREFIX=github.com/onitake
 PACKAGE=restreamer
 PACKAGE_PATH=src/$(PACKAGE_PREFIX)/$(PACKAGE)
-RESTREAMER_SOURCES=restreamer.go profile.go
+RESTREAMER_SOURCES=restreamer.go profile.go logger.go
 RESTREAMER_EXE=restreamer$(PACKAGE_OS)$(PACKAGE_ARCH)$(EXE_SUFFIX)
 
 # always force a rebuild of the main binary
