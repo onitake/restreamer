@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Gregor Riepl
+/* Copyright (c) 2018-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"time"
 )
 
 const (
@@ -32,6 +33,7 @@ type changeType int
 
 const (
 	changeConnect changeType = iota
+	changeHeartbeat
 )
 
 // stateChange encapsulates a state change notification
@@ -41,6 +43,8 @@ type stateChange struct {
 	// connected contains the number of new connections.
 	// Can be negative if connections are dropped.
 	connected int
+	// when contains the point of time when the event was created
+	when time.Time
 }
 
 // EventQueue encapsulates state for a connection load reporting callback.
@@ -162,12 +166,28 @@ func (reporter *EventQueue) handle(message *stateChange) {
 	switch message.typ {
 	case changeConnect:
 		reporter.handleConnect(message.connected)
+	case changeHeartbeat:
+		reporter.handleHeartbeat(message.when)
 	default:
 		logger.Logkv(
 			"event", queueEventError,
 			"error", queueErrorInvalidNotification,
 			"type", message.typ,
 		)
+	}
+}
+
+// handleHeartbeat handles a periodic heartbeat
+func (reporter *EventQueue) handleHeartbeat(when time.Time) {
+	logger.Logkv(
+		"event", queueEventHeartbeat,
+		"message", fmt.Sprintf("Periodic heartbeat at: %v", when),
+		"when", when,
+	)
+	for handler, ok := range reporter.handlers[EventHeartbeat] {
+		if ok {
+			handler.HandleEvent(EventHeartbeat, when)
+		}
 	}
 }
 
@@ -283,6 +303,15 @@ func (reporter *EventQueue) NotifyConnect(connected int) {
 	message := &stateChange{
 		typ:       changeConnect,
 		connected: connected,
+	}
+	reporter.notifier <- message
+}
+
+func (reporter *EventQueue) NotifyHeartbeat(when time.Time) {
+	// construct the notification message and pass it down the queue
+	message := &stateChange{
+		typ:  changeHeartbeat,
+		when: when,
 	}
 	reporter.notifier <- message
 }

@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Gregor Riepl
+/* Copyright (c) 2018-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -16,6 +16,8 @@
 
 package event
 
+import "time"
+
 // Notifiable defines the interface for a notification dispatcher.
 //
 // Inidividual calls cause state changes, which may trigger events.
@@ -25,4 +27,7 @@ type Notifiable interface {
 	//
 	// Connects and disconnects should be reported separately.
 	NotifyConnect(connected int)
+	// NotifyHeartbeat is called periodically when enabled, to allow sending
+	// keepalive messages to a monitoring system
+	NotifyHeartbeat(when time.Time)
 }

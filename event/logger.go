@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Gregor Riepl
+/* Copyright (c) 2018-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,16 +23,20 @@ import (
 const (
 	moduleEvent = "event"
 	//
-	queueEventError     = "error"
-	queueEventLimitHit  = "hit"
-	queueEventLimitMiss = "miss"
-	queueEventStarting  = "starting"
-	queueEventStopping  = "stopping"
-	queueEventStarted   = "started"
-	queueEventReceived  = "received"
-	queueEventDraining  = "draining"
-	queueEventStopped   = "stopped"
-	queueEventConnect   = "connect"
+	queueEventError          = "error"
+	queueEventLimitHit       = "hit"
+	queueEventLimitMiss      = "miss"
+	queueEventStarting       = "starting"
+	queueEventStopping       = "stopping"
+	queueEventStarted        = "started"
+	queueEventReceived       = "received"
+	queueEventDraining       = "draining"
+	queueEventStopped        = "stopped"
+	queueEventConnect        = "connect"
+	queueEventHeartbeat      = "heartbeat"
+	queueEventHeartbeatStart = "heartbeat_start"
+	queueEventHeartbeatStop  = "heartbeat_stop"
+	queueEventHeartbeatFire  = "heartbeat_fire"
 	//
 	queueErrorAlreadyRunning      = "already_running"
 	queueErrorInvalidNotification = "invalid_notification"

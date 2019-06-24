@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Gregor Riepl
+/* Copyright (c) 2018-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,12 +37,13 @@ func TestArrayRange(t *testing.T) {
 
 func TestConfig01(t *testing.T) {
 	t01 := &Configuration{
-		Listen:       "localhost:http",
-		Timeout:      0,
-		Reconnect:    10,
-		InputBuffer:  1000,
-		OutputBuffer: 400,
-		NoStats:      false,
+		Listen:            "localhost:http",
+		Timeout:           0,
+		Reconnect:         10,
+		InputBuffer:       1000,
+		OutputBuffer:      400,
+		NoStats:           false,
+		HeartbeatInterval: 60,
 	}
 	r01 := DefaultConfiguration()
 	if !reflect.DeepEqual(t01, r01) {
