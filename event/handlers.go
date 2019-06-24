@@ -1,4 +1,4 @@
-/* Copyright (c) 2018 Gregor Riepl
+/* Copyright (c) 2018-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,11 @@
 package event
 
 type EventType int
+
 const (
 	EventLimitHit EventType = iota
 	EventLimitMiss
+	EventHeartbeat
 )
 
 type Handler interface {

@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017 Gregor Riepl
+/* Copyright (c) 2016-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -81,6 +81,8 @@ func main() {
 
 	controller := streaming.NewAccessController(config.MaxConnections)
 
+	enableheartbeat := false
+
 	queue := event.NewEventQueue(int(config.FullConnections))
 	for _, note := range config.Notifications {
 		var typ event.EventType
@@ -89,6 +91,9 @@ func main() {
 			typ = event.EventLimitHit
 		case "limit_miss":
 			typ = event.EventLimitMiss
+		case "heartbeat":
+			typ = event.EventHeartbeat
+			enableheartbeat = true
 		}
 		var handler event.Handler
 		var err error
@@ -118,6 +123,10 @@ func main() {
 		}
 	}
 	queue.Start()
+
+	if enableheartbeat {
+		event.NewHeartbeat(time.Duration(config.HeartbeatInterval)*time.Second, queue)
+	}
 
 	i := 0
 	mux := http.NewServeMux()

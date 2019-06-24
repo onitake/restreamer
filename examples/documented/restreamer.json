@@ -28,6 +28,9 @@
 	"": "Restreamer will start reporting that it is full when this limit is reached.",
 	"": "It will still accept new connections until maxconnections is reached, however.",
 	"fullconnections": 90,
+	"": "Number of seconds between each heartbeat.",
+	"": "Will be ignore if no heartbeat notifications are defined.",
+	"heartbeatinterval": 60,
 	"": "The JSON access log file name. If this option is empty, access logs are disabled.",
 	"log": "",
 	"": "The user database used for authentication stanzas",
@@ -123,6 +126,7 @@
 			"": "Event to watch for: limit_hit or limit_miss",
 			"": "limit_hit notifies when the soft limit (fullconnections) is reached",
 			"": "limit_miss notifies when the number of connections goes below this threshold",
+			"": "heartbeat notifies once per heartbeatinterval",
 			"event": "limit_hit",
 			"": "The kind of notification that is generated. Only url is supported.",
 			"type": "url",
@@ -140,6 +144,11 @@
 			"event": "limit_miss",
 			"type": "url",
 			"url": "http://localhost:8001/miss"
+		},
+		{
+			"event": "heartbeat",
+			"type": "url",
+			"url": "http://localhost:8001/ping"
 		}
 	]
 }

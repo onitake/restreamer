@@ -1,4 +1,4 @@
-/* Copyright (c) 2016-2017 Gregor Riepl
+/* Copyright (c) 2016-2019 Gregor Riepl
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -115,6 +115,9 @@ type Configuration struct {
 	FullConnections uint `json:"fullconnections"`
 	// NoStats disables statistics collection, if set.
 	NoStats bool `json:"nostats"`
+	// HeartbeatInterval defines the number of seconds between heartbeat notifications.
+	// This setting has not effect if no notifications were defined.
+	HeartbeatInterval uint `json:"heartbeatinterval"`
 	// Log is the access log file name.
 	Log string `json:"log"`
 	// Profile determines if profiling should be enabled.
@@ -133,12 +136,13 @@ type Configuration struct {
 // with default values.
 func DefaultConfiguration() *Configuration {
 	return &Configuration{
-		Listen:       "localhost:http",
-		Timeout:      0,
-		Reconnect:    10,
-		InputBuffer:  1000,
-		OutputBuffer: 400,
-		NoStats:      false,
+		Listen:            "localhost:http",
+		Timeout:           0,
+		Reconnect:         10,
+		InputBuffer:       1000,
+		OutputBuffer:      400,
+		NoStats:           false,
+		HeartbeatInterval: 60,
 	}
 }
 
