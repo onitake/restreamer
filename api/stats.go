@@ -62,10 +62,12 @@ type realCollector struct {
 	packetsSent uint64
 	// total number of dropped packets
 	packetsDropped uint64
-	// upstream connection state
-	connected util.AtomicBool
 	// total streaming duration
 	duration int64
+	// upstream connection state
+	// NOTE AtomicBool is a 32-bit type and must listed be after 64-bit fields
+	// to avoid crashes due to misalignment!
+	connected util.AtomicBool
 }
 
 func (stats *realCollector) ConnectionAdded() {
