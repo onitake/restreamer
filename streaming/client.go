@@ -372,6 +372,19 @@ func (client *Client) start(url *url.URL) error {
 				return err
 			}
 			client.input = conn
+		case "multicastudp":
+			// Parse the string address
+			addr, err := net.ResolveUDPAddr("udp", url.Host)
+			if err != nil {
+				log.Fatal(err)
+			}
+			// Open up a connection
+			conn, err := net.ListenMulticastUDP("udp", nil, addr)
+			if err != nil {
+				log.Fatal(err)
+			}
+			conn.SetReadBuffer(maxDatagramSize)
+			client.input = conn
 		default:
 			return ErrInvalidProtocol
 		}
