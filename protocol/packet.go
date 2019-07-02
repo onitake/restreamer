@@ -21,26 +21,26 @@ import (
 )
 
 const (
-	// PacketSize is the TS packet size (188 bytes)
-	PacketSize = 188
+	// MpegTsPacketSize is the TS packet size (188 bytes)
+	MpegTsPacketSize = 188
 	// SyncByte is the byte value of the TS synchronization code (0x47)
-	SyncByte = 0x47
+	MpegTsSyncByte = 0x47
 )
 
-// Packet is an alias to a byte slice and represents one TS packet.
+// MpegTsPacket is an alias to a byte slice and represents one TS packet.
 // It is 188 bytes long and starts with 0x47.
-type Packet []byte
+type MpegTsPacket []byte
 
-// ReadPacket reads data from the input stream,
+// ReadMpegTsPacket reads data from the input stream,
 // scans for the sync byte and returns one packet from that point on.
 //
 // If a sync byte can't be found among the first 188 bytes,
 // no packets are returned
-func ReadPacket(reader io.Reader) (Packet, error) {
-	garbage := make(Packet, PacketSize)
+func ReadMpegTsPacket(reader io.Reader) (MpegTsPacket, error) {
+	garbage := make(MpegTsPacket, MpegTsPacketSize)
 	offset := 0
 	// read 188 bytes ahead (assume we are at the start of a packet)
-	for offset < PacketSize {
+	for offset < MpegTsPacketSize {
 		nbytes, err := reader.Read(garbage[offset:])
 		// read error - bail out
 		if err != nil {
@@ -51,13 +51,13 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 	}
 
 	// quick check if it starts with the sync byte 0x47
-	if garbage[0] != SyncByte {
+	if garbage[0] != MpegTsSyncByte {
 		//logger.Logkv("event", "partial")
 
 		// nope, scan first
 		sync := -1
 		for i, bytes := range garbage {
-			if bytes == SyncByte {
+			if bytes == MpegTsSyncByte {
 				// found, very good
 				sync = i
 				break
@@ -73,11 +73,11 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 		// create a new packet and append the remaining data.
 		// this should happen only when the stream is out of sync,
 		// so performance impact is minimal
-		packet := make(Packet, PacketSize)
+		packet := make(MpegTsPacket, MpegTsPacketSize)
 		offset = len(packet) - sync
 		//logger.Logkv("event", "offset", "offset", offset)
 		copy(packet, garbage[sync:])
-		for offset < PacketSize {
+		for offset < MpegTsPacketSize {
 			nbytes, err := reader.Read(packet[offset:])
 			if err != nil {
 				return nil, err

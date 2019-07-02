@@ -34,7 +34,7 @@ func makeRandomPacket(t *testing.T, bytes int) []byte {
 
 func TestPacketScan(t *testing.T) {
 	c01 := bytes.NewBuffer([]byte{})
-	r01, err := ReadPacket(c01)
+	r01, err := ReadMpegTsPacket(c01)
 	if err != io.EOF || r01 != nil {
 		t.Error("t01: Expected EOF on empty buffer, got something else")
 	}
@@ -42,7 +42,7 @@ func TestPacketScan(t *testing.T) {
 	c02 := bytes.NewBuffer([]byte{
 		0x00,
 	})
-	r02, err := ReadPacket(c02)
+	r02, err := ReadMpegTsPacket(c02)
 	if err != io.EOF || r02 != nil {
 		t.Error("t02: Expected EOF on incomplete buffer without sync, got something else")
 	}
@@ -50,13 +50,13 @@ func TestPacketScan(t *testing.T) {
 	c03 := bytes.NewBuffer([]byte{
 		0x47, 0x00,
 	})
-	r03, err := ReadPacket(c03)
+	r03, err := ReadMpegTsPacket(c03)
 	if err != io.EOF || r03 != nil {
 		t.Error("t03: Expected EOF on incomplete buffer, got something else")
 	}
 
 	c04 := bytes.NewBuffer(make([]byte, 188))
-	r04, err := ReadPacket(c04)
+	r04, err := ReadMpegTsPacket(c04)
 	if err != nil || len(r04) != 0 {
 		t.Errorf("t04: Expected empty result on zero buffer, got something else")
 	}
@@ -64,7 +64,7 @@ func TestPacketScan(t *testing.T) {
 	b05 := makeRandomPacket(t, 188)
 	b05[0] = 0x47
 	c05 := bytes.NewBuffer(b05)
-	r05, err := ReadPacket(c05)
+	r05, err := ReadMpegTsPacket(c05)
 	if err != nil || !bytes.Equal(b05, r05) {
 		t.Error("t05: Expected packet identical to buffer, got an error or something else")
 	}
@@ -72,7 +72,7 @@ func TestPacketScan(t *testing.T) {
 	b06 := makeRandomPacket(t, 189)
 	b06[0] = 0x47
 	c06 := bytes.NewBuffer(b06)
-	r06, err := ReadPacket(c06)
+	r06, err := ReadMpegTsPacket(c06)
 	if err != nil || !bytes.Equal(b06[:188], r06) {
 		t.Error("t06: Expected packet identical to head of buffer, got an error or something else")
 	}
@@ -81,7 +81,7 @@ func TestPacketScan(t *testing.T) {
 	b07[0] = 0
 	b07[1] = 0x47
 	c07 := bytes.NewBuffer(b07)
-	r07, err := ReadPacket(c07)
+	r07, err := ReadMpegTsPacket(c07)
 	if err != nil || !bytes.Equal(b07[1:189], r07) {
 		t.Error("t07: Expected packet identical to tail of buffer, got an error or something else")
 	}
@@ -90,7 +90,7 @@ func TestPacketScan(t *testing.T) {
 	b08[0] = 0
 	b08[1] = 0x47
 	c08 := bytes.NewBuffer(b08)
-	r08, err := ReadPacket(c08)
+	r08, err := ReadMpegTsPacket(c08)
 	if err != io.EOF || r08 != nil {
 		t.Error("t08: Expected EOF on incomplete packet that didn't start at offset 0, got something else")
 	}

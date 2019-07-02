@@ -187,7 +187,7 @@ func (streamer *Streamer) eatCommands() {
 //
 // This routine will block; you should run it asynchronously like this:
 //
-// queue := make(chan protocol.Packet, inputQueueSize)
+// queue := make(chan protocol.MpegTsPacket, inputQueueSize)
 // go func() {
 //   log.Fatal(streamer.Stream(queue))
 // }
@@ -195,7 +195,7 @@ func (streamer *Streamer) eatCommands() {
 // or simply:
 //
 // go streamer.Stream(queue)
-func (streamer *Streamer) Stream(queue <-chan protocol.Packet) error {
+func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 	// interlock and check for availability first
 	if !util.CompareAndSwapBool(&streamer.running, false, true) {
 		return ErrAlreadyRunning
