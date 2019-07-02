@@ -21,7 +21,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"github.com/onitake/restreamer/configuration"
-	"github.com/onitake/restreamer/protocol"
+	"github.com/onitake/restreamer/auth"
 	"net/http"
 	"net/url"
 	"testing"
@@ -87,7 +87,7 @@ func testStatisticsConnections(t *testing.T, connections, full, max int64, statu
 	}
 	api := &statisticsApi{
 		stats: stats,
-		auth:  protocol.NewAuthenticator(configuration.Authentication{}, nil),
+		auth:  auth.NewAuthenticator(configuration.Authentication{}, nil),
 	}
 	writer := newMockWriter(t)
 	testurl, _ := url.Parse("http://localhost/statistics")
@@ -116,7 +116,7 @@ func testHealthConnections(t *testing.T, connections, full, max int64, status st
 	}
 	api := &healthApi{
 		stats: stats,
-		auth:  protocol.NewAuthenticator(configuration.Authentication{}, nil),
+		auth:  auth.NewAuthenticator(configuration.Authentication{}, nil),
 	}
 	writer := newMockWriter(t)
 	testurl, _ := url.Parse("http://localhost/health")

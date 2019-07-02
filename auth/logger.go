@@ -14,14 +14,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package protocol
+package auth
 
 import (
 	"github.com/onitake/restreamer/util"
 )
 
 const (
-	moduleProtocol = "protocol"
+	moduleAuth = "auth"
 	//
 	eventProtocolError          = "error"
 	eventProtocolAuthenticating = "authenticating"
@@ -30,4 +30,4 @@ const (
 	errorProtocolForbidden = "forbidden"
 )
 
-var logger util.Logger = util.NewGlobalModuleLogger(moduleProtocol, nil)
+var logger util.Logger = util.NewGlobalModuleLogger(moduleAuth, nil)
