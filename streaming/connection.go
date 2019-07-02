@@ -17,7 +17,7 @@
 package streaming
 
 import (
-	"github.com/onitake/restreamer/mpegts"
+	"github.com/onitake/restreamer/protocol"
 	"net/http"
 	"time"
 )
@@ -28,7 +28,7 @@ import (
 // No separate thread is created.
 type Connection struct {
 	// Queue is the per-connection packet queue
-	Queue chan mpegts.Packet
+	Queue chan protocol.Packet
 	// ClientAddress is the remote client address
 	ClientAddress string
 	// the destination socket
@@ -45,7 +45,7 @@ type Connection struct {
 // and will be used for logging.
 func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) *Connection {
 	conn := &Connection{
-		Queue:         make(chan mpegts.Packet, qsize),
+		Queue:         make(chan protocol.Packet, qsize),
 		ClientAddress: clientaddr,
 		writer:        destination,
 	}

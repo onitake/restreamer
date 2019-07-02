@@ -17,7 +17,7 @@
 package api
 
 import (
-	"github.com/onitake/restreamer/mpegts"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"sync"
 	"sync/atomic"
@@ -247,16 +247,16 @@ func (stats *realStatistics) update(delta time.Duration, change map[string]*real
 		stream.TotalPacketsReceived += diff.packetsReceived
 		stream.TotalPacketsSent += diff.packetsSent
 		stream.TotalPacketsDropped += diff.packetsDropped
-		stream.TotalBytesReceived = stream.TotalPacketsReceived * mpegts.PacketSize
-		stream.TotalBytesSent = stream.TotalPacketsSent * mpegts.PacketSize
-		stream.TotalBytesDropped = stream.TotalPacketsDropped * mpegts.PacketSize
+		stream.TotalBytesReceived = stream.TotalPacketsReceived * protocol.PacketSize
+		stream.TotalBytesSent = stream.TotalPacketsSent * protocol.PacketSize
+		stream.TotalBytesDropped = stream.TotalPacketsDropped * protocol.PacketSize
 		stream.TotalStreamTime += diff.duration
 		stream.PacketsPerSecondReceived = uint64(float64(diff.packetsReceived) / delta.Seconds())
 		stream.PacketsPerSecondSent = uint64(float64(diff.packetsSent) / delta.Seconds())
 		stream.PacketsPerSecondDropped = uint64(float64(diff.packetsDropped) / delta.Seconds())
-		stream.BytesPerSecondReceived = stream.PacketsPerSecondReceived * mpegts.PacketSize
-		stream.BytesPerSecondSent = stream.PacketsPerSecondSent * mpegts.PacketSize
-		stream.BytesPerSecondDropped = stream.PacketsPerSecondDropped * mpegts.PacketSize
+		stream.BytesPerSecondReceived = stream.PacketsPerSecondReceived * protocol.PacketSize
+		stream.BytesPerSecondSent = stream.PacketsPerSecondSent * protocol.PacketSize
+		stream.BytesPerSecondDropped = stream.PacketsPerSecondDropped * protocol.PacketSize
 		stream.Connected = diff.connected != 0
 
 		// update the global counters as well

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/event"
-	"github.com/onitake/restreamer/mpegts"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/util"
 	"net/http"
@@ -187,7 +187,7 @@ func (streamer *Streamer) eatCommands() {
 //
 // This routine will block; you should run it asynchronously like this:
 //
-// queue := make(chan mpegts.Packet, inputQueueSize)
+// queue := make(chan protocol.Packet, inputQueueSize)
 // go func() {
 //   log.Fatal(streamer.Stream(queue))
 // }
@@ -195,7 +195,7 @@ func (streamer *Streamer) eatCommands() {
 // or simply:
 //
 // go streamer.Stream(queue)
-func (streamer *Streamer) Stream(queue <-chan mpegts.Packet) error {
+func (streamer *Streamer) Stream(queue <-chan protocol.Packet) error {
 	// interlock and check for availability first
 	if !util.CompareAndSwapBool(&streamer.running, false, true) {
 		return ErrAlreadyRunning

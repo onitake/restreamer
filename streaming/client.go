@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onitake/restreamer/api"
-	"github.com/onitake/restreamer/mpegts"
+	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"io"
 	"net"
@@ -405,9 +405,9 @@ func (client *Client) pull(url *url.URL) error {
 	// declare here so we can send back individual errors
 	var err error
 	// the packet queue will be allocated and connected to the streamer as soon as the first packet has been received
-	var queue chan mpegts.Packet
+	var queue chan protocol.Packet
 	// save a few bytes
-	var packet mpegts.Packet
+	var packet protocol.Packet
 
 	for util.LoadBool(&client.running) {
 		// somewhat hacky read timeout:
@@ -426,7 +426,7 @@ func (client *Client) pull(url *url.URL) error {
 		}
 		// read a packet
 		//log.Printf("Reading a packet from %p\n", client.input)
-		packet, err = mpegts.ReadPacket(client.input)
+		packet, err = protocol.ReadPacket(client.input)
 		// we got a packet, stop the timer and drain it
 		if timer != nil && !timer.Stop() {
 			logger.Logkv(
@@ -457,7 +457,7 @@ func (client *Client) pull(url *url.URL) error {
 						"event", eventClientStarted,
 						"url", url.String(),
 					)
-					queue = make(chan mpegts.Packet, client.queueSize)
+					queue = make(chan protocol.Packet, client.queueSize)
 					go client.streamer.Stream(queue)
 				}
 
