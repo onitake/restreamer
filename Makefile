@@ -50,7 +50,8 @@ test: $(PACKAGE_PATH)
 		$(PACKAGE_PREFIX)/$(PACKAGE)/api \
 		$(PACKAGE_PREFIX)/$(PACKAGE)/mpegts \
 		$(PACKAGE_PREFIX)/$(PACKAGE)/event \
-		$(PACKAGE_PREFIX)/$(PACKAGE)/configuration
+		$(PACKAGE_PREFIX)/$(PACKAGE)/configuration \
+		$(PACKAGE_PREFIX)/$(PACKAGE)/auth
 
 docker: bin/restreamer
 	docker build -t restreamer .

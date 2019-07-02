@@ -18,7 +18,7 @@ package api
 
 import (
 	"encoding/json"
-	"github.com/onitake/restreamer/protocol"
+	"github.com/onitake/restreamer/auth"
 	"net/http"
 )
 
@@ -32,12 +32,12 @@ type connectChecker interface {
 type healthApi struct {
 	stats Statistics
 	// auth is an authentication verifier for client requests
-	auth protocol.Authenticator
+	auth auth.Authenticator
 }
 
 // NewHealthApi creates a new health API object,
 // serving data from a system Statistics object.
-func NewHealthApi(stats Statistics, auth protocol.Authenticator) http.Handler {
+func NewHealthApi(stats Statistics, auth auth.Authenticator) http.Handler {
 	return &healthApi{
 		stats: stats,
 		auth:  auth,
@@ -51,7 +51,7 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	writer.Header().Add("Content-Type", "application/json")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !auth.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
@@ -96,12 +96,12 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 type statisticsApi struct {
 	stats Statistics
 	// auth is an authentication verifier for client requests
-	auth protocol.Authenticator
+	auth auth.Authenticator
 }
 
 // NewStatisticsApi creates a new statistics API object,
 // serving data from a system Statistics object.
-func NewStatisticsApi(stats Statistics, auth protocol.Authenticator) http.Handler {
+func NewStatisticsApi(stats Statistics, auth auth.Authenticator) http.Handler {
 	return &statisticsApi{
 		stats: stats,
 		auth:  auth,
@@ -115,7 +115,7 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	writer.Header().Add("Content-Type", "application/json")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !auth.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
@@ -185,12 +185,12 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 type streamStateApi struct {
 	client connectChecker
 	// auth is an authentication verifier for client requests
-	auth protocol.Authenticator
+	auth auth.Authenticator
 }
 
 // NewStreamStateApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
-func NewStreamStateApi(client connectChecker, auth protocol.Authenticator) http.Handler {
+func NewStreamStateApi(client connectChecker, auth auth.Authenticator) http.Handler {
 	return &streamStateApi{
 		client: client,
 		auth:   auth,
@@ -205,7 +205,7 @@ func (api *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.R
 	writer.Header().Add("Content-Type", "text/plain")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !auth.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 
@@ -229,12 +229,12 @@ type inhibitor interface {
 type streamControlApi struct {
 	inhibit inhibitor
 	// auth is an authentication verifier for client requests
-	auth protocol.Authenticator
+	auth auth.Authenticator
 }
 
 // NewStreamStateApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
-func NewStreamControlApi(inhibit inhibitor, auth protocol.Authenticator) http.Handler {
+func NewStreamControlApi(inhibit inhibitor, auth auth.Authenticator) http.Handler {
 	return &streamControlApi{
 		inhibit: inhibit,
 		auth:    auth,
@@ -252,7 +252,7 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 	writer.Header().Add("Content-Type", "text/plain")
 
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(api.auth, request, writer) {
+	if !auth.HandleHttpAuthentication(api.auth, request, writer) {
 		return
 	}
 

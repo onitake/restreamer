@@ -18,7 +18,7 @@ package event
 
 import (
 	"fmt"
-	"github.com/onitake/restreamer/protocol"
+	"github.com/onitake/restreamer/auth"
 	"net/http"
 	"net/url"
 )
@@ -28,10 +28,10 @@ type UrlHandler struct {
 	// Url is the parsed URL
 	Url *url.URL
 	// userauth will be used to generate credentials for client requests
-	userauth *protocol.UserAuthenticator
+	userauth *auth.UserAuthenticator
 }
 
-func NewUrlHandler(urly string, userauth *protocol.UserAuthenticator) (*UrlHandler, error) {
+func NewUrlHandler(urly string, userauth *auth.UserAuthenticator) (*UrlHandler, error) {
 	u, err := url.Parse(urly)
 	if err == nil {
 		return &UrlHandler{

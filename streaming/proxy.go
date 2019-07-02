@@ -20,7 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onitake/restreamer/api"
-	"github.com/onitake/restreamer/protocol"
+	"github.com/onitake/restreamer/auth"
 	"hash/fnv"
 	"io"
 	"mime"
@@ -85,7 +85,7 @@ type Proxy struct {
 	// the global stats collector
 	stats api.Statistics
 	// auth is an authentication verifier for client requests
-	auth protocol.Authenticator
+	auth auth.Authenticator
 }
 
 // NewProxy constructs a new HTTP proxy.
@@ -94,7 +94,7 @@ type Proxy struct {
 // number of seconds. If it is zero, the resource will be fetched from upstream
 // every time it is requested.
 // timeout sets the upstream HTTP connection timeout.
-func NewProxy(uri string, timeout uint, cache uint, auth protocol.Authenticator) (*Proxy, error) {
+func NewProxy(uri string, timeout uint, cache uint, auth auth.Authenticator) (*Proxy, error) {
 	parsed, err := url.Parse(uri)
 	if err != nil {
 		return nil, err
@@ -334,7 +334,7 @@ func (proxy *Proxy) cache() *fetchableResource {
 // Satisfies the http.Handler interface, so it can be used in an HTTP server.
 func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	// fail-fast: verify that this user can access this resource first
-	if !protocol.HandleHttpAuthentication(proxy.auth, request, writer) {
+	if !auth.HandleHttpAuthentication(proxy.auth, request, writer) {
 		return
 	}
 
