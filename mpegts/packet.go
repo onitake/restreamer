@@ -31,6 +31,11 @@ const (
 // It is 188 bytes long and starts with 0x47.
 type Packet []byte
 
+var (
+	totalCount  int64
+	noSyncCount int64
+)
+
 // ReadPacket reads data from the input stream,
 // scans for the sync byte and returns one packet from that point on.
 //
@@ -86,9 +91,13 @@ func ReadPacket(reader io.Reader) (Packet, error) {
 			//logger.Logkv("event", "append", "bytes", nbytes, "position", offset)
 		}
 		// return the assembled packet
+		noSyncCount++
+		totalCount++
+		logger.Logkv("event", "stats", "no_sync", noSyncCount, "total", totalCount, "ratio", float64(noSyncCount)/float64(totalCount))
 		return packet, nil
 	}
 
 	// and done
+	totalCount++
 	return garbage, nil
 }
