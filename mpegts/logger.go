@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	moduleMpegts = "api"
+	moduleMpegts = "mpegts"
 )
 
 var logger util.Logger = util.NewGlobalModuleLogger(moduleMpegts, nil)
