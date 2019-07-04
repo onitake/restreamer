@@ -397,14 +397,18 @@ func (client *Client) start(url *url.URL) error {
 			}
 			client.input = conn
 		case "multicastudp":
-			// Parse the string address
+			logger.Logkv(
+				"event", eventClientOpenUdpMulticast,
+				"group", url.Host,
+				"message", fmt.Sprintf("Joining UDP multicast group %s.", url.Host),
+			)
 			addr, err := net.ResolveUDPAddr("udp", url.Host)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			conn, err := net.ListenMulticastUDP("udp", client.interf, addr)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			conn.SetReadBuffer(client.datagramBufferSize)
 			client.input = conn
