@@ -51,8 +51,9 @@ const (
 	eventClientTimerKill      = "killed"
 	eventClientReadTimeout    = "read_timeout"
 	//
-	errorClientConnect = "connect"
-	errorClientParse   = "parse"
+	errorClientConnect   = "connect"
+	errorClientParse     = "parse"
+	errorClientInterface = "interface"
 	//
 	eventConnectionDebug      = "debug"
 	eventConnectionError      = "error"

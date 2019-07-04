@@ -152,7 +152,7 @@ func main() {
 			// should give a bit more randomness
 			remotes := util.ShuffleStrings(rnd, streamdef.Remotes)
 
-			client, err := streaming.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer)
+			client, err := streaming.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer, streamdef.ClientInterface)
 			if err == nil {
 				client.SetCollector(reg)
 				client.Connect()

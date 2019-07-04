@@ -112,6 +112,9 @@ type Client struct {
 	listener connectCloser
 	// queueSize is the size of the input queue
 	queueSize uint
+	// interf denotes a specific network interface to create the connection on
+	// currently only supported for multicast
+	interf *net.Interface
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -128,7 +131,8 @@ type Client struct {
 //   reconnect: the minimal reconnect delay
 //   readtimeout: the read timeout
 //   qsize: the input queue size
-func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint) (*Client, error) {
+//   intf: the network interface to create connections on
+func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -146,6 +150,18 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 	}
 	if count < 1 {
 		return nil, ErrNoUrl
+	}
+	var pintf *net.Interface
+	if intf != "" {
+		var err error
+		pintf, err = net.InterfaceByName(intf)
+		if err != nil {
+			logger.Logkv(
+				"event", eventClientError,
+				"error", errorClientInterface,
+				"message", fmt.Sprintf("Error parsing network interface %s: %s", intf, err),
+			)
+		}
 	}
 	// this timeout is only used for establishing connections
 	toduration := time.Duration(timeout) * time.Second
@@ -177,6 +193,7 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		stats:       &api.DummyCollector{},
 		listener:    &dummyConnectCloser{},
 		queueSize:   qsize,
+		interf:             pintf,
 	}
 	return &client, nil
 }
@@ -378,8 +395,7 @@ func (client *Client) start(url *url.URL) error {
 			if err != nil {
 				log.Fatal(err)
 			}
-			// Open up a connection
-			conn, err := net.ListenMulticastUDP("udp", nil, addr)
+			conn, err := net.ListenMulticastUDP("udp", client.interf, addr)
 			if err != nil {
 				log.Fatal(err)
 			}

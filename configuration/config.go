@@ -59,6 +59,10 @@ type Resource struct {
 	Remote string `json:"remote"`
 	// Remotes is the upstream URLs.
 	Remotes []string `json:"remotes"`
+	// ClientInterface denotes a specific network interface for the remote connection.
+	// This is currently only supported for multicast UDP.
+	// All interfaces will be used if this is not set.
+	ClientInterface string `json:"clientinterface"`
 	// Cache the cache time in seconds.
 	Cache uint `json:"cache"`
 	// Authentication specifies credentials required to access this resource.
