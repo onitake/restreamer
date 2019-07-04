@@ -17,11 +17,12 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/event"
-	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
 	"log"
@@ -85,6 +86,7 @@ func main() {
 
 	queue := event.NewEventQueue(int(config.FullConnections))
 	for _, note := range config.Notifications {
+		var err error
 		var typ event.EventType
 		switch note.Event {
 		case "limit_hit":
@@ -93,10 +95,10 @@ func main() {
 			typ = event.EventLimitMiss
 		case "heartbeat":
 			typ = event.EventHeartbeat
-			enableheartbeat = true
+		default:
+			err = errors.New(fmt.Sprintf("Unknown event type: %s", note.Event))
 		}
 		var handler event.Handler
-		var err error
 		switch note.Type {
 		case "url":
 			auth := auth.NewUserAuthenticator(note.Authentication, auth.NewAuthenticator(note.Authentication, config.UserList))
@@ -111,9 +113,18 @@ func main() {
 			if err == nil {
 				handler = urlhandler
 			}
+		default:
+			err = errors.New(fmt.Sprintf("Unknown handler type: %s", note.Type))
 		}
 		if err == nil {
 			queue.RegisterEventHandler(typ, handler)
+			if typ == event.EventHeartbeat {
+				enableheartbeat = true
+				logger.Logkv(
+					"event", "enable_heartbeat",
+					"message", fmt.Sprintf("Enabling heartbeat API"),
+				)
+			}
 		} else {
 			logger.Logkv(
 				"event", eventMainError,
