@@ -30,6 +30,10 @@ import (
 	"time"
 )
 
+const (
+	defaultDatagramBufferSize int = mpegts.PacketSize * 100
+)
+
 var (
 	// ErrInvalidProtocol is thrown when an invalid protocol was specified.
 	// See the docs and example config for a list of supported protocols.
@@ -115,6 +119,8 @@ type Client struct {
 	// interf denotes a specific network interface to create the connection on
 	// currently only supported for multicast
 	interf *net.Interface
+	// datagramBufferSize defines the read buffer for datagram (UDP sockets)
+	datagramBufferSize int
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -183,17 +189,18 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		getter: &http.Client{
 			Transport: transport,
 		},
-		urls:        urls,
-		response:    nil,
-		input:       nil,
-		Wait:        time.Duration(reconnect) * time.Second,
-		ReadTimeout: time.Duration(readtimeout) * time.Second,
-		streamer:    streamer,
-		running:     util.AtomicFalse,
-		stats:       &api.DummyCollector{},
-		listener:    &dummyConnectCloser{},
-		queueSize:   qsize,
+		urls:               urls,
+		response:           nil,
+		input:              nil,
+		Wait:               time.Duration(reconnect) * time.Second,
+		ReadTimeout:        time.Duration(readtimeout) * time.Second,
+		streamer:           streamer,
+		running:            util.AtomicFalse,
+		stats:              &api.DummyCollector{},
+		listener:           &dummyConnectCloser{},
+		queueSize:          qsize,
 		interf:             pintf,
+		datagramBufferSize: defaultDatagramBufferSize,
 	}
 	return &client, nil
 }
@@ -399,7 +406,7 @@ func (client *Client) start(url *url.URL) error {
 			if err != nil {
 				log.Fatal(err)
 			}
-			conn.SetReadBuffer(maxDatagramSize)
+			conn.SetReadBuffer(client.datagramBufferSize)
 			client.input = conn
 		default:
 			return ErrInvalidProtocol
