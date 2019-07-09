@@ -43,7 +43,9 @@ These are the key components:
 * api/api - web API for service monitoring
 * api/stats - stat collector and tracker
 * streaming/proxy - static web server and proxy
-* restreamer - core program that glues the components together
+* protocol - network protocol library
+* configuration - abstraction of the configuration file
+* cmd/restreamer - core program that glues the components together
 
 
 ## Compilation
@@ -52,23 +54,27 @@ restreamer is go-gettable.
 Just invoke:
 
 ```
-CGO_ENABLED=0 go build github.com/onitake/restreamer
+CGO_ENABLED=0 go get github.com/onitake/restreamer/...
 ```
 
 Disabling CGO is recommended, as this will produce a standalone binary that
 does not depend on libc. This is useful for running restreamer in a bare container.
 
-A makefile is also provided, allowing builds outside GOPATH.
-Simply invoke `make` to build `bin/restreamer`.
+A makefile is also provided, as a quick build reference.
+Simply invoke `make` to build `restreamer`.
 
-Passing GOOS and/or GOARCH to `make` will yield cross-compiled binaries for the
+Passing GOOS and/or GOARCH will yield cross-compiled binaries for the
 respective platform. For example:
 
+```
+GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build github.com/onitake/restreamer/cmd/restreamer
+```
+or
 ```
 make GOOS=windows GOARCH=amd64
 ```
 
-You can also use `make test` to run the test suite.
+You can also use `make test` to run the test suite, or `make fmt` to run `go fmt` on all sources.
 
 
 ## Configuration
