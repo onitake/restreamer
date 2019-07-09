@@ -30,10 +30,6 @@ import (
 	"time"
 )
 
-const (
-	defaultDatagramBufferSize int = mpegts.PacketSize * 100
-)
-
 var (
 	// ErrInvalidProtocol is thrown when an invalid protocol was specified.
 	// See the docs and example config for a list of supported protocols.
@@ -119,8 +115,10 @@ type Client struct {
 	// interf denotes a specific network interface to create the connection on
 	// currently only supported for multicast
 	interf *net.Interface
-	// datagramBufferSize defines the read buffer for datagram (UDP sockets)
-	datagramBufferSize int
+	// readBufferSize is the size of the receive on UDP sockets.
+	readBufferSize int
+	// packetSize defines the size of individual datagram packets (UDP)
+	packetSize int
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -137,8 +135,10 @@ type Client struct {
 //   reconnect: the minimal reconnect delay
 //   readtimeout: the read timeout
 //   qsize: the input queue size
-//   intf: the network interface to create connections on
-func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string) (*Client, error) {
+//   intf: the network interface to create multicast connections on
+//   bufferSize: the UDP socket receive buffer size
+//   packetSize: the UDP packet size
+func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string, bufferSize uint, packetSize uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -200,7 +200,8 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		listener:           &dummyConnectCloser{},
 		queueSize:          qsize,
 		interf:             pintf,
-		datagramBufferSize: defaultDatagramBufferSize,
+		readBufferSize:     int(bufferSize * protocol.MpegTsPacketSize),
+		packetSize:         int(packetSize),
 	}
 	return &client, nil
 }
@@ -396,22 +397,37 @@ func (client *Client) start(url *url.URL) error {
 				return err
 			}
 			client.input = conn
-		case "multicastudp":
-			logger.Logkv(
-				"event", eventClientOpenUdpMulticast,
-				"group", url.Host,
-				"message", fmt.Sprintf("Joining UDP multicast group %s.", url.Host),
-			)
+		case "udp":
 			addr, err := net.ResolveUDPAddr("udp", url.Host)
 			if err != nil {
 				return err
 			}
-			conn, err := net.ListenMulticastUDP("udp", client.interf, addr)
-			if err != nil {
-				return err
+			var conn *net.UDPConn
+			if addr.IP.IsMulticast() {
+				logger.Logkv(
+					"event", eventClientOpenUdpMulticast,
+					"address", addr,
+					"message", fmt.Sprintf("Joining UDP multicast group %s on interface %v.", url.Host, client.interf),
+				)
+				var err error
+				conn, err = net.ListenMulticastUDP("udp", client.interf, addr)
+				if err != nil {
+					return err
+				}
+			} else {
+				logger.Logkv(
+					"event", eventClientOpenUdp,
+					"address", addr,
+					"message", fmt.Sprintf("Connecting to UDP address %s.", addr),
+				)
+				var err error
+				conn, err = net.ListenUDP("udp", addr)
+				if err != nil {
+					return err
+				}
 			}
-			conn.SetReadBuffer(client.datagramBufferSize)
-			client.input = conn
+			conn.SetReadBuffer(client.readBufferSize)
+			client.input = protocol.NewFixedReader(conn, client.packetSize)
 		default:
 			return ErrInvalidProtocol
 		}

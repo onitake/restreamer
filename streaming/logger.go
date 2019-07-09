@@ -50,6 +50,7 @@ const (
 	eventClientNoPacket         = "nopacket"
 	eventClientTimerKill        = "killed"
 	eventClientReadTimeout      = "read_timeout"
+	eventClientOpenUdp          = "open_udp"
 	eventClientOpenUdpMulticast = "open_multicast"
 	//
 	errorClientConnect   = "connect"
