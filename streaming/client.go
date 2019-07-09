@@ -112,6 +112,13 @@ type Client struct {
 	listener connectCloser
 	// queueSize is the size of the input queue
 	queueSize uint
+	// interf denotes a specific network interface to create the connection on
+	// currently only supported for multicast
+	interf *net.Interface
+	// readBufferSize is the size of the receive on UDP sockets.
+	readBufferSize int
+	// packetSize defines the size of individual datagram packets (UDP)
+	packetSize int
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -128,7 +135,10 @@ type Client struct {
 //   reconnect: the minimal reconnect delay
 //   readtimeout: the read timeout
 //   qsize: the input queue size
-func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint) (*Client, error) {
+//   intf: the network interface to create multicast connections on
+//   bufferSize: the UDP socket receive buffer size
+//   packetSize: the UDP packet size
+func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string, bufferSize uint, packetSize uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -146,6 +156,18 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 	}
 	if count < 1 {
 		return nil, ErrNoUrl
+	}
+	var pintf *net.Interface
+	if intf != "" {
+		var err error
+		pintf, err = net.InterfaceByName(intf)
+		if err != nil {
+			logger.Logkv(
+				"event", eventClientError,
+				"error", errorClientInterface,
+				"message", fmt.Sprintf("Error parsing network interface %s: %s", intf, err),
+			)
+		}
 	}
 	// this timeout is only used for establishing connections
 	toduration := time.Duration(timeout) * time.Second
@@ -167,16 +189,19 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		getter: &http.Client{
 			Transport: transport,
 		},
-		urls:        urls,
-		response:    nil,
-		input:       nil,
-		Wait:        time.Duration(reconnect) * time.Second,
-		ReadTimeout: time.Duration(readtimeout) * time.Second,
-		streamer:    streamer,
-		running:     util.AtomicFalse,
-		stats:       &api.DummyCollector{},
-		listener:    &dummyConnectCloser{},
-		queueSize:   qsize,
+		urls:           urls,
+		response:       nil,
+		input:          nil,
+		Wait:           time.Duration(reconnect) * time.Second,
+		ReadTimeout:    time.Duration(readtimeout) * time.Second,
+		streamer:       streamer,
+		running:        util.AtomicFalse,
+		stats:          &api.DummyCollector{},
+		listener:       &dummyConnectCloser{},
+		queueSize:      qsize,
+		interf:         pintf,
+		readBufferSize: int(bufferSize * protocol.MpegTsPacketSize),
+		packetSize:     int(packetSize),
 	}
 	return &client, nil
 }
@@ -372,6 +397,37 @@ func (client *Client) start(url *url.URL) error {
 				return err
 			}
 			client.input = conn
+		case "udp":
+			addr, err := net.ResolveUDPAddr("udp", url.Host)
+			if err != nil {
+				return err
+			}
+			var conn *net.UDPConn
+			if addr.IP.IsMulticast() {
+				logger.Logkv(
+					"event", eventClientOpenUdpMulticast,
+					"address", addr,
+					"message", fmt.Sprintf("Joining UDP multicast group %s on interface %v.", url.Host, client.interf),
+				)
+				var err error
+				conn, err = net.ListenMulticastUDP("udp", client.interf, addr)
+				if err != nil {
+					return err
+				}
+			} else {
+				logger.Logkv(
+					"event", eventClientOpenUdp,
+					"address", addr,
+					"message", fmt.Sprintf("Connecting to UDP address %s.", addr),
+				)
+				var err error
+				conn, err = net.ListenUDP("udp", addr)
+				if err != nil {
+					return err
+				}
+			}
+			conn.SetReadBuffer(client.readBufferSize)
+			client.input = protocol.NewFixedReader(conn, client.packetSize)
 		default:
 			return ErrInvalidProtocol
 		}

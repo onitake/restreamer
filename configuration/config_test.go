@@ -86,6 +86,7 @@ func TestConfig04(t *testing.T) {
 			Remotes: []string{
 				"t04",
 			},
+			Mru: 1500,
 		},
 	}
 	c04 := `{
@@ -109,6 +110,7 @@ func TestConfig04(t *testing.T) {
 		Resource{
 			Type:   "api",
 			Remote: "t04b",
+			Mru:    1500,
 		},
 	}
 	c04b := `{
@@ -138,6 +140,7 @@ func TestConfig05(t *testing.T) {
 					"t05",
 				},
 			},
+			Mru: 1500,
 		},
 	}
 	c05 := `{

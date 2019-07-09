@@ -59,11 +59,18 @@ type Resource struct {
 	Remote string `json:"remote"`
 	// Remotes is the upstream URLs.
 	Remotes []string `json:"remotes"`
+	// ClientInterface denotes a specific network interface for the remote connection.
+	// This is currently only supported for multicast UDP.
+	// All interfaces will be used if this is not set.
+	ClientInterface string `json:"clientinterface"`
 	// Cache the cache time in seconds.
 	Cache uint `json:"cache"`
 	// Authentication specifies credentials required to access this resource.
 	// If the authentication type is unset, no authentication is required.
 	Authentication Authentication `json:"authentication"`
+	// Mru (maximum receive unit) is the size of the datagram receive buffer.
+	// Only used for UDP and RTP protocols.
+	Mru uint `json:"mru"`
 }
 
 // UserCredentials is a set of credentials for a single user
@@ -99,8 +106,8 @@ type Configuration struct {
 	Reconnect uint `json:"reconnect"`
 	// ReadTimeout is the upstream read timeout.
 	ReadTimeout uint `json:"readtimeout"`
-	// InputBuffer is the maximum number of packets.
-	// on the input buffer
+	// InputBuffer is the maximum number of packets on the input buffer of each stream.
+	// It also determines the socket buffer size for datagram-oriented connections.
 	InputBuffer uint `json:"inputbuffer"`
 	// OutputBuffer is the size of the output buffer per connection.
 	// Note that each connection will eat at least OutputBuffer * 192 bytes
@@ -188,6 +195,10 @@ func LoadConfiguration(reader io.Reader) (*Configuration, error) {
 			resource.Authentication.Users = users
 			// reset
 			resource.Authentication.User = ""
+		}
+		// fix up UDP buffer size
+		if resource.Mru == 0 {
+			resource.Mru = 1500
 		}
 	}
 	for i := range config.Notifications {
