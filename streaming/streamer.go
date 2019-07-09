@@ -19,9 +19,9 @@ package streaming
 import (
 	"errors"
 	"fmt"
-	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/event"
+	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"net/http"
@@ -95,7 +95,7 @@ type Streamer struct {
 	// If false, incoming connections are blocked.
 	running util.AtomicBool
 	// stats is the statistics collector for this stream
-	stats api.Collector
+	stats metrics.Collector
 	// request is an unbuffered queue for requests to add or remove a connection
 	request chan *ConnectionRequest
 	// events is an event receiver
@@ -126,7 +126,7 @@ func NewStreamer(qsize uint, broker ConnectionBroker, auth auth.Authenticator) *
 		broker:    broker,
 		queueSize: int(qsize),
 		running:   util.AtomicFalse,
-		stats:     &api.DummyCollector{},
+		stats:     &metrics.DummyCollector{},
 		request:   make(chan *ConnectionRequest),
 		auth:      auth,
 	}
@@ -136,7 +136,7 @@ func NewStreamer(qsize uint, broker ConnectionBroker, auth auth.Authenticator) *
 }
 
 // SetCollector assigns a stats collector
-func (streamer *Streamer) SetCollector(stats api.Collector) {
+func (streamer *Streamer) SetCollector(stats metrics.Collector) {
 	streamer.stats = stats
 }
 

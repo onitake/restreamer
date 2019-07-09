@@ -23,6 +23,7 @@ import (
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/event"
+	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
 	"log"
@@ -73,11 +74,11 @@ func main() {
 
 	clients := make(map[string]*streaming.Client)
 
-	var stats api.Statistics
+	var stats metrics.Statistics
 	if config.NoStats {
-		stats = &api.DummyStatistics{}
+		stats = &metrics.DummyStatistics{}
 	} else {
-		stats = api.NewStatistics(config.MaxConnections, config.FullConnections)
+		stats = metrics.NewStatistics(config.MaxConnections, config.FullConnections)
 	}
 
 	controller := streaming.NewAccessController(config.MaxConnections)

@@ -19,7 +19,7 @@ package streaming
 import (
 	"errors"
 	"fmt"
-	"github.com/onitake/restreamer/api"
+	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
 	"io"
@@ -107,7 +107,7 @@ type Client struct {
 	// Use ReadBool(client.running) to get the current value.
 	running util.AtomicBool
 	// stats is the statistics collector for this client
-	stats api.Collector
+	stats metrics.Collector
 	// listener is a downstream object that can handle connect/disconnect notifications
 	listener connectCloser
 	// queueSize is the size of the input queue
@@ -196,7 +196,7 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		ReadTimeout:    time.Duration(readtimeout) * time.Second,
 		streamer:       streamer,
 		running:        util.AtomicFalse,
-		stats:          &api.DummyCollector{},
+		stats:          &metrics.DummyCollector{},
 		listener:       &dummyConnectCloser{},
 		queueSize:      qsize,
 		interf:         pintf,
@@ -207,7 +207,7 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 }
 
 // SetCollector assigns a stats collector.
-func (client *Client) SetCollector(stats api.Collector) {
+func (client *Client) SetCollector(stats metrics.Collector) {
 	client.stats = stats
 }
 
