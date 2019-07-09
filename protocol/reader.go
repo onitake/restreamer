@@ -17,8 +17,8 @@
 package protocol
 
 import (
-	"io"
 	"bytes"
+	"io"
 )
 
 // FixedReader implements a buffered reader that always reads a fixed amount
@@ -34,18 +34,18 @@ import (
 // If the underlying reader implements the io.Closer interface, Close() calls
 // will be forwarded. Otherwise, Close() is a no-op.
 type FixedReader struct {
-	reader io.Reader
+	reader     io.Reader
 	packetSize int
-	buffer *bytes.Buffer
+	buffer     *bytes.Buffer
 }
 
 // NewPacketBuffer creates a new buffered reader that pulls in data from an
 // io.Reader in chunks of psize bytes.
 func NewFixedReader(reader io.Reader, psize int) *FixedReader {
 	return &FixedReader{
-		reader: reader,
+		reader:     reader,
 		packetSize: psize,
-		buffer: bytes.NewBuffer(make([]byte, 0, psize)),
+		buffer:     bytes.NewBuffer(make([]byte, 0, psize)),
 	}
 }
 

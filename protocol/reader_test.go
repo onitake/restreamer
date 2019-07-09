@@ -17,8 +17,8 @@
 package protocol
 
 import (
-	"io"
 	"bytes"
+	"io"
 	"testing"
 )
 
@@ -69,7 +69,7 @@ func TestFixedReaderJustRight(t *testing.T) {
 		if n != 2 || err != nil {
 			t.Fatal("Expected 2 bytes and no error")
 		}
-		if g[0] != byte(i * 2) || g[1] != byte(i * 2 + 1) {
+		if g[0] != byte(i*2) || g[1] != byte(i*2+1) {
 			t.Fatal("Expected number sequence")
 		}
 	}
@@ -93,7 +93,7 @@ func TestFixedReaderMultiRead(t *testing.T) {
 		if n != 2 || err != nil {
 			t.Fatal("Expected 2 bytes and no error")
 		}
-		if g[0] != byte(i * 2) || g[1] != byte(i * 2 + 1) {
+		if g[0] != byte(i*2) || g[1] != byte(i*2+1) {
 			t.Fatal("Expected number sequence")
 		}
 	}
@@ -160,7 +160,7 @@ func TestFixedReaderClose(t *testing.T) {
 	for i := 0; i < len(d); i++ {
 		d[i] = byte(i)
 	}
-	r := &closeableBuffer{bytes.NewBuffer(d),false}
+	r := &closeableBuffer{bytes.NewBuffer(d), false}
 	f := NewFixedReader(r, 2)
 	g := make([]byte, 2)
 	n, err := f.Read(g)
@@ -183,7 +183,7 @@ func TestFixedReaderCloseRemain(t *testing.T) {
 	for i := 0; i < len(d); i++ {
 		d[i] = byte(i)
 	}
-	r := &closeableBuffer{bytes.NewBuffer(d),false}
+	r := &closeableBuffer{bytes.NewBuffer(d), false}
 	f := NewFixedReader(r, 4)
 	g := make([]byte, 2)
 	n, err := f.Read(g)

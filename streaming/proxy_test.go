@@ -18,8 +18,8 @@ package streaming
 
 import (
 	"encoding/hex"
-	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/auth"
+	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/util"
 	"net/http"
 	"net/url"

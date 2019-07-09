@@ -110,7 +110,7 @@ func TestConfig04(t *testing.T) {
 		Resource{
 			Type:   "api",
 			Remote: "t04b",
-			Mru: 1500,
+			Mru:    1500,
 		},
 	}
 	c04b := `{
