@@ -31,7 +31,7 @@ const (
 // It is 188 bytes long and starts with 0x47.
 type MpegTsPacket []byte
 
-// ReadPacket reads data from the input stream,
+// ReadMpegTsPacket reads data from the input stream,
 // scans for the sync byte and returns one packet from that point on.
 //
 // If a sync byte can't be found among the first 188 bytes,
