@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/configuration"
+	"github.com/onitake/restreamer/metrics"
 	"net/http"
 	"net/url"
 	"testing"
@@ -57,29 +58,29 @@ func (writer *mockWriter) WriteHeader(status int) {
 }
 
 type mockStatistics struct {
-	Streams map[string]*StreamStatistics
-	Global  StreamStatistics
+	Streams map[string]*metrics.StreamStatistics
+	Global  metrics.StreamStatistics
 }
 
 func (*mockStatistics) Start() {}
 func (*mockStatistics) Stop()  {}
-func (*mockStatistics) RegisterStream(name string) Collector {
+func (*mockStatistics) RegisterStream(name string) metrics.Collector {
 	return nil
 }
 func (*mockStatistics) RemoveStream(name string) {}
-func (stats *mockStatistics) GetStreamStatistics(name string) *StreamStatistics {
+func (stats *mockStatistics) GetStreamStatistics(name string) *metrics.StreamStatistics {
 	return stats.Streams[name]
 }
-func (stats *mockStatistics) GetAllStreamStatistics() map[string]*StreamStatistics {
+func (stats *mockStatistics) GetAllStreamStatistics() map[string]*metrics.StreamStatistics {
 	return stats.Streams
 }
-func (stats *mockStatistics) GetGlobalStatistics() *StreamStatistics {
+func (stats *mockStatistics) GetGlobalStatistics() *metrics.StreamStatistics {
 	return &stats.Global
 }
 
 func testStatisticsConnections(t *testing.T, connections, full, max int64, status string) {
 	stats := &mockStatistics{
-		Global: StreamStatistics{
+		Global: metrics.StreamStatistics{
 			Connections:     connections,
 			MaxConnections:  max,
 			FullConnections: full,
@@ -108,7 +109,7 @@ func testStatisticsConnections(t *testing.T, connections, full, max int64, statu
 
 func testHealthConnections(t *testing.T, connections, full, max int64, status string) {
 	stats := &mockStatistics{
-		Global: StreamStatistics{
+		Global: metrics.StreamStatistics{
 			Connections:     connections,
 			MaxConnections:  max,
 			FullConnections: full,
