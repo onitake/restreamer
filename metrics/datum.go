@@ -73,6 +73,10 @@ func (d *int64Gauge) FloatCounterValue() (float64, error) {
 
 type float64Gauge float64
 
+func FloatGauge(value float64) Datum {
+	v := float64Gauge(value)
+	return &v
+}
 func (d *float64Gauge) UpdateFrom(datum Datum) error {
 	value, err := datum.FloatGaugeValue()
 	if err == nil {
@@ -101,6 +105,10 @@ func (d *float64Gauge) FloatCounterValue() (float64, error) {
 
 type boolGauge bool
 
+func BoolGauge(value bool) Datum {
+	v := boolGauge(value)
+	return &v
+}
 func (d *boolGauge) UpdateFrom(datum Datum) error {
 	value, err := datum.BoolGaugeValue()
 	if err == nil {
@@ -129,6 +137,10 @@ func (d *boolGauge) FloatCounterValue() (float64, error) {
 
 type stringGauge string
 
+func StringGauge(value string) Datum {
+	v := stringGauge(value)
+	return &v
+}
 func (d *stringGauge) UpdateFrom(datum Datum) error {
 	value, err := datum.StringGaugeValue()
 	if err == nil {
@@ -157,6 +169,10 @@ func (d *stringGauge) FloatCounterValue() (float64, error) {
 
 type int64Counter int64
 
+func IntCounter(value int64) Datum {
+	v := int64Counter(value)
+	return &v
+}
 func (d *int64Counter) UpdateFrom(datum Datum) error {
 	value, err := datum.IntCounterValue()
 	if err == nil {
@@ -185,6 +201,10 @@ func (d *int64Counter) FloatCounterValue() (float64, error) {
 
 type float64Counter float64
 
+func FloatCounter(value float64) Datum {
+	v := float64Counter(value)
+	return &v
+}
 func (d *float64Counter) UpdateFrom(datum Datum) error {
 	value, err := datum.FloatCounterValue()
 	if err == nil {
