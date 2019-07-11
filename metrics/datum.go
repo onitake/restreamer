@@ -41,6 +41,10 @@ type Datum interface {
 
 type int64Gauge int64
 
+func IntGauge(value int64) Datum {
+	v := int64Gauge(value)
+	return &v
+}
 func (d *int64Gauge) UpdateFrom(datum Datum) error {
 	value, err := datum.IntGaugeValue()
 	if err == nil {

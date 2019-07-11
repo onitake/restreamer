@@ -24,3 +24,29 @@ func TestCollectorCreateStop(t *testing.T) {
 	m := NewMetricsCollector()
 	m.Stop()
 }
+
+func TestCollectorUpdate(t *testing.T) {
+	m := NewMetricsCollector()
+	u := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: IntGauge(100),
+		},
+	}
+	c := make(chan []MetricResponse)
+	m.Update(u, c)
+	r := <-c
+	if len(r) < 1 || r[0].Error != nil {
+		t.Errorf("Expected nil error and value %d, got %v", 100, r)
+	} else {
+		v, err := r[0].Metric.Value.IntGaugeValue()
+		if err != nil {
+			t.Errorf("Expected nil error on value get")
+		} else {
+			if v != 100 {
+				t.Errorf("Expected nil error and value %d, got %v", 100, r)
+			}
+		}
+	}
+	m.Stop()
+}

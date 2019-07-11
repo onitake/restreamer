@@ -16,6 +16,15 @@
 
 package metrics
 
+import (
+	"errors"
+	"sort"
+)
+
+var (
+	ErrMetricDoesNotExist = errors.New("Metric does not exist")
+)
+
 type requestType int
 
 const (
@@ -24,18 +33,68 @@ const (
 	stopRequest
 )
 
-// metricUpdate represents a single update, fetch or stop request
-type metricUpdate struct {
-	// typ is the type of request
-	typ requestType
-	// namespace is the directory where the metric is stored
-	namespace string
-	// metric is the name of the metric to update
-	metric string
-	// datum contains a reference to the datum to send or receive
-	// its type must match the metric, if it already exists
-	// if it doesn't, a new metric is created
-	datum Datum
+// Metric represents a single metric and includes
+// - a name
+// - the metric data
+// - optionally a set of tags.
+//
+// Tags are used to separate metrics with the same name into different buckets.
+// They can be used to store host names, namespaces, modules, etc.
+//
+// Note: The name and all tags and their values can use all Unicode characters
+// representable by a rune, EXCEPT for the null character (\0).
+// The null character is used to construct a combined metric key for efficient lookup.
+type Metric struct {
+	// Name is the name of the metric.
+	// May not contain null (\0) characters.
+	Name string
+	// Tags is a dictionary containing tags with values. It can be empty.
+	// May not contain null (\0) characters in tags or tag values.
+	Tags map[string]string
+	// Value is the value stored in the metric
+	Value Datum
+}
+
+// makeKey generates a unique key for storing this metric.
+//
+// The key is constructed as follows:
+// Key = Name
+// TagKeys = SORT_LEXICAL(KEYS(Tags))
+// FOR EACH TagKey IN TagKeys:
+//   Key = CONCAT(Key, '\0', TagKey, '\0', VALUE_FOR_KEY(Tags, TagKey))
+func (m *Metric) makeKey() string {
+	key := m.Name
+	tagkeys := make([]string, 0, len(m.Tags))
+	for k, _ := range m.Tags {
+		tagkeys = append(tagkeys, k)
+	}
+	sort.Strings(tagkeys)
+	for _, k := range tagkeys {
+		key += "\u0000"
+		key += k
+		key += "\u0000"
+		key += m.Tags[k]
+	}
+	return key
+}
+
+// MetricResponse contains a reponse to a single metric update or fetch request.
+type MetricResponse struct {
+	// Error is nil on a successul update or non-nil if the update or fetch failed.
+	Error error
+	// Metric contains the new value of the metric.
+	Metric Metric
+}
+
+// metricsUpdate represents a single update, fetch or stop request.
+// Multiple metrics can be updated in a single request.
+type metricsUpdate struct {
+	// Type is the type of request
+	Type requestType
+	// Metrics is the list of metrics to update
+	Metrics []Metric
+	// Return is a return channel to send responses or errors back to the requester
+	Return chan<- []MetricResponse
 }
 
 // MetricsCollector is a generic metrics collector for any kind of system metrics.
@@ -53,17 +112,20 @@ type metricUpdate struct {
 // - string: string (only for gauges)
 type MetricsCollector struct {
 	// queue is the processing queue for updates
-	queue chan *metricUpdate
-	// metrics contains all the collected metrics,
-	// sorted by namespace and metric name
-	metrics map[string]map[string]Datum
+	queue chan *metricsUpdate
+	// metrics contains all the collected metrics.
+	//
+	// It is keyed by a unique combination of the Name and all Tags and their
+	// Values associated with each metric.
+	// See Metric.makeKey() for a description of the algorithm.
+	metrics map[string]*Metric
 }
 
 // NewMetricsCollector creates a new metrics collector and starts its background processor.
 func NewMetricsCollector() *MetricsCollector {
 	c := &MetricsCollector{
-		queue:   make(chan *metricUpdate),
-		metrics: make(map[string]map[string]Datum),
+		queue:   make(chan *metricsUpdate),
+		metrics: make(map[string]*Metric),
 	}
 	c.start()
 	return c
@@ -78,23 +140,39 @@ func (c *MetricsCollector) loop() {
 	running := true
 	for running {
 		msg := <-c.queue
-		switch msg.typ {
+		switch msg.Type {
 		case updateRequest:
-			if c.metrics[msg.namespace] == nil {
-				c.metrics[msg.namespace] = make(map[string]Datum)
+			response := make([]MetricResponse, 0, len(msg.Metrics))
+			for _, m := range msg.Metrics {
+				pm := &m
+				r := MetricResponse{}
+				k := pm.makeKey()
+				if c.metrics[k] == nil {
+					c.metrics[k] = pm
+				} else {
+					r.Error = c.metrics[k].Value.UpdateFrom(pm.Value)
+				}
+				r.Metric = *c.metrics[k]
+				response = append(response, r)
 			}
-			if c.metrics[msg.namespace][msg.metric] == nil {
-				c.metrics[msg.namespace][msg.metric] = msg.datum
-			} else {
-				// TODO process the error
-				/*err = */
-				c.metrics[msg.namespace][msg.metric].UpdateFrom(msg.datum)
+			if msg.Return != nil {
+				msg.Return <- response
 			}
 		case fetchRequest:
-			if c.metrics[msg.namespace] == nil || c.metrics[msg.namespace][msg.metric] == nil {
-				// TODO return an error
-			} else {
-				// TODO return a copy of c.metrics[msg.namespace][msg.metric]
+			response := make([]MetricResponse, 0, len(msg.Metrics))
+			for _, m := range msg.Metrics {
+				pm := &m
+				r := MetricResponse{}
+				k := pm.makeKey()
+				if c.metrics[k] == nil {
+					r.Error = ErrMetricDoesNotExist
+				} else {
+					r.Metric = *c.metrics[k]
+				}
+				response = append(response, r)
+			}
+			if msg.Return != nil {
+				msg.Return <- response
 			}
 		case stopRequest:
 			running = false
@@ -106,41 +184,20 @@ func (c *MetricsCollector) loop() {
 
 // Stop stops the collection loop
 func (c *MetricsCollector) Stop() {
-	c.queue <- &metricUpdate{stopRequest, "", "", nil}
+	c.queue <- &metricsUpdate{stopRequest, nil, nil}
 }
 
-// UpdateIntGauge updates an int64 gauge.
-func (c *MetricsCollector) UpdateIntGauge(namespace, metric string, datum int64) {
-	pdatum := int64Gauge(datum)
-	c.queue <- &metricUpdate{updateRequest, namespace, metric, &pdatum}
+// Update updates one or more metrics.
+// If a metric doesn't exist, it will be created.
+// It it exists and has a different type, an error is generated and no update will occur.
+// When passing multiple metrics to update, one failure will not prevent other metrics from being updated.
+func (c *MetricsCollector) Update(metrics []Metric, ret chan<- []MetricResponse) {
+	c.queue <- &metricsUpdate{updateRequest, metrics, ret}
 }
 
-// UpdateFloatGauge updates a float64 gauge.
-func (c *MetricsCollector) UpdateFloatGauge(namespace, metric string, datum float64) {
-	pdatum := float64Gauge(datum)
-	c.queue <- &metricUpdate{updateRequest, namespace, metric, &pdatum}
-}
-
-// UpdateBoolGauge updates a boolean gauge.
-func (c *MetricsCollector) UpdateBoolGauge(namespace, metric string, datum bool) {
-	pdatum := boolGauge(datum)
-	c.queue <- &metricUpdate{updateRequest, namespace, metric, &pdatum}
-}
-
-// UpdateStringGauge updates a string gauge.
-func (c *MetricsCollector) UpdateStringGauge(namespace, metric string, datum string) {
-	pdatum := stringGauge(datum)
-	c.queue <- &metricUpdate{updateRequest, namespace, metric, &pdatum}
-}
-
-// AddIntCounter adds datum to an int64 counter.
-func (c *MetricsCollector) AddIntCounter(namespace, metric string, datum int64) {
-	pdatum := int64Counter(datum)
-	c.queue <- &metricUpdate{updateRequest, namespace, metric, &pdatum}
-}
-
-// AddFloatCounter adds datum to a float64 counter.
-func (c *MetricsCollector) AddFloatCounter(namespace, metric string, datum float64) {
-	pdatum := float64Counter(datum)
-	c.queue <- &metricUpdate{updateRequest, namespace, metric, &pdatum}
+// Fetches one or more metrics.
+// Any values passed with the request are ignored.
+// If a metric doesn't exist, an error will be generated.
+func (c *MetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricResponse) {
+	c.queue <- &metricsUpdate{fetchRequest, metrics, ret}
 }
