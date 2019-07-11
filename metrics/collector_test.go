@@ -50,3 +50,110 @@ func TestCollectorUpdate(t *testing.T) {
 	}
 	m.Stop()
 }
+
+func TestCollectorUpdateNil(t *testing.T) {
+	m := NewMetricsCollector()
+	u := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: IntGauge(100),
+		},
+	}
+	m.Update(u, nil)
+	m.Stop()
+}
+
+func TestCollectorUpdate2Fetch(t *testing.T) {
+	m := NewMetricsCollector()
+	u := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: IntGauge(100),
+		},
+	}
+	m.Update(u, nil)
+	f := []Metric{
+		Metric{
+			Name:  "TestMetric",
+		},
+	}
+	c := make(chan []MetricResponse)
+	m.Fetch(f, c)
+	r := <-c
+	if len(r) < 1 || r[0].Error != nil {
+		t.Errorf("Expected nil error and value %d, got %v", 100, r)
+	} else {
+		v, err := r[0].Metric.Value.IntGaugeValue()
+		if err != nil {
+			t.Errorf("Expected nil error on value get")
+		} else {
+			if v != 100 {
+				t.Errorf("Expected nil error and value %d, got %v", 100, r)
+			}
+		}
+	}
+	m.Stop()
+}
+
+func TestCollector2UpdateFetch(t *testing.T) {
+	m := NewMetricsCollector()
+	u := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: IntGauge(100),
+		},
+	}
+	m.Update(u, nil)
+	u2 := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: IntGauge(200),
+		},
+	}
+	m.Update(u2, nil)
+	f := []Metric{
+		Metric{
+			Name:  "TestMetric",
+		},
+	}
+	c := make(chan []MetricResponse)
+	m.Fetch(f, c)
+	r := <-c
+	if len(r) < 1 || r[0].Error != nil {
+		t.Errorf("Expected nil error and value %d, got %v", 200, r)
+	} else {
+		v, err := r[0].Metric.Value.IntGaugeValue()
+		if err != nil {
+			t.Errorf("Expected nil error on value get")
+		} else {
+			if v != 200 {
+				t.Errorf("Expected nil error and value %d, got %v", 200, r)
+			}
+		}
+	}
+	m.Stop()
+}
+
+func TestCollector2UpdateFail(t *testing.T) {
+	m := NewMetricsCollector()
+	u := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: IntGauge(100),
+		},
+	}
+	m.Update(u, nil)
+	u2 := []Metric{
+		Metric{
+			Name:  "TestMetric",
+			Value: FloatGauge(200),
+		},
+	}
+	c := make(chan []MetricResponse)
+	m.Update(u2, c)
+	r := <-c
+	if len(r) < 1 || r[0].Error == nil {
+		t.Errorf("Expected error, got %v", r)
+	}
+	m.Stop()
+}
