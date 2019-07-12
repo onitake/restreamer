@@ -74,7 +74,7 @@ func TestCollectorUpdate2Fetch(t *testing.T) {
 	m.Update(u, nil)
 	f := []Metric{
 		Metric{
-			Name:  "TestMetric",
+			Name: "TestMetric",
 		},
 	}
 	c := make(chan []MetricResponse)
@@ -113,7 +113,7 @@ func TestCollector2UpdateFetch(t *testing.T) {
 	m.Update(u2, nil)
 	f := []Metric{
 		Metric{
-			Name:  "TestMetric",
+			Name: "TestMetric",
 		},
 	}
 	c := make(chan []MetricResponse)
@@ -124,7 +124,7 @@ func TestCollector2UpdateFetch(t *testing.T) {
 	} else {
 		v, err := r[0].Metric.Value.IntGaugeValue()
 		if err != nil || v != 200 {
-				t.Errorf("Expected nil error and value %d, got %d / %v", 200, v, err)
+			t.Errorf("Expected nil error and value %d, got %d / %v", 200, v, err)
 		}
 	}
 	m.Stop()
