@@ -55,14 +55,14 @@ type Metric struct {
 	Value Datum
 }
 
-// makeKey generates a unique key for storing this metric.
+// MakeKey generates a unique key for storing this metric.
 //
 // The key is constructed as follows:
 // Key = Name
 // TagKeys = SORT_LEXICAL(KEYS(Tags))
 // FOR EACH TagKey IN TagKeys:
 //   Key = CONCAT(Key, '\0', TagKey, '\0', VALUE_FOR_KEY(Tags, TagKey))
-func (m *Metric) makeKey() string {
+func (m *Metric) MakeKey() string {
 	key := m.Name
 	tagkeys := make([]string, 0, len(m.Tags))
 	for k, _ := range m.Tags {
@@ -117,7 +117,7 @@ type MetricsCollector struct {
 	//
 	// It is keyed by a unique combination of the Name and all Tags and their
 	// Values associated with each metric.
-	// See Metric.makeKey() for a description of the algorithm.
+	// See Metric.MakeKey() for a description of the algorithm.
 	metrics map[string]*Metric
 }
 
@@ -146,7 +146,7 @@ func (c *MetricsCollector) loop() {
 			for _, m := range msg.Metrics {
 				pm := &m
 				r := MetricResponse{}
-				k := pm.makeKey()
+				k := pm.MakeKey()
 				if c.metrics[k] == nil {
 					c.metrics[k] = pm
 				} else {
@@ -163,7 +163,7 @@ func (c *MetricsCollector) loop() {
 			for _, m := range msg.Metrics {
 				pm := &m
 				r := MetricResponse{}
-				k := pm.makeKey()
+				k := pm.MakeKey()
 				if c.metrics[k] == nil {
 					r.Error = ErrMetricDoesNotExist
 				} else {
