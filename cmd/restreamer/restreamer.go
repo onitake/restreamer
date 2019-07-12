@@ -72,6 +72,8 @@ func main() {
 		logbackend.Logger = flogger
 	}
 
+	collector := metrics.NewMetricsCollector()
+
 	clients := make(map[string]*streaming.Client)
 
 	var stats metrics.Statistics
@@ -167,6 +169,7 @@ func main() {
 			client, err := streaming.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer, streamdef.ClientInterface, config.InputBuffer, streamdef.Mru)
 			if err == nil {
 				client.SetCollector(reg)
+				client.SetCollector2(collector)
 				client.Connect()
 				clients[streamdef.Serve] = client
 				mux.Handle(streamdef.Serve, streamer)
