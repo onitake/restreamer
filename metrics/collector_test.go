@@ -120,15 +120,11 @@ func TestCollector2UpdateFetch(t *testing.T) {
 	m.Fetch(f, c)
 	r := <-c
 	if len(r) < 1 || r[0].Error != nil {
-		t.Errorf("Expected nil error and value %d, got %v", 200, r)
+		t.Errorf("Expected nil error on set, got %v", r)
 	} else {
 		v, err := r[0].Metric.Value.IntGaugeValue()
-		if err != nil {
-			t.Errorf("Expected nil error on value get")
-		} else {
-			if v != 200 {
-				t.Errorf("Expected nil error and value %d, got %v", 200, r)
-			}
+		if err != nil || v != 200 {
+				t.Errorf("Expected nil error and value %d, got %d / %v", 200, v, err)
 		}
 	}
 	m.Stop()
