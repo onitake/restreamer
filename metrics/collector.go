@@ -93,11 +93,50 @@ type metricsUpdate struct {
 	Type requestType
 	// Metrics is the list of metrics to update
 	Metrics []Metric
-	// Return is a return channel to send responses or errors back to the requester
+	// Return is a return channel to send responses or errors back to the requester.
+	// Can be nil if no response is required.
 	Return chan<- []MetricResponse
 }
 
-// MetricsCollector is a generic metrics collector for any kind of system metrics.
+type MetricsCollector interface {
+	Stop()
+	Update(metrics []Metric, ret chan<- []MetricResponse)
+	Fetch(metrics []Metric, ret chan<- []MetricResponse)
+}
+
+// DummyMetricsCollector is a metrics collector that doesn't collect anything
+// and simply returns errors when trying to fetch data
+type DummyMetricsCollector struct{}
+
+func (c *DummyMetricsCollector) Stop() {
+	// nothing
+}
+
+// Update updates one or more metrics.
+// If a metric doesn't exist, it will be created.
+// It it exists and has a different type, an error is generated and no update will occur.
+// When passing multiple metrics to update, one failure will not prevent other metrics from being updated.
+func (c *DummyMetricsCollector) Update(metrics []Metric, ret chan<- []MetricResponse) {
+	if ret != nil {
+		empty := make([]MetricResponse, len(metrics))
+		ret <- empty
+	}
+}
+
+// Fetches one or more metrics.
+// Any values passed with the request are ignored.
+// If a metric doesn't exist, an error will be generated.
+func (c *DummyMetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricResponse) {
+	if ret != nil {
+		empty := make([]MetricResponse, len(metrics))
+		for _, m := range empty {
+			m.Error = ErrMetricDoesNotExist
+		}
+		ret <- empty
+	}
+}
+
+// realMetricsCollector is a generic metrics collector for any kind of system metrics.
 //
 // It uses a channel to transport updates to a central data processor.
 //
@@ -110,7 +149,7 @@ type metricsUpdate struct {
 // - float64: signed 64-bit floating-point
 // - bool: boolean (only for gauges)
 // - string: string (only for gauges)
-type MetricsCollector struct {
+type realMetricsCollector struct {
 	// queue is the processing queue for updates
 	queue chan *metricsUpdate
 	// metrics contains all the collected metrics.
@@ -122,8 +161,8 @@ type MetricsCollector struct {
 }
 
 // NewMetricsCollector creates a new metrics collector and starts its background processor.
-func NewMetricsCollector() *MetricsCollector {
-	c := &MetricsCollector{
+func NewMetricsCollector() MetricsCollector {
+	c := &realMetricsCollector{
 		queue:   make(chan *metricsUpdate),
 		metrics: make(map[string]*Metric),
 	}
@@ -132,11 +171,11 @@ func NewMetricsCollector() *MetricsCollector {
 }
 
 // start starts the collection loop
-func (c *MetricsCollector) start() {
+func (c *realMetricsCollector) start() {
 	go c.loop()
 }
 
-func (c *MetricsCollector) loop() {
+func (c *realMetricsCollector) loop() {
 	running := true
 	for running {
 		msg := <-c.queue
@@ -183,7 +222,7 @@ func (c *MetricsCollector) loop() {
 }
 
 // Stop stops the collection loop
-func (c *MetricsCollector) Stop() {
+func (c *realMetricsCollector) Stop() {
 	c.queue <- &metricsUpdate{stopRequest, nil, nil}
 }
 
@@ -191,13 +230,13 @@ func (c *MetricsCollector) Stop() {
 // If a metric doesn't exist, it will be created.
 // It it exists and has a different type, an error is generated and no update will occur.
 // When passing multiple metrics to update, one failure will not prevent other metrics from being updated.
-func (c *MetricsCollector) Update(metrics []Metric, ret chan<- []MetricResponse) {
+func (c *realMetricsCollector) Update(metrics []Metric, ret chan<- []MetricResponse) {
 	c.queue <- &metricsUpdate{updateRequest, metrics, ret}
 }
 
 // Fetches one or more metrics.
 // Any values passed with the request are ignored.
 // If a metric doesn't exist, an error will be generated.
-func (c *MetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricResponse) {
+func (c *realMetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricResponse) {
 	c.queue <- &metricsUpdate{fetchRequest, metrics, ret}
 }
