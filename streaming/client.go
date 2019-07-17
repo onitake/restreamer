@@ -517,14 +517,14 @@ func (client *Client) pull(url *url.URL) error {
 				if queue == nil {
 					client.listener.Connect()
 					client.stats.SourceConnected()
-					client.stats2.Update([]Metric{
-						Metric{
+					client.stats2.Update([]metrics.Metric{
+						metrics.Metric{
 							Name: "SourceConnected",
 							Tags: map[string]string{
 								"Module": "streaming.client",
 								"URL":    url.String(),
 							},
-							Value: IntCounter(1),
+							Value: metrics.IntCounter(1),
 						},
 					}, nil)
 					logger.Logkv(
@@ -537,14 +537,14 @@ func (client *Client) pull(url *url.URL) error {
 
 				// report the packet
 				client.stats.PacketReceived()
-				client.stats2.Update([]Metric{
-					Metric{
+				client.stats2.Update([]metrics.Metric{
+					metrics.Metric{
 						Name: "PacketReceived",
 						Tags: map[string]string{
 							"Module": "streaming.client",
 							"URL":    url.String(),
 						},
-						Value: IntCounter(1),
+						Value: metrics.IntCounter(1),
 					},
 				}, nil)
 
@@ -570,14 +570,14 @@ func (client *Client) pull(url *url.URL) error {
 		)
 		close(queue)
 		client.stats.SourceDisconnected()
-		client.stats2.Update([]Metric{
-			Metric{
+		client.stats2.Update([]metrics.Metric{
+			metrics.Metric{
 				Name: "SourceDisconnected",
 				Tags: map[string]string{
 					"Module": "streaming.client",
 					"URL":    url.String(),
 				},
-				Value: IntCounter(1),
+				Value: metrics.IntCounter(1),
 			},
 		}, nil)
 		logger.Logkv(
