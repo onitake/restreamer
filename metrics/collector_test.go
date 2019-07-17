@@ -72,18 +72,17 @@ func TestCollectorUpdate2Fetch(t *testing.T) {
 		},
 	}
 	m.Update(u, nil)
-	f := []Metric{
-		Metric{
-			Name: "TestMetric",
-		},
+	i := MetricFilter{
+		Name: "TestMetric",
 	}
-	c := make(chan []MetricResponse)
-	m.Fetch(f, c)
+	e := MetricFilter{}
+	c := make(chan []Metric)
+	m.Fetch(i, e, c)
 	r := <-c
-	if len(r) < 1 || r[0].Error != nil {
-		t.Errorf("Expected nil error and value %d, got %v", 100, r)
+	if len(r) < 1 {
+		t.Errorf("Expected %d metrics, got %d", 1, len(r))
 	} else {
-		v, err := r[0].Metric.Value.IntGaugeValue()
+		v, err := r[0].Value.IntGaugeValue()
 		if err != nil {
 			t.Errorf("Expected nil error on value get")
 		} else {
@@ -111,18 +110,17 @@ func TestCollector2UpdateFetch(t *testing.T) {
 		},
 	}
 	m.Update(u2, nil)
-	f := []Metric{
-		Metric{
-			Name: "TestMetric",
-		},
+	i := MetricFilter{
+		Name: "TestMetric",
 	}
-	c := make(chan []MetricResponse)
-	m.Fetch(f, c)
+	e := MetricFilter{}
+	c := make(chan []Metric)
+	m.Fetch(i, e, c)
 	r := <-c
-	if len(r) < 1 || r[0].Error != nil {
-		t.Errorf("Expected nil error on set, got %v", r)
+	if len(r) < 1 {
+		t.Errorf("Expected %d metrics, got %d", 1, len(r))
 	} else {
-		v, err := r[0].Metric.Value.IntGaugeValue()
+		v, err := r[0].Value.IntGaugeValue()
 		if err != nil || v != 200 {
 			t.Errorf("Expected nil error and value %d, got %d / %v", 200, v, err)
 		}

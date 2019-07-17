@@ -25,14 +25,6 @@ var (
 	ErrMetricDoesNotExist = errors.New("Metric does not exist")
 )
 
-type requestType int
-
-const (
-	updateRequest requestType = iota
-	fetchRequest
-	stopRequest
-)
-
 // Metric represents a single metric and includes
 // - a name
 // - the metric data
@@ -55,14 +47,14 @@ type Metric struct {
 	Value Datum
 }
 
-// MakeKey generates a unique key for storing this metric.
+// makeKey generates a unique key for storing this metric.
 //
 // The key is constructed as follows:
 // Key = Name
 // TagKeys = SORT_LEXICAL(KEYS(Tags))
 // FOR EACH TagKey IN TagKeys:
 //   Key = CONCAT(Key, '\0', TagKey, '\0', VALUE_FOR_KEY(Tags, TagKey))
-func (m *Metric) MakeKey() string {
+func (m *Metric) makeKey() string {
 	key := m.Name
 	tagkeys := make([]string, 0, len(m.Tags))
 	for k, _ := range m.Tags {
@@ -86,54 +78,150 @@ type MetricResponse struct {
 	Metric Metric
 }
 
-// metricsUpdate represents a single update, fetch or stop request.
-// Multiple metrics can be updated in a single request.
-type metricsUpdate struct {
-	// Type is the type of request
-	Type requestType
-	// Metrics is the list of metrics to update
-	Metrics []Metric
-	// Return is a return channel to send responses or errors back to the requester.
-	// Can be nil if no response is required.
-	Return chan<- []MetricResponse
-}
-
+// MetricsCollector is the generic interface for a metrics-collecting facility.
+//
+// Functions to stop collection, update a list of metrics and a fetching a
+// filtered list of metrics are provided.
 type MetricsCollector interface {
+	// Stops metrics collection.
+	// After calling this method, the collector should not be used any more.
 	Stop()
+	// Update updates one or more metrics.
+	// If a metric doesn't exist, it will be created.
+	// It it exists and has a different type, an error is generated and no update will occur.
+	// When passing multiple metrics to update, one failure will not prevent other metrics from being updated.
 	Update(metrics []Metric, ret chan<- []MetricResponse)
-	Fetch(metrics []Metric, ret chan<- []MetricResponse)
+	// Fetch fetches one or more metrics.
+	// Instead of a metric list, a filter must be provided.
+	Fetch(include, exclude MetricFilter, ret chan<- []Metric)
 }
 
-// DummyMetricsCollector is a metrics collector that doesn't collect anything
-// and simply returns errors when trying to fetch data
+// DummyMetricsCollector is a metrics collector that doesn't collect anything.
+// It will still notify on the response channels, but with empty data.
 type DummyMetricsCollector struct{}
 
 func (c *DummyMetricsCollector) Stop() {
 	// nothing
 }
 
-// Update updates one or more metrics.
-// If a metric doesn't exist, it will be created.
-// It it exists and has a different type, an error is generated and no update will occur.
-// When passing multiple metrics to update, one failure will not prevent other metrics from being updated.
 func (c *DummyMetricsCollector) Update(metrics []Metric, ret chan<- []MetricResponse) {
 	if ret != nil {
-		empty := make([]MetricResponse, len(metrics))
-		ret <- empty
+		ret <- []MetricResponse{}
 	}
 }
 
-// Fetches one or more metrics.
-// Any values passed with the request are ignored.
-// If a metric doesn't exist, an error will be generated.
-func (c *DummyMetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricResponse) {
+func (c *DummyMetricsCollector) Fetch(include, exclude MetricFilter, ret chan<- []Metric) {
 	if ret != nil {
-		empty := make([]MetricResponse, len(metrics))
-		for _, m := range empty {
-			m.Error = ErrMetricDoesNotExist
-		}
-		ret <- empty
+		ret <- []Metric{}
 	}
+}
+
+// metricsAction represents a single update, fetch or stop request.
+// Multiple metrics can be updated in a single request.
+type metricsAction interface {
+	// act executes an action on the given collector.
+	// The return value determines if the collector should continue or not
+	// (used for the Stop action). false = stop.
+	act(collector *realMetricsCollector) bool
+}
+
+type updateAction struct {
+	// Metrics is the list of metrics to update
+	metrics []Metric
+	// Return is a return channel to send responses or errors back to the requester.
+	// Can be nil if no response is required.
+	ret chan<- []MetricResponse
+}
+
+func (a *updateAction) act(c *realMetricsCollector) bool {
+	response := make([]MetricResponse, 0, len(a.metrics))
+	for _, m := range a.metrics {
+		pm := &m
+		r := MetricResponse{}
+		k := pm.makeKey()
+		if c.metrics[k] == nil {
+			c.metrics[k] = pm
+		} else {
+			r.Error = c.metrics[k].Value.UpdateFrom(pm.Value)
+		}
+		r.Metric = *c.metrics[k]
+		response = append(response, r)
+	}
+	if a.ret != nil {
+		a.ret <- response
+	}
+	return true;
+}
+
+type stopAction struct{}
+
+func (a *stopAction) act(c *realMetricsCollector) bool {
+	return false;
+}
+
+// MetricFilter defines which metrics need to match to be included in the result.
+type MetricFilter struct {
+	// Name refers to the metric name.
+	// The empty string means all metrics
+	Name string
+	// Tags is a list of tag-values that must match.
+	// If a value is the empty string, all metrics that include the tag match.
+	Tags map[string]string
+}
+
+type fetchAction struct {
+	// include defines which criteria need to be fulfilled by this fetch request.
+	//
+	// This is an inclusive list, anything that does not match the name or tags is excluded.
+	// An empty name or tag list is treated as undefined, i.e. does not filter results.
+	// A tag key with an empty value names a tag that must be set, but its value is not relevant.
+	//
+	// Inclusions are processed before exclusions.
+	include MetricFilter
+	// exclude defines which criteria must not be fulfilled by this fetch request.
+	//
+	// This is an exclusive list, anything that matches the name or tags is excluded.
+	// An empty name or tag list is treated as undefined, i.e. does not filter results.
+	// A tag key with an empty value names a tag that must not be set, independent of the value.
+	exclude MetricFilter
+	// Return is a return channel to send responses or errors back to the requester.
+	ret chan<- []Metric
+}
+
+func (a *fetchAction) act(c *realMetricsCollector) bool {
+	response := make([]Metric, 0)
+	/*
+	if a.include.name == nil {
+		// start with all metric values
+		for k, _ := range c.metrics {
+			all = append(all, k)
+		}
+	} else {
+		// start with a specific metric name
+		all = append(all, c.nameBucket...)
+	}
+	for k, v := range a.include.tags {
+		if v == "" {
+			// filter by tag existence
+			
+		} else {
+			// filter by tag and value
+		}
+		pm := &m
+		r := MetricResponse{}
+		k := pm.makeKey()
+		if c.metrics[k] == nil {
+			r.Error = ErrMetricDoesNotExist
+		} else {
+			r.Metric = *c.metrics[k]
+		}
+		response = append(response, r)
+	}
+	*/
+	if a.ret != nil {
+		a.ret <- response
+	}
+	return true;
 }
 
 // realMetricsCollector is a generic metrics collector for any kind of system metrics.
@@ -150,21 +238,32 @@ func (c *DummyMetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricRespo
 // - bool: boolean (only for gauges)
 // - string: string (only for gauges)
 type realMetricsCollector struct {
-	// queue is the processing queue for updates
-	queue chan *metricsUpdate
+	// queue is the processing queue for updates.
+	queue chan metricsAction
 	// metrics contains all the collected metrics.
-	//
 	// It is keyed by a unique combination of the Name and all Tags and their
 	// Values associated with each metric.
-	// See Metric.MakeKey() for a description of the algorithm.
+	// See Metric.makeKey() for a description of the algorithm.
 	metrics map[string]*Metric
+	// nameBucket maps metric names to metric keys.
+	// Can be used for efficient lookup of metrics by name.
+	nameBucket map[string][]string
+	// tagBucket maps tags to metric keys.
+	// Can be used for efficient lookup of metrics by tag.
+	tagBucket map[string][]string
+	// tagValueBucket maps tags and tag values to metric keys.
+	// Can be used for efficient lookup of metrics by tag and value.
+	tagValueBucket map[string]map[string][]string
 }
 
 // NewMetricsCollector creates a new metrics collector and starts its background processor.
 func NewMetricsCollector() MetricsCollector {
 	c := &realMetricsCollector{
-		queue:   make(chan *metricsUpdate),
+		queue:   make(chan metricsAction),
 		metrics: make(map[string]*Metric),
+		nameBucket: make(map[string][]string),
+		tagBucket: make(map[string][]string),
+		tagValueBucket: make(map[string]map[string][]string),
 	}
 	c.start()
 	return c
@@ -179,51 +278,13 @@ func (c *realMetricsCollector) loop() {
 	running := true
 	for running {
 		msg := <-c.queue
-		switch msg.Type {
-		case updateRequest:
-			response := make([]MetricResponse, 0, len(msg.Metrics))
-			for _, m := range msg.Metrics {
-				pm := &m
-				r := MetricResponse{}
-				k := pm.MakeKey()
-				if c.metrics[k] == nil {
-					c.metrics[k] = pm
-				} else {
-					r.Error = c.metrics[k].Value.UpdateFrom(pm.Value)
-				}
-				r.Metric = *c.metrics[k]
-				response = append(response, r)
-			}
-			if msg.Return != nil {
-				msg.Return <- response
-			}
-		case fetchRequest:
-			response := make([]MetricResponse, 0, len(msg.Metrics))
-			for _, m := range msg.Metrics {
-				pm := &m
-				r := MetricResponse{}
-				k := pm.MakeKey()
-				if c.metrics[k] == nil {
-					r.Error = ErrMetricDoesNotExist
-				} else {
-					r.Metric = *c.metrics[k]
-				}
-				response = append(response, r)
-			}
-			if msg.Return != nil {
-				msg.Return <- response
-			}
-		case stopRequest:
-			running = false
-		default:
-			panic("Invalid metric type")
-		}
+		running = msg.act(c)
 	}
 }
 
 // Stop stops the collection loop
 func (c *realMetricsCollector) Stop() {
-	c.queue <- &metricsUpdate{stopRequest, nil, nil}
+	c.queue <- &stopAction{}
 }
 
 // Update updates one or more metrics.
@@ -231,12 +292,12 @@ func (c *realMetricsCollector) Stop() {
 // It it exists and has a different type, an error is generated and no update will occur.
 // When passing multiple metrics to update, one failure will not prevent other metrics from being updated.
 func (c *realMetricsCollector) Update(metrics []Metric, ret chan<- []MetricResponse) {
-	c.queue <- &metricsUpdate{updateRequest, metrics, ret}
+	c.queue <- &updateAction{metrics, ret}
 }
 
 // Fetches one or more metrics.
 // Any values passed with the request are ignored.
 // If a metric doesn't exist, an error will be generated.
-func (c *realMetricsCollector) Fetch(metrics []Metric, ret chan<- []MetricResponse) {
-	c.queue <- &metricsUpdate{fetchRequest, metrics, ret}
+func (c *realMetricsCollector) Fetch(include, exclude MetricFilter, ret chan<- []Metric) {
+	c.queue <- &fetchAction{include, exclude, ret}
 }
