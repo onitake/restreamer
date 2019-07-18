@@ -22,6 +22,7 @@ import (
 	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"io"
 	"net"
 	"net/http"
@@ -45,6 +46,23 @@ var (
 	ErrInvalidResponse = errors.New("restreamer: unsupported response code")
 	// ErrNoUrl is thrown when the list of upstream URLs was empty
 	ErrNoUrl = errors.New("restreamer: no parseable upstream URL")
+)
+
+var (
+	metricSourceConnected = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "source_connected",
+			Help: "Connection status, 0=disconnected 1=connected.",
+		},
+		[]string{"stream", "url"},
+	)
+	metricPacketsReceived = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "packets_received",
+			Help: "Total number of MPEG-TS packets received.",
+		},
+		[]string{"stream", "url"},
+	)
 )
 
 // connectCloser represents types that have a Connect() and a Close() method.
@@ -85,6 +103,8 @@ func (*dummyConnectCloser) Connect() error {
 //     "client": "1.2.3.4:12" | client ip:port,
 // }
 type Client struct {
+	// name is a unique name for this stream, only used for logging and metrics
+	name string
 	// connector is a network dialer for TCP, UDP and HTTP
 	connector *net.Dialer
 	// getter is a generic HTTP client
@@ -131,6 +151,7 @@ type Client struct {
 // a reconnect will be attempted immediately.
 //
 // Arguments:
+//   name: a unique name for this streaming client, used for metrics and logging
 //   uris: a list of upstream URIs, used in random order
 //   queue: the outgoing packet queue
 //   timeout: the connect timeout
@@ -140,7 +161,7 @@ type Client struct {
 //   intf: the network interface to create multicast connections on
 //   bufferSize: the UDP socket receive buffer size
 //   packetSize: the UDP packet size
-func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string, bufferSize uint, packetSize uint) (*Client, error) {
+func NewClient(name string, uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string, bufferSize uint, packetSize uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
 	for _, uri := range uris {
@@ -187,6 +208,7 @@ func NewClient(uris []string, streamer *Streamer, timeout uint, reconnect uint, 
 		ExpectContinueTimeout: toduration,
 	}
 	client := Client{
+		name:      name,
 		connector: dialer,
 		getter: &http.Client{
 			Transport: transport,
@@ -517,16 +539,7 @@ func (client *Client) pull(url *url.URL) error {
 				if queue == nil {
 					client.listener.Connect()
 					client.stats.SourceConnected()
-					client.stats2.Update([]metrics.Metric{
-						metrics.Metric{
-							Name: "SourceConnected",
-							Tags: map[string]string{
-								"Module": "streaming.client",
-								"URL":    url.String(),
-							},
-							Value: metrics.IntCounter(1),
-						},
-					}, nil)
+					metricSourceConnected.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Set(1.0)
 					logger.Logkv(
 						"event", eventClientStarted,
 						"url", url.String(),
@@ -537,16 +550,7 @@ func (client *Client) pull(url *url.URL) error {
 
 				// report the packet
 				client.stats.PacketReceived()
-				client.stats2.Update([]metrics.Metric{
-					metrics.Metric{
-						Name: "PacketReceived",
-						Tags: map[string]string{
-							"Module": "streaming.client",
-							"URL":    url.String(),
-						},
-						Value: metrics.IntCounter(1),
-					},
-				}, nil)
+				metricPacketsReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Inc()
 
 				//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				//log.Printf("Got a packet (length %d)\n", len(packet))
@@ -570,16 +574,7 @@ func (client *Client) pull(url *url.URL) error {
 		)
 		close(queue)
 		client.stats.SourceDisconnected()
-		client.stats2.Update([]metrics.Metric{
-			metrics.Metric{
-				Name: "SourceDisconnected",
-				Tags: map[string]string{
-					"Module": "streaming.client",
-					"URL":    url.String(),
-				},
-				Value: metrics.IntCounter(1),
-			},
-		}, nil)
+		metricSourceConnected.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Set(0.0)
 		logger.Logkv(
 			"event", eventClientStopped,
 			"url", url.String(),
