@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/metrics"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 )
 
@@ -270,4 +271,32 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write([]byte("400 bad request"))
 	}
+}
+
+// prometheusApi implements a handler for scraping Prometheus metrics.
+type prometheusApi struct {
+	// auth is an authentication verifier for client requests
+	auth auth.Authenticator
+	// handler is the delegate HTTP handler
+	handler http.Handler
+}
+
+// NewPrometheusApi creates a new Prometheus metrics API object,
+// serving metrics to a Prometheus instance.
+func NewPrometheusApi(auth auth.Authenticator) http.Handler {
+	return &prometheusApi{
+		auth:    auth,
+		handler: promhttp.Handler(),
+	}
+}
+
+// ServeHTTP is the http handler method.
+func (api *prometheusApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// fail-fast: verify that this user can access this resource first
+	if !auth.HandleHttpAuthentication(api.auth, request, writer) {
+		return
+	}
+
+	// authentication successful, forward the request to the promhttp handler
+	api.handler.ServeHTTP(writer, request)
 }

@@ -259,6 +259,14 @@ func main() {
 						"message", fmt.Sprintf("Error, stream not found: %s", streamdef.Remote),
 					)
 				}
+			case "prometheus":
+				logger.Logkv(
+					"event", eventMainConfigApi,
+					"api", "prometheus",
+					"serve", streamdef.Serve,
+					"message", fmt.Sprintf("Registering Prometheus API on %s", streamdef.Serve),
+				)
+				mux.Handle(streamdef.Serve, api.NewPrometheusApi(auth))
 			default:
 				logger.Logkv(
 					"event", eventMainError,
