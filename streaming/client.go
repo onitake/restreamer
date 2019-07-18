@@ -133,8 +133,6 @@ type Client struct {
 	running util.AtomicBool
 	// stats is the statistics collector for this client
 	stats metrics.Collector
-	// stats2 is the new generic statistics collector
-	stats2 metrics.MetricsCollector
 	// listener is a downstream object that can handle connect/disconnect notifications
 	listener connectCloser
 	// queueSize is the size of the input queue
@@ -231,7 +229,6 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 		interf:         pintf,
 		readBufferSize: int(bufferSize * protocol.MpegTsPacketSize),
 		packetSize:     int(packetSize),
-		stats2:         &metrics.DummyMetricsCollector{},
 	}
 	return &client, nil
 }
@@ -239,11 +236,6 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 // SetCollector assigns a stats collector.
 func (client *Client) SetCollector(stats metrics.Collector) {
 	client.stats = stats
-}
-
-// SetCollector assigns a stats collector.
-func (client *Client) SetCollector2(stats metrics.MetricsCollector) {
-	client.stats2 = stats
 }
 
 // SetStateListener adds a listener that will be notified when the client
