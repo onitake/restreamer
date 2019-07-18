@@ -51,14 +51,14 @@ var (
 var (
 	metricSourceConnected = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "source_connected",
+			Name: "streaming_source_connected",
 			Help: "Connection status, 0=disconnected 1=connected.",
 		},
 		[]string{"stream", "url"},
 	)
 	metricPacketsReceived = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "packets_received",
+			Name: "streaming_packets_received",
 			Help: "Total number of MPEG-TS packets received.",
 		},
 		[]string{"stream", "url"},

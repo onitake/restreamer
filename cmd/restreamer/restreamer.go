@@ -156,7 +156,7 @@ func main() {
 
 			auth := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
 
-			streamer := streaming.NewStreamer(config.OutputBuffer, controller, auth)
+			streamer := streaming.NewStreamer(streamdef.Serve, config.OutputBuffer, controller, auth)
 			streamer.SetCollector(reg)
 			streamer.SetNotifier(queue)
 
