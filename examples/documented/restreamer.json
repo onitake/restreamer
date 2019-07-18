@@ -51,7 +51,8 @@
 			"type": "stream",
 			"": "API endpoint, only used if type is api.",
 			"": "health = reports system health.",
-			"": "statistics = reports detailed system statistics.",
+			"": "statistics = reports detailed system statistics. [deprecated, use prometheus]",
+			"": "prometheus = reports detailed system statistics as a standard Prometheus scrape endpoint.",
 			"": "check = reports the status of a stream. remote contains the serve path of the stream.",
 			"": "control = allows setting a stream offline or online. The state is controlled by the presence of the query parameters 'offline' or 'online', respectively.",
 			"api": "",
@@ -113,6 +114,11 @@
 			"type": "api",
 			"api": "health",
 			"serve": "/health"
+		},
+		{
+			"type": "api",
+			"api": "prometheus",
+			"serve": "/metrics"
 		},
 		{
 			"type": "static",
