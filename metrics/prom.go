@@ -33,6 +33,13 @@ var (
 	DefaultGatherer prometheus.Gatherer = defaultRegistry
 )
 
+func init() {
+	// register the standard metrics
+	DefaultRegisterer.Register(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	// the Go metrics are NOT enabled by default as they can have a serious performance impact.
+	// if you want them, you need to register them yourself.
+}
+
 // promErrorLogger is an internal error logger that prints to the kvl log.
 type promErrorLogger struct{}
 
