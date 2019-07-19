@@ -75,10 +75,10 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(metricPacketsSent)
-	prometheus.MustRegister(metricPacketsDropped)
-	prometheus.MustRegister(metricConnections)
-	prometheus.MustRegister(metricDuration)
+	metrics.MustRegister(metricPacketsSent)
+	metrics.MustRegister(metricPacketsDropped)
+	metrics.MustRegister(metricConnections)
+	metrics.MustRegister(metricDuration)
 }
 
 // Command is one of several possible constants.

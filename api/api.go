@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/metrics"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 )
 
@@ -286,7 +285,7 @@ type prometheusApi struct {
 func NewPrometheusApi(auth auth.Authenticator) http.Handler {
 	return &prometheusApi{
 		auth:    auth,
-		handler: promhttp.Handler(),
+		handler: metrics.PromHandler(),
 	}
 }
 

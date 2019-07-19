@@ -66,8 +66,8 @@ var (
 )
 
 func init() {
-	prometheus.MustRegister(metricSourceConnected)
-	prometheus.MustRegister(metricPacketsReceived)
+	metrics.MustRegister(metricSourceConnected)
+	metrics.MustRegister(metricPacketsReceived)
 }
 
 // connectCloser represents types that have a Connect() and a Close() method.
