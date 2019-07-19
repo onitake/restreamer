@@ -138,23 +138,23 @@ API endpoint and expose it on /metrics to expose them.
 
 Supported metrics are:
 
-* streaming_packets_sent
+* _streaming_packets_sent_
   Total number of MPEG-TS packets sent from the output queue.
-* streaming_bytes_sent
+* _streaming_bytes_sent_
   Total number of bytes sent from the output queue.
-* streaming_packets_dropped
+* _streaming_packets_dropped_
   Total number of MPEG-TS packets dropped from the output queue.
-* streaming_bytes_dropped"
+* _streaming_bytes_dropped_
   Total number of bytes dropped from the output queue.
-* streaming_connections
+* _streaming_connections_
   Number of active client connections.
-* streaming_duration
+* _streaming_duration_
   Total time spent streaming, summed over all client connections. In nanoseconds.
-* streaming_source_connected
+* _streaming_source_connected_
   Connection status, 0=disconnected 1=connected.
-* streaming_packets_received
+* _streaming_packets_received_
   Total number of MPEG-TS packets received.
-* streaming_bytes_received
+* _streaming_bytes_received_
   Total number of bytes received.
 
 Additionally, the standard process metrics supported by the Prometheus client
