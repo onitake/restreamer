@@ -19,8 +19,8 @@ package streaming
 import (
 	"errors"
 	"fmt"
-	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/auth"
+	"github.com/onitake/restreamer/metrics"
 	"hash/fnv"
 	"io"
 	"mime"
@@ -83,7 +83,7 @@ type Proxy struct {
 	// this channel should never be written to - shutdown is signalled by closing the channel
 	shutdown chan struct{}
 	// the global stats collector
-	stats api.Statistics
+	stats metrics.Statistics
 	// auth is an authentication verifier for client requests
 	auth auth.Authenticator
 }
@@ -110,13 +110,13 @@ func NewProxy(uri string, timeout uint, cache uint, auth auth.Authenticator) (*P
 		fetcher:  make(chan chan<- *fetchableResource, proxyFetchQueue),
 		shutdown: make(chan struct{}),
 		resource: nil,
-		stats:    &api.DummyStatistics{},
+		stats:    &metrics.DummyStatistics{},
 		auth:     auth,
 	}, nil
 }
 
 // SetStatistics assigns a stats collector.
-func (proxy *Proxy) SetStatistics(stats api.Statistics) {
+func (proxy *Proxy) SetStatistics(stats metrics.Statistics) {
 	proxy.stats = stats
 }
 

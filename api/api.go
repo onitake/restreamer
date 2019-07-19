@@ -19,6 +19,7 @@ package api
 import (
 	"encoding/json"
 	"github.com/onitake/restreamer/auth"
+	"github.com/onitake/restreamer/metrics"
 	"net/http"
 )
 
@@ -30,14 +31,14 @@ type connectChecker interface {
 // healthApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting system health.
 type healthApi struct {
-	stats Statistics
+	stats metrics.Statistics
 	// auth is an authentication verifier for client requests
 	auth auth.Authenticator
 }
 
 // NewHealthApi creates a new health API object,
 // serving data from a system Statistics object.
-func NewHealthApi(stats Statistics, auth auth.Authenticator) http.Handler {
+func NewHealthApi(stats metrics.Statistics, auth auth.Authenticator) http.Handler {
 	return &healthApi{
 		stats: stats,
 		auth:  auth,
@@ -94,14 +95,14 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 // statisticsApi encapsulates a system status object and
 // provides an HTTP/JSON handler for reporting total system statistics.
 type statisticsApi struct {
-	stats Statistics
+	stats metrics.Statistics
 	// auth is an authentication verifier for client requests
 	auth auth.Authenticator
 }
 
 // NewStatisticsApi creates a new statistics API object,
 // serving data from a system Statistics object.
-func NewStatisticsApi(stats Statistics, auth auth.Authenticator) http.Handler {
+func NewStatisticsApi(stats metrics.Statistics, auth auth.Authenticator) http.Handler {
 	return &statisticsApi{
 		stats: stats,
 		auth:  auth,
@@ -269,4 +270,32 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 		writer.WriteHeader(http.StatusBadRequest)
 		writer.Write([]byte("400 bad request"))
 	}
+}
+
+// prometheusApi implements a handler for scraping Prometheus metrics.
+type prometheusApi struct {
+	// auth is an authentication verifier for client requests
+	auth auth.Authenticator
+	// handler is the delegate HTTP handler
+	handler http.Handler
+}
+
+// NewPrometheusApi creates a new Prometheus metrics API object,
+// serving metrics to a Prometheus instance.
+func NewPrometheusApi(auth auth.Authenticator) http.Handler {
+	return &prometheusApi{
+		auth:    auth,
+		handler: metrics.PromHandler(),
+	}
+}
+
+// ServeHTTP is the http handler method.
+func (api *prometheusApi) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
+	// fail-fast: verify that this user can access this resource first
+	if !auth.HandleHttpAuthentication(api.auth, request, writer) {
+		return
+	}
+
+	// authentication successful, forward the request to the promhttp handler
+	api.handler.ServeHTTP(writer, request)
 }

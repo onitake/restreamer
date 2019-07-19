@@ -6,7 +6,7 @@
 
 HTTP transport stream proxy
 
-Copyright © 2016-2018 Gregor Riepl;
+Copyright © 2016-2019 Gregor Riepl;
 All rights reserved.
 
 Please see the LICENSE file for details on permitted use of this software.
@@ -41,10 +41,11 @@ These are the key components:
 * streaming/connection - HTTP server that feeds data to clients
 * streaming/streamer - connection broker and data queue
 * api/api - web API for service monitoring
-* api/stats - stat collector and tracker
 * streaming/proxy - static web server and proxy
 * protocol - network protocol library
 * configuration - abstraction of the configuration file
+* metrics - a small wrapper around the Promethus client library
+* metrics/stats - the old, deprecated metrics collector; use Prometheus if possible
 * cmd/restreamer - core program that glues the components together
 
 
@@ -128,6 +129,38 @@ Output can be sent to stdout or written to a log file.
 
 It is highly recommended to log to stdout and collect logs using journald
 or a similar logging engine.
+
+
+## Metrics
+
+Metrics are exported through the Prometheus client library. Enable a Prometheus
+API endpoint and expose it on /metrics to expose them.
+
+Supported metrics are:
+
+* _streaming_packets_sent_
+  Total number of MPEG-TS packets sent from the output queue.
+* _streaming_bytes_sent_
+  Total number of bytes sent from the output queue.
+* _streaming_packets_dropped_
+  Total number of MPEG-TS packets dropped from the output queue.
+* _streaming_bytes_dropped_
+  Total number of bytes dropped from the output queue.
+* _streaming_connections_
+  Number of active client connections.
+* _streaming_duration_
+  Total time spent streaming, summed over all client connections. In nanoseconds.
+* _streaming_source_connected_
+  Connection status, 0=disconnected 1=connected.
+* _streaming_packets_received_
+  Total number of MPEG-TS packets received.
+* _streaming_bytes_received_
+  Total number of bytes received.
+
+Additionally, the standard process metrics supported by the Prometheus client
+library are exported. Go runtime statistics are disabled, as they can have a
+considerable effect on realtime operation. To enable them, you need to turn on
+profiling.
 
 
 ## Optimisation

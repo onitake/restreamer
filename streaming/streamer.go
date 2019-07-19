@@ -19,11 +19,12 @@ package streaming
 import (
 	"errors"
 	"fmt"
-	"github.com/onitake/restreamer/api"
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/event"
+	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/protocol"
 	"github.com/onitake/restreamer/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"net/http"
 	"sync"
 	"time"
@@ -41,6 +42,60 @@ var (
 	// ErrPoolFull is logged when the connection pool is full.
 	ErrPoolFull = errors.New("restreamer: maximum number of active connections exceeded")
 )
+
+var (
+	metricPacketsSent = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_packets_sent",
+			Help: "Total number of MPEG-TS packets sent from the output queue.",
+		},
+		[]string{"stream"},
+	)
+	metricBytesSent = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_bytes_sent",
+			Help: "Total number of bytes sent from the output queue.",
+		},
+		[]string{"stream"},
+	)
+	metricPacketsDropped = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_packets_dropped",
+			Help: "Total number of MPEG-TS packets dropped from the output queue.",
+		},
+		[]string{"stream"},
+	)
+	metricBytesDropped = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_bytes_dropped",
+			Help: "Total number of bytes dropped from the output queue.",
+		},
+		[]string{"stream"},
+	)
+	metricConnections = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "streaming_connections",
+			Help: "Number of active client connections.",
+		},
+		[]string{"stream"},
+	)
+	metricDuration = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_duration",
+			Help: "Total time spent streaming, summed over all client connections. In nanoseconds.",
+		},
+		[]string{"stream"},
+	)
+)
+
+func init() {
+	metrics.MustRegister(metricPacketsSent)
+	metrics.MustRegister(metricBytesSent)
+	metrics.MustRegister(metricPacketsDropped)
+	metrics.MustRegister(metricBytesDropped)
+	metrics.MustRegister(metricConnections)
+	metrics.MustRegister(metricDuration)
+}
 
 // Command is one of several possible constants.
 // See StreamerCommandAdd for more information.
@@ -84,6 +139,8 @@ type ConnectionRequest struct {
 // distributing received packets on the input queue to the output queues.
 // It also handles and manages HTTP connections when added to an HTTP server.
 type Streamer struct {
+	// name is a unique name for this stream, only used for logging and metrics
+	name string
 	// lock is the outgoing connection pool lock
 	lock sync.Mutex
 	// broker is a global connection broker
@@ -95,7 +152,7 @@ type Streamer struct {
 	// If false, incoming connections are blocked.
 	running util.AtomicBool
 	// stats is the statistics collector for this stream
-	stats api.Collector
+	stats metrics.Collector
 	// request is an unbuffered queue for requests to add or remove a connection
 	request chan *ConnectionRequest
 	// events is an event receiver
@@ -121,12 +178,13 @@ type ConnectionBroker interface {
 // qsize is the length of each connection's queue (in packets).
 // broker handles policy enforcement
 // stats is a statistics collector object.
-func NewStreamer(qsize uint, broker ConnectionBroker, auth auth.Authenticator) *Streamer {
+func NewStreamer(name string, qsize uint, broker ConnectionBroker, auth auth.Authenticator) *Streamer {
 	streamer := &Streamer{
+		name:      name,
 		broker:    broker,
 		queueSize: int(qsize),
 		running:   util.AtomicFalse,
-		stats:     &api.DummyCollector{},
+		stats:     &metrics.DummyCollector{},
 		request:   make(chan *ConnectionRequest),
 		auth:      auth,
 	}
@@ -136,7 +194,7 @@ func NewStreamer(qsize uint, broker ConnectionBroker, auth auth.Authenticator) *
 }
 
 // SetCollector assigns a stats collector
-func (streamer *Streamer) SetCollector(stats api.Collector) {
+func (streamer *Streamer) SetCollector(stats metrics.Collector) {
 	streamer.stats = stats
 }
 
@@ -234,12 +292,17 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 
 						// report the packet
 						streamer.stats.PacketSent()
+						metricPacketsSent.With(prometheus.Labels{"stream": streamer.name}).Inc()
+						metricBytesSent.With(prometheus.Labels{"stream": streamer.name}).Add(protocol.MpegTsPacketSize)
+
 					default:
 						// queue is full
 						//log.Print(ErrSlowRead)
 
 						// report the drop
 						streamer.stats.PacketDropped()
+						metricPacketsDropped.With(prometheus.Labels{"stream": streamer.name}).Inc()
+						metricBytesDropped.With(prometheus.Labels{"stream": streamer.name}).Add(protocol.MpegTsPacketSize)
 					}
 				}
 			} else {
@@ -365,6 +428,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	if conn != nil {
 		// connection will be handled, report
 		streamer.stats.ConnectionAdded()
+		metricConnections.With(prometheus.Labels{"stream": streamer.name}).Inc()
 		// also notify the event queue
 		streamer.events.NotifyConnect(1)
 
@@ -398,7 +462,9 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		// and report
 		streamer.events.NotifyConnect(-1)
 		streamer.stats.ConnectionRemoved()
+		metricConnections.With(prometheus.Labels{"stream": streamer.name}).Dec()
 		streamer.stats.StreamDuration(duration)
+		metricDuration.With(prometheus.Labels{"stream": streamer.name}).Add(float64(duration))
 
 		// also notify the broker
 		streamer.broker.Release(streamer)

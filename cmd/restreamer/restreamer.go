@@ -23,8 +23,10 @@ import (
 	"github.com/onitake/restreamer/auth"
 	"github.com/onitake/restreamer/configuration"
 	"github.com/onitake/restreamer/event"
+	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
+	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"math/rand"
 	"net/http"
@@ -61,6 +63,8 @@ func main() {
 
 	if config.Profile {
 		EnableProfiling()
+		// If profiling is enabled, we also want the Go runtime metrics collector
+		metrics.DefaultRegisterer.Register(prometheus.NewGoCollector())
 	}
 
 	if config.Log != "" {
@@ -73,11 +77,11 @@ func main() {
 
 	clients := make(map[string]*streaming.Client)
 
-	var stats api.Statistics
+	var stats metrics.Statistics
 	if config.NoStats {
-		stats = &api.DummyStatistics{}
+		stats = &metrics.DummyStatistics{}
 	} else {
-		stats = api.NewStatistics(config.MaxConnections, config.FullConnections)
+		stats = metrics.NewStatistics(config.MaxConnections, config.FullConnections)
 	}
 
 	controller := streaming.NewAccessController(config.MaxConnections)
@@ -155,7 +159,7 @@ func main() {
 
 			auth := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
 
-			streamer := streaming.NewStreamer(config.OutputBuffer, controller, auth)
+			streamer := streaming.NewStreamer(streamdef.Serve, config.OutputBuffer, controller, auth)
 			streamer.SetCollector(reg)
 			streamer.SetNotifier(queue)
 
@@ -163,7 +167,7 @@ func main() {
 			// should give a bit more randomness
 			remotes := util.ShuffleStrings(rnd, streamdef.Remotes)
 
-			client, err := streaming.NewClient(remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer, streamdef.ClientInterface, config.InputBuffer, streamdef.Mru)
+			client, err := streaming.NewClient(streamdef.Serve, remotes, streamer, config.Timeout, config.Reconnect, config.ReadTimeout, config.InputBuffer, streamdef.ClientInterface, config.InputBuffer, streamdef.Mru)
 			if err == nil {
 				client.SetCollector(reg)
 				client.Connect()
@@ -255,6 +259,14 @@ func main() {
 						"message", fmt.Sprintf("Error, stream not found: %s", streamdef.Remote),
 					)
 				}
+			case "prometheus":
+				logger.Logkv(
+					"event", eventMainConfigApi,
+					"api", "prometheus",
+					"serve", streamdef.Serve,
+					"message", fmt.Sprintf("Registering Prometheus API on %s", streamdef.Serve),
+				)
+				mux.Handle(streamdef.Serve, api.NewPrometheusApi(auth))
 			default:
 				logger.Logkv(
 					"event", eventMainError,
