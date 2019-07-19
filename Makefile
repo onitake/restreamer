@@ -29,4 +29,4 @@ docker: restreamer
 	docker build -t restreamer .
 
 restreamer:
-	go build ./cmd/restreamer
+	go build -mod=vendor ./cmd/restreamer
