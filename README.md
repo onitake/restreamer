@@ -41,10 +41,11 @@ These are the key components:
 * streaming/connection - HTTP server that feeds data to clients
 * streaming/streamer - connection broker and data queue
 * api/api - web API for service monitoring
-* api/stats - stat collector and tracker
 * streaming/proxy - static web server and proxy
 * protocol - network protocol library
 * configuration - abstraction of the configuration file
+* metrics - a small wrapper around the Promethus client library
+* metrics/stats - the old, deprecated metrics collector; use Prometheus if possible
 * cmd/restreamer - core program that glues the components together
 
 
@@ -128,6 +129,38 @@ Output can be sent to stdout or written to a log file.
 
 It is highly recommended to log to stdout and collect logs using journald
 or a similar logging engine.
+
+
+## Metrics
+
+Metrics are exported through the Prometheus client library. Enable a Prometheus
+API endpoint and expose it on /metrics to expose them.
+
+Supported metrics are:
+
+* streaming_packets_sent
+  Total number of MPEG-TS packets sent from the output queue.
+* streaming_bytes_sent
+  Total number of bytes sent from the output queue.
+* streaming_packets_dropped
+  Total number of MPEG-TS packets dropped from the output queue.
+* streaming_bytes_dropped"
+  Total number of bytes dropped from the output queue.
+* streaming_connections
+  Number of active client connections.
+* streaming_duration
+  Total time spent streaming, summed over all client connections. In nanoseconds.
+* streaming_source_connected
+  Connection status, 0=disconnected 1=connected.
+* streaming_packets_received
+  Total number of MPEG-TS packets received.
+* streaming_bytes_received
+  Total number of bytes received.
+
+Additionally, the standard process metrics supported by the Prometheus client
+library are exported. Go runtime statistics are disabled, as they can have a
+considerable effect on realtime operation. To enable them, you need to turn on
+profiling.
 
 
 ## Optimisation
