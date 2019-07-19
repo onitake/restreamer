@@ -51,10 +51,24 @@ var (
 		},
 		[]string{"stream"},
 	)
+	metricBytesSent = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_bytes_sent",
+			Help: "Total number of bytes sent from the output queue.",
+		},
+		[]string{"stream"},
+	)
 	metricPacketsDropped = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "streaming_packets_dropped",
 			Help: "Total number of MPEG-TS packets dropped from the output queue.",
+		},
+		[]string{"stream"},
+	)
+	metricBytesDropped = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_bytes_dropped",
+			Help: "Total number of bytes dropped from the output queue.",
 		},
 		[]string{"stream"},
 	)
@@ -76,7 +90,9 @@ var (
 
 func init() {
 	metrics.MustRegister(metricPacketsSent)
+	metrics.MustRegister(metricBytesSent)
 	metrics.MustRegister(metricPacketsDropped)
+	metrics.MustRegister(metricBytesDropped)
 	metrics.MustRegister(metricConnections)
 	metrics.MustRegister(metricDuration)
 }
@@ -277,6 +293,7 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 						// report the packet
 						streamer.stats.PacketSent()
 						metricPacketsSent.With(prometheus.Labels{"stream": streamer.name}).Inc()
+						metricBytesSent.With(prometheus.Labels{"stream": streamer.name}).Add(protocol.MpegTsPacketSize)
 
 					default:
 						// queue is full
@@ -285,6 +302,7 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 						// report the drop
 						streamer.stats.PacketDropped()
 						metricPacketsDropped.With(prometheus.Labels{"stream": streamer.name}).Inc()
+						metricBytesDropped.With(prometheus.Labels{"stream": streamer.name}).Add(protocol.MpegTsPacketSize)
 					}
 				}
 			} else {

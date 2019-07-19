@@ -63,11 +63,19 @@ var (
 		},
 		[]string{"stream", "url"},
 	)
+	metricBytesReceived = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "streaming_bytes_received",
+			Help: "Total number of bytes received.",
+		},
+		[]string{"stream", "url"},
+	)
 )
 
 func init() {
 	metrics.MustRegister(metricSourceConnected)
 	metrics.MustRegister(metricPacketsReceived)
+	metrics.MustRegister(metricBytesReceived)
 }
 
 // connectCloser represents types that have a Connect() and a Close() method.
@@ -548,6 +556,7 @@ func (client *Client) pull(url *url.URL) error {
 				// report the packet
 				client.stats.PacketReceived()
 				metricPacketsReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Inc()
+				metricBytesReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Add(protocol.MpegTsPacketSize)
 
 				//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				//log.Printf("Got a packet (length %d)\n", len(packet))
