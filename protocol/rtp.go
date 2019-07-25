@@ -63,15 +63,34 @@ const (
 // RtpPacket represents a decoded RTP packet.
 // The header fields are dissected, while the payload is contained as a byte slice.
 type RtpPacket struct {
+	// Version contains the RTP protocol version.
+	// Only version 2 is supported.
 	Version uint8
+	// Padding is true if the packet hat the padding flag set.
+	// The extension header and/or payload is always truncated to the actual size.
 	Padding bool
+	// Marker is true if the packet hat the marker bit set.
 	Marker bool
+	// PayloadType describes the kind of data contained in the packet.
+	// See the RtpPayloadType constants for known values. Not that some ranges
+	// are dynamically assigned and must be defined by the application.
 	PayloadType RtpPayloadType
+	// SequenceNumber is a 16-bit sequence number that helps with correct ordering
+	// wen reassembling the stream.
 	SequenceNumber uint16
+	// Timestamp is an application-defined absolute timestamp that should be
+	// used as the basis for ES timestamps. It can also be ignored if the
+	// packaged protocol has sufficiently well-defined timestamps.
 	Timestamp uint32
+	// Ssrc contains the value of the SSRC field.
 	Ssrc uint32
+	// Csrc contains the values of the CSRC fields.
+	// If the packet had no CSRCs, it is an empty list (nil).
 	Csrc []uint32
+	// Extension contains the full extension header, including the length and ... fields.
 	Extension []byte
+	// Payload contains the actual data part of the packet.
+	// It is truncated to the packet size, excluding padding (if it was enabled)
 	Payload []byte
 }
 
@@ -148,6 +167,7 @@ func (r *RtpReader) ReadRtpPacket() (*RtpPacket, error) {
 		offset += 4 + xlen
 	}
 
+	// TODO truncate padding
 	p.Payload = data[offset:n]
 
 	return p, nil
