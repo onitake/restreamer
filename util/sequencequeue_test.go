@@ -22,9 +22,12 @@ import (
 
 func TestSequenceQueuePush(t *testing.T) {
 	q := NewSequenceQueue(1)
-	e := q.Insert(0, "A")
+	o, e := q.Insert(0, "A")
 	if e != nil {
-		t.Errorf("Insert returned error: %v", e)
+		t.Fatalf("Insert returned error: %v", e)
+	}
+	if o != nil {
+		t.Errorf("Old value was not nil: %v", o)
 	}
 	l := q.Length()
 	if l != 1 {
@@ -37,13 +40,19 @@ func TestSequenceQueuePush(t *testing.T) {
 
 func TestSequenceQueuePushOob(t *testing.T) {
 	q := NewSequenceQueue(1)
-	e := q.Insert(1, "A")
+	o, e := q.Insert(1, "A")
 	if e != ErrSequenceQueueOutOfBounds {
-		t.Errorf("Didn't get out of bounds error but: %v", e)
+		t.Fatalf("Didn't get out of bounds error but: %v", e)
 	}
-	e = q.Insert(-1, "B")
+	if o != nil {
+		t.Errorf("Old value was not nil: %v", o)
+	}
+	o, e = q.Insert(-1, "B")
 	if e != ErrSequenceQueueOutOfBounds {
-		t.Errorf("Didn't get out of bounds error but: %v", e)
+		t.Fatalf("Didn't get out of bounds error but: %v", e)
+	}
+	if o != nil {
+		t.Errorf("Old value was not nil: %v", o)
 	}
 	l := q.Length()
 	if l != 0 {
@@ -53,10 +62,13 @@ func TestSequenceQueuePushOob(t *testing.T) {
 
 func TestSequenceQueuePushPop(t *testing.T) {
 	q := NewSequenceQueue(1)
-	e := q.Insert(0, "A")
+	o, e := q.Insert(0, "A")
 	if e != nil {
 		t.Logf("head=%d tail=%d length=%d", q.head, q.tail, q.length)
-		t.Errorf("Insert returned error: %v", e)
+		t.Fatalf("Insert returned error: %v", e)
+	}
+	if o != nil {
+		t.Errorf("Old value was not nil: %v", o)
 	}
 	r, e := q.Pop()
 	if e != nil {
@@ -70,24 +82,30 @@ func TestSequenceQueuePushPop(t *testing.T) {
 
 func TestSequenceQueuePushOccupied(t *testing.T) {
 	q := NewSequenceQueue(1)
-	e := q.Insert(0, "A")
+	o, e := q.Insert(0, "A")
 	if e != nil {
 		t.Logf("head=%d tail=%d length=%d", q.head, q.tail, q.length)
-		t.Errorf("Insert returned error: %v", e)
+		t.Fatalf("Insert returned error: %v", e)
 	}
-	e = q.Insert(0, "A")
-	if e != ErrSequenceQueueOccupied {
-		t.Fatalf("Got nil instead of error")
+	if o != nil {
+		t.Errorf("Old value was not nil: %v", o)
+	}
+	o, e = q.Insert(0, "A")
+	if o == nil {
+		t.Errorf("Old value was nil")
 	}
 }
 
 func TestSequenceQueuePushMutiple(t *testing.T) {
 	q := NewSequenceQueue(10)
 	for i := 0; i < 10; i++ {
-		e := q.Insert(i, i)
+		o, e := q.Insert(i, i)
 		if e != nil {
 			t.Logf("head=%d tail=%d length=%d", q.head, q.tail, q.length)
-			t.Errorf("Insert returned error: %v", e)
+			t.Fatalf("Insert returned error: %v", e)
+		}
+		if o != nil {
+			t.Errorf("Old value was not nil: %v", o)
 		}
 	}
 	for i := 0; i < 10; i++ {
@@ -109,16 +127,19 @@ func TestSequenceQueuePushMutiple(t *testing.T) {
 func TestSequenceQueuePushReverse(t *testing.T) {
 	q := NewSequenceQueue(10)
 	for i := 9; i >= 0; i-- {
-		e := q.Insert(i, i)
+		o, e := q.Insert(i, i)
 		if e != nil {
 			t.Logf("head=%d tail=%d length=%d", q.head, q.tail, q.length)
-			t.Errorf("Insert returned error: %v", e)
+			t.Fatalf("Insert returned error: %v", e)
+		}
+		if o != nil {
+			t.Errorf("Old value was not nil: %v", o)
 		}
 		if i != 0 {
-			r, e := q.Pop()
-			if e != ErrSequenceQueueSlotEmpty {
+			r, e := q.Peek()
+			if e != nil {
 				t.Logf("head=%d tail=%d length=%d", q.head, q.tail, q.length)
-				t.Fatalf("Expected empty slot at head, got: %v", e)
+				t.Fatalf("Insert returned error: %v", e)
 			}
 			if r != nil {
 				t.Errorf("Got value: %v expected: %v", r, nil)

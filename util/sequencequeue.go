@@ -22,9 +22,7 @@ import (
 
 var (
 	ErrSequenceQueueEmpty = errors.New("Queue is empty")
-	ErrSequenceQueueOccupied = errors.New("Queue position is already occupied")
 	ErrSequenceQueueOutOfBounds = errors.New("Insert index out of bounds")
-	ErrSequenceQueueSlotEmpty = errors.New("Queue slot is empty")
 )
 
 type SequenceQueue struct {
@@ -44,9 +42,9 @@ func (f *SequenceQueue) Length() int {
 	return f.length
 }
 
-func (f *SequenceQueue) Insert(position int, value interface{}) error {
+func (f *SequenceQueue) Insert(position int, value interface{}) (old interface{}, err error) {
 	if position < 0 || position >= len(f.queue) {
-		return ErrSequenceQueueOutOfBounds
+		return nil, ErrSequenceQueueOutOfBounds
 	}
 	index := (f.head + position) % len(f.queue)
 	if position >= f.length {
@@ -54,13 +52,17 @@ func (f *SequenceQueue) Insert(position int, value interface{}) error {
 		f.tail = (index + 1) % len(f.queue)
 		f.length = position + 1
 	} else {
-		if f.queue[index] == nil {
-			f.queue[index] = value
-		} else {
-			return ErrSequenceQueueOccupied
-		}
+		old = f.queue[index]
+		f.queue[index] = value
 	}
-	return nil
+	return old, nil
+}
+
+func (f *SequenceQueue) Peek() (interface{}, error) {
+	if f.length == 0 {
+		return nil, ErrSequenceQueueEmpty
+	}
+	return f.queue[f.head], nil
 }
 
 func (f *SequenceQueue) Pop() (interface{}, error) {
@@ -68,9 +70,6 @@ func (f *SequenceQueue) Pop() (interface{}, error) {
 		return nil, ErrSequenceQueueEmpty
 	}
 	ret := f.queue[f.head]
-	if ret == nil {
-		return nil, ErrSequenceQueueSlotEmpty
-	}
 	f.queue[f.head] = nil
 	f.head = (f.head + 1) % len(f.queue)
 	f.length--
