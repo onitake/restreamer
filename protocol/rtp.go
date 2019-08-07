@@ -94,7 +94,7 @@ type RtpPacket struct {
 	Payload []byte
 }
 
-// RtpReader is packet reader on top of an underlying standard reader.
+// RtpReader is a packet reader on top of an underlying standard reader.
 // It has a configurable maximum packet size.
 type RtpReader struct {
 	// Reader is the underlying I/O facility
@@ -129,15 +129,21 @@ func (r *RtpReader) ReadRtpPacket() (*RtpPacket, error) {
 		return nil, ErrInvalidRtpPacketSize
 	}
 
-	p.Version = data[0] & 0x03
+	p.Version = (data[0] & 0xc0) >> 6
 	if p.Version != 2 {
+		logger.Logkv(
+			"event", "error",
+			"error", "rtp_version",
+			"version", p.Version,
+			"message", "Invalid RTP version",
+		)
 		return nil, ErrInvalidRtpVersion
 	}
-	p.Padding = data[0] & 0x04 != 0
-	p.Marker = data[0] & 0x80 != 0
+	p.Padding = data[0] & 0x20 != 0
+	p.Marker = data[1] & 0x80 != 0
 
-	extension := data[0] & 0x08 != 0
-	csrcc := int((data[0] & 0x70) >> 4)
+	extension := data[0] & 0x10 != 0
+	csrcc := int(data[0] & 0x0f)
 	xhlen := 0
 	if extension {
 		xhlen = 4
