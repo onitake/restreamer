@@ -53,7 +53,7 @@ func (manager *StateManager) Unregister(channel chan<- bool) {
 
 // Sends a state change to all registered notification channels and clears the list.
 func (manager *StateManager) Notify() {
-	for notifiable, _ := range manager.notifiables {
+	for notifiable := range manager.notifiables {
 		notifiable <- true
 	}
 	manager.notifiables = make(map[chan<- bool]bool)

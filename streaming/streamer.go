@@ -284,7 +284,7 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 				//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				//log.Printf("Got packet (length %d)\n", len(packet))
 
-				for conn, _ := range pool {
+				for conn := range pool {
 					select {
 					case conn.Queue <- packet:
 						// packet distributed, done
@@ -348,7 +348,7 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 				)
 				inhibit = true
 				// close all downstream connections
-				for conn, _ := range pool {
+				for conn := range pool {
 					close(conn.Queue)
 				}
 				// TODO implement inhibit in the check api
@@ -374,10 +374,10 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 	}
 
 	// clean up
-	for _ = range queue {
+	for range queue {
 		// drain any leftovers
 	}
-	for conn, _ := range pool {
+	for conn := range pool {
 		close(conn.Queue)
 	}
 
@@ -449,7 +449,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			Connection: conn,
 		}
 		// and drain the queue AFTER we have sent the shutdown signal
-		for _ = range conn.Queue {
+		for range conn.Queue {
 			// drain any leftovers
 		}
 		logger.Logkv(

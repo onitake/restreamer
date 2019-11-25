@@ -81,7 +81,7 @@ func TestConfig03(t *testing.T) {
 func TestConfig04(t *testing.T) {
 	t04 := DefaultConfiguration()
 	t04.Resources = []Resource{
-		Resource{
+		{
 			Type: "stream",
 			Remotes: []string{
 				"t04",
@@ -107,7 +107,7 @@ func TestConfig04(t *testing.T) {
 
 	t04b := DefaultConfiguration()
 	t04b.Resources = []Resource{
-		Resource{
+		{
 			Type:   "api",
 			Remote: "t04b",
 			Mru:    1500,
@@ -133,7 +133,7 @@ func TestConfig04(t *testing.T) {
 func TestConfig05(t *testing.T) {
 	t05 := DefaultConfiguration()
 	t05.Resources = []Resource{
-		Resource{
+		{
 			Authentication: Authentication{
 				Type: "basic",
 				Users: []string{

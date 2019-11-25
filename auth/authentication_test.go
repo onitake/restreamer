@@ -58,7 +58,7 @@ func TestBasicAuthenticator01(t *testing.T) {
 		user,
 	}
 	cred := map[string]configuration.UserCredentials{
-		user: configuration.UserCredentials{
+		user: {
 			Password: password,
 		},
 	}
@@ -75,7 +75,7 @@ func TestBasicAuthenticator02(t *testing.T) {
 	realm := "Test Realm"
 	whitelist := []string{}
 	cred := map[string]configuration.UserCredentials{
-		user: configuration.UserCredentials{
+		user: {
 			Password: password,
 		},
 	}
