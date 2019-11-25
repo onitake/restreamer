@@ -1,4 +1,4 @@
-[![language](https://img.shields.io/badge/language-go-%2300ADD8.svg?style=flat-square)](https://golang.org/) [![release](https://img.shields.io/github/release/onitake/restreamer.svg?style=flat-square)](https://github.com/onitake/restreamer/releases) [![](https://img.shields.io/travis/onitake/restreamer.svg?style=flat-square)](https://travis-ci.org/onitake/restreamer)
+[![language](https://img.shields.io/badge/language-go-%2300ADD8.svg?style=flat-square)](https://golang.org/) [![release](https://img.shields.io/github/release/onitake/restreamer.svg?style=flat-square)](https://github.com/onitake/restreamer/releases) [![buildstatus](https://img.shields.io/travis/onitake/restreamer.svg?style=flat-square)](https://travis-ci.org/onitake/restreamer) [![goreport](https://goreportcard.com/badge/github.com/onitake/restreamer)](https://goreportcard.com/report/github.com/onitake/restreamer)
 
 ![restreamer logo](doc/logo.png)
 
