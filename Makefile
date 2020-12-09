@@ -2,8 +2,6 @@
 #export GODEBUG = gctrace=1
 # use go netcode instead of libc
 export CGO_ENABLED = 0
-# enforce using gomod
-export GO111MODULE = on
 
 PACKAGE:=github.com/onitake/restreamer
 
@@ -20,10 +18,6 @@ test:
 
 fmt:
 	go fmt $(PACKAGE)/...
-
-vendor:
-	go mod tidy
-	go mod vendor
 
 docker: restreamer
 	docker build -t restreamer .
