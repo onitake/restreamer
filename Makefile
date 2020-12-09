@@ -3,8 +3,6 @@
 # use go netcode instead of libc
 export CGO_ENABLED = 0
 
-PACKAGE:=github.com/onitake/restreamer
-
 # always force a rebuild of the main binary
 .PHONY: all clean test fmt vendor docker restreamer
 
@@ -14,13 +12,13 @@ clean:
 	rm -rf restreamer
 
 test:
-	go test $(PACKAGE)/...
+	go test ./...
 
 fmt:
-	go fmt $(PACKAGE)/...
+	go fmt ./...
 
-docker: restreamer
-	docker build -t restreamer .
+docker:
+	docker build -t onitake/restreamer .
 
 restreamer:
 	go build ./cmd/restreamer
