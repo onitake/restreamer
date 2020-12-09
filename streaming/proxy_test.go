@@ -24,15 +24,24 @@ import (
 	"net/http"
 	"net/url"
 	"testing"
+	"time"
 )
 
 type mockProxyLogger struct {
-	t *testing.T
+	t      *testing.T
+	Closed chan bool
 }
 
 func (l *mockProxyLogger) Logd(lines ...util.Dict) {
+	shutdown := false
 	for _, line := range lines {
 		l.t.Logf("%v", line)
+		if line["event"] == eventProxyOffline {
+			shutdown = true
+		}
+	}
+	if shutdown {
+		l.Closed <- true
 	}
 }
 
@@ -69,7 +78,8 @@ func (writer *MockWriter) WriteHeader(status int) {
 	writer.log.Log(writer.header)
 }
 
-func testWithProxy(t *testing.T, proxy *Proxy) {
+func testWithProxy(t *testing.T, l *mockProxyLogger, proxy *Proxy) {
+	logger = l
 	writer := newMockWriter(t)
 	writer.log = t
 	uri, _ := url.ParseRequestURI("http://host/test.txt")
@@ -84,18 +94,24 @@ func testWithProxy(t *testing.T, proxy *Proxy) {
 	proxy.Start()
 	proxy.ServeHTTP(writer, request)
 	proxy.Shutdown()
+	select {
+	case <-l.Closed:
+		if len(l.Closed) > 0 {
+			t.Fatalf("Multiple shutdown messages received")
+		}
+	case <-time.After(5 * time.Second):
+		t.Errorf("Timeout waiting for proxy shutdown")
+	}
 }
 
 func TestProxy(t *testing.T) {
-	l := &mockProxyLogger{t}
+	l := &mockProxyLogger{t, make(chan bool)}
 
 	auth := auth.NewAuthenticator(configuration.Authentication{}, nil)
 
 	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0, auth)
-	logger = l
-	testWithProxy(t, direct)
+	testWithProxy(t, l, direct)
 
 	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1, auth)
-	logger = l
-	testWithProxy(t, cached)
+	testWithProxy(t, l, cached)
 }
