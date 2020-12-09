@@ -120,8 +120,8 @@ func TestModuleLogger00(t *testing.T) {
 	if m00.lines[0]["a"] != "b" {
 		t.Errorf("Didn't find test key in log line")
 	}
-	if len(m00.lines[0][KeyTime].(string)) < 24 {
-		t.Errorf("Missing or invalid time key: %v", m00.lines[0][KeyTime])
+	if len(m00.lines[0][KeyTime].(string)) < 20 {
+		t.Errorf("Missing time key, or formatted time too short")
 	}
 }
 
