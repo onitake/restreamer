@@ -380,7 +380,19 @@ func (client *Client) start(url *url.URL) error {
 				"path", url.Path,
 				"message", fmt.Sprintf("Opening %s.", url.Path),
 			)
-			file, err := os.Open(url.Path)
+			// prevent blocking on opening named pipes for reading.
+			//
+			// O_NONBLOCK is not portable, but should work at least on POSIX-compliant systems.
+			// we'd still need to reset back to blocking I/O once the file is open.
+			// O_RDWR without O_NONBLOCK will also work, according to POSIX semantics.
+			// since we never write to the pipe, this shouldn't cause problems.
+			// and non-POSIX systems probably don't support named pipes well anyway, so YMMV.
+			//
+			// see: https://pubs.opengroup.org/onlinepubs/007908799/xsh/open.html
+			// and: https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
+			//file, err := os.OpenFile(url.Path, syscall.O_RDONLY | syscall.O_NONBLOCK, 0666)
+			//syscall.SetNonblock(file.Fd(), false)
+			file, err := os.OpenFile(url.Path, os.O_RDWR, 0666)
 			if err != nil {
 				return err
 			}
