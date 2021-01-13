@@ -31,6 +31,10 @@ import (
 	"time"
 )
 
+const (
+	defaultPacketQueueSize int = 16
+)
+
 var (
 	// ErrInvalidProtocol is thrown when an invalid protocol was specified.
 	// See the docs and example config for a list of supported protocols.
@@ -152,6 +156,8 @@ type Client struct {
 	readBufferSize int
 	// packetSize defines the size of individual datagram packets (UDP)
 	packetSize int
+	// packetQueueSize defines the number of RTP packets to buffer for sequence reordering
+	packetQueueSize int
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -237,6 +243,7 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 		interf:         pintf,
 		readBufferSize: int(bufferSize * protocol.MpegTsPacketSize),
 		packetSize:     int(packetSize),
+		packetQueueSize: defaultPacketQueueSize,
 	}
 	return &client, nil
 }
@@ -475,6 +482,37 @@ func (client *Client) start(url *url.URL) error {
 			}
 			conn.SetReadBuffer(client.readBufferSize)
 			client.input = protocol.NewFixedReader(conn, client.packetSize)
+		case "rtp":
+			addr, err := net.ResolveUDPAddr("udp", url.Host)
+			if err != nil {
+				return err
+			}
+			var conn *net.UDPConn
+			if addr.IP.IsMulticast() {
+				logger.Logkv(
+					"event", eventClientOpenUdpMulticast,
+					"address", addr,
+					"message", fmt.Sprintf("Joining UDP multicast group %s on interface %v.", url.Host, client.interf),
+				)
+				var err error
+				conn, err = net.ListenMulticastUDP("udp", client.interf, addr)
+				if err != nil {
+					return err
+				}
+			} else {
+				logger.Logkv(
+					"event", eventClientOpenUdp,
+					"address", addr,
+					"message", fmt.Sprintf("Connecting to UDP address %s.", addr),
+				)
+				var err error
+				conn, err = net.ListenUDP("udp", addr)
+				if err != nil {
+					return err
+				}
+			}
+			conn.SetReadBuffer(client.readBufferSize)
+			client.input = protocol.NewRtpBridge(conn, client.packetSize, client.packetQueueSize)
 		default:
 			return ErrInvalidProtocol
 		}
