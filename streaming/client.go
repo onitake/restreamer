@@ -152,6 +152,8 @@ type Client struct {
 	readBufferSize int
 	// packetSize defines the size of individual datagram packets (UDP)
 	packetSize int
+	// promCounter allows enabling/disabling Prometheus packet metrics.
+	promCounter bool
 }
 
 // NewClient constructs a new streaming HTTP client, without connecting the socket yet.
@@ -567,8 +569,10 @@ func (client *Client) pull(url *url.URL) error {
 
 				// report the packet
 				client.stats.PacketReceived()
-				metricPacketsReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Inc()
-				metricBytesReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Add(protocol.MpegTsPacketSize)
+				if client.promCounter {
+					metricPacketsReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Inc()
+					metricBytesReceived.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Add(protocol.MpegTsPacketSize)
+				}
 
 				//log.Printf("Got a packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				//log.Printf("Got a packet (length %d)\n", len(packet))
