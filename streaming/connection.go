@@ -86,7 +86,7 @@ func (conn *Connection) Close() error {
 // Serve starts serving data to a client, continuously feeding packets from the queue.
 // An optional preamble buffer can be passed that will be sent before streaming the live payload
 // (but after the HTTP response headers).
-func (conn *Connection) Serve(preamble []byte) {
+func (conn *Connection) Serve(preamble []byte) bool {
 	// set the content type (important)
 	conn.writer.Header().Set("Content-Type", "video/mpeg")
 	// a stream is always current

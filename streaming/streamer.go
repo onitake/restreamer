@@ -352,6 +352,9 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 				// close all downstream connections
 				for conn := range pool {
 					conn.Close()
+					// avoid waiting for the removal round-trip, this will make us less racy
+					// double deletes are safe, so nothing bad will happen when we do get the remove command later
+					delete(pool, request.Connection)
 				}
 				// TODO implement inhibit in the check api
 			case StreamerCommandAllow:
@@ -441,6 +444,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			"remote", request.RemoteAddr,
 		)
 
+		// here's where the action happens
 		start := time.Now()
 		conn.Serve(streamer.preamble)
 		duration := time.Since(start)
