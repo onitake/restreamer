@@ -80,7 +80,9 @@ func (conn *Connection) Close() error {
 }
 
 // Serve starts serving data to a client, continuously feeding packets from the queue.
-func (conn *Connection) Serve() {
+// The context argument is used to react to Done() status - you should pass the request's Context() object here.
+// Returns true if we exited because the queue was closed, false if the external connection was closed instead.
+func (conn *Connection) Serve(ctx context.Context) bool {
 	// set the content type (important)
 	conn.writer.Header().Set("Content-Type", "video/mpeg")
 	// a stream is always current
@@ -107,16 +109,6 @@ func (conn *Connection) Serve() {
 		"event", eventHeaderSent,
 		"message", "Sent header",
 	)
-
-	// see if can get notified about connection closure
-	notifier, ok := conn.writer.(http.CloseNotifier)
-	if !ok {
-		logger.Logkv(
-			"event", eventConnectionError,
-			"error", errorConnectionNoCloseNotify,
-			"message", "Writer does not support CloseNotify",
-		)
-	}
 
 	// this is the exit status indicator
 	qclosed := false
@@ -151,7 +143,7 @@ func (conn *Connection) Serve() {
 				// indicate that the queue was closed
 				qclosed = true
 			}
-		case <-notifier.CloseNotify():
+		case <-ctx.Done():
 			// connection closed while we were waiting for more data
 			logger.Logkv(
 				"event", eventConnectionClosedWait,
