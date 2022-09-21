@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -101,20 +102,21 @@ func (*dummyConnectCloser) Connect() error {
 // Client implements a streaming HTTP client with failover support.
 //
 // Logging specification:
-// {
-//   "time": 1234 | unix timestamp in UTCS,
-//   "module": "client",
-//   "event": "" | error or upstream-connect or upstream-disconnect or upstream-loss or upstream-timeout or upstream-offline or client-streaming or client-stopped,
-//   when event=error:
-//     "error": "error-name"
-//     "error-specific key": "error-specific data"
-//   when event=retry:
-//     "retry: "99999" | seconds until retry
-//   when event=upstream-*:
-//     "url": "http://upstream/url" | upstream stream URL,
-//   when event=client-*:
-//     "client": "1.2.3.4:12" | client ip:port,
-// }
+//
+//	{
+//	  "time": 1234 | unix timestamp in UTCS,
+//	  "module": "client",
+//	  "event": "" | error or upstream-connect or upstream-disconnect or upstream-loss or upstream-timeout or upstream-offline or client-streaming or client-stopped,
+//	  when event=error:
+//	    "error": "error-name"
+//	    "error-specific key": "error-specific data"
+//	  when event=retry:
+//	    "retry: "99999" | seconds until retry
+//	  when event=upstream-*:
+//	    "url": "http://upstream/url" | upstream stream URL,
+//	  when event=client-*:
+//	    "client": "1.2.3.4:12" | client ip:port,
+//	}
 type Client struct {
 	// name is a unique name for this stream, only used for logging and metrics
 	name string
@@ -164,16 +166,17 @@ type Client struct {
 // a reconnect will be attempted immediately.
 //
 // Arguments:
-//   name: a unique name for this streaming client, used for metrics and logging
-//   uris: a list of upstream URIs, used in random order
-//   queue: the outgoing packet queue
-//   timeout: the connect timeout
-//   reconnect: the minimal reconnect delay
-//   readtimeout: the read timeout
-//   qsize: the input queue size
-//   intf: the network interface to create multicast connections on
-//   bufferSize: the UDP socket receive buffer size
-//   packetSize: the UDP packet size
+//
+//	name: a unique name for this streaming client, used for metrics and logging
+//	uris: a list of upstream URIs, used in random order
+//	queue: the outgoing packet queue
+//	timeout: the connect timeout
+//	reconnect: the minimal reconnect delay
+//	readtimeout: the read timeout
+//	qsize: the input queue size
+//	intf: the network interface to create multicast connections on
+//	bufferSize: the UDP socket receive buffer size
+//	packetSize: the UDP packet size
 func NewClient(name string, uris []string, streamer *Streamer, timeout uint, reconnect uint, readtimeout uint, qsize uint, intf string, bufferSize uint, packetSize uint) (*Client, error) {
 	urls := make([]*url.URL, len(uris))
 	count := 0
@@ -210,11 +213,10 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 	dialer := &net.Dialer{
 		Timeout:   toduration,
 		KeepAlive: 0,
-		DualStack: true,
 	}
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
-		Dial:                  dialer.Dial,
+		DialContext:           dialer.DialContext,
 		DisableKeepAlives:     true,
 		TLSHandshakeTimeout:   toduration,
 		ResponseHeaderTimeout: toduration,
@@ -365,22 +367,22 @@ func (client *Client) loop() {
 }
 
 // start connects the socket, sends the HTTP request and starts streaming.
-func (client *Client) start(url *url.URL) error {
+func (client *Client) start(urly *url.URL) error {
 	/*client.logger.Logkv(
 		"event", eventClientDebug,
 		"debug", map[string]interface{}{
 			"timeout": client.Timeout,
 		},
-		"url": url.String(),
+		"urly": urly.String(),
 	)*/
 	if client.input == nil {
-		switch url.Scheme {
+		switch urly.Scheme {
 		// handled by os.Open
 		case "file":
 			logger.Logkv(
 				"event", eventClientOpenPath,
-				"path", url.Path,
-				"message", fmt.Sprintf("Opening %s.", url.Path),
+				"path", urly.Path,
+				"message", fmt.Sprintf("Opening %s.", urly.Path),
 			)
 			// prevent blocking on opening named pipes for reading.
 			//
@@ -392,9 +394,9 @@ func (client *Client) start(url *url.URL) error {
 			//
 			// see: https://pubs.opengroup.org/onlinepubs/007908799/xsh/open.html
 			// and: https://pubs.opengroup.org/onlinepubs/9699919799/functions/write.html
-			//file, err := os.OpenFile(url.Path, syscall.O_RDONLY | syscall.O_NONBLOCK, 0666)
+			//file, err := os.OpenFile(urly.Path, syscall.O_RDONLY | syscall.O_NONBLOCK, 0666)
 			//syscall.SetNonblock(file.Fd(), false)
-			file, err := os.OpenFile(url.Path, os.O_RDWR, 0666)
+			file, err := os.OpenFile(urly.Path, os.O_RDWR, 0666)
 			if err != nil {
 				return err
 			}
@@ -405,10 +407,10 @@ func (client *Client) start(url *url.URL) error {
 		case "https":
 			logger.Logkv(
 				"event", eventClientOpenHttp,
-				"url", url.String(),
-				"message", fmt.Sprintf("Connecting to %s.", url),
+				"urly", urly.String(),
+				"message", fmt.Sprintf("Connecting to %s.", urly),
 			)
-			request, err := http.NewRequest("GET", url.String(), nil)
+			request, err := http.NewRequest("GET", urly.String(), nil)
 			if err != nil {
 				return err
 			}
@@ -422,10 +424,10 @@ func (client *Client) start(url *url.URL) error {
 		case "tcp":
 			logger.Logkv(
 				"event", eventClientOpenTcp,
-				"host", url.Host,
-				"message", fmt.Sprintf("Connecting TCP socket to %s.", url.Host),
+				"host", urly.Host,
+				"message", fmt.Sprintf("Connecting TCP socket to %s.", urly.Host),
 			)
-			conn, err := client.connector.Dial(url.Scheme, url.Host)
+			conn, err := client.connector.Dial(urly.Scheme, urly.Host)
 			if err != nil {
 				return err
 			}
@@ -438,16 +440,16 @@ func (client *Client) start(url *url.URL) error {
 		case "unixpacket":
 			logger.Logkv(
 				"event", eventClientOpenDomain,
-				"path", url.Path,
-				"message", fmt.Sprintf("Connecting domain socket to %s.", url.Path),
+				"path", urly.Path,
+				"message", fmt.Sprintf("Connecting domain socket to %s.", urly.Path),
 			)
-			conn, err := client.connector.Dial(url.Scheme, url.Path)
+			conn, err := client.connector.Dial(urly.Scheme, urly.Path)
 			if err != nil {
 				return err
 			}
 			client.input = conn
 		case "udp":
-			addr, err := net.ResolveUDPAddr("udp", url.Host)
+			addr, err := net.ResolveUDPAddr("udp", urly.Host)
 			if err != nil {
 				return err
 			}
@@ -456,7 +458,7 @@ func (client *Client) start(url *url.URL) error {
 				logger.Logkv(
 					"event", eventClientOpenUdpMulticast,
 					"address", addr,
-					"message", fmt.Sprintf("Joining UDP multicast group %s on interface %v.", url.Host, client.interf),
+					"message", fmt.Sprintf("Joining UDP multicast group %s on interface %v.", urly.Host, client.interf),
 				)
 				var err error
 				conn, err = net.ListenMulticastUDP("udp", client.interf, addr)
@@ -475,8 +477,38 @@ func (client *Client) start(url *url.URL) error {
 					return err
 				}
 			}
-			conn.SetReadBuffer(client.readBufferSize)
+			if err := conn.SetReadBuffer(client.readBufferSize); err != nil {
+				logger.Logkv(
+					"event", eventClientError,
+					"error", errorClientSetBufferSize,
+					"address", addr,
+					"message", fmt.Sprintf("Error setting read buffer size: %v (ignored)", err),
+				)
+			}
 			client.input = protocol.NewFixedReader(conn, client.packetSize)
+		case "fork":
+			command := urly.Hostname()
+			arguments, err := url.QueryUnescape(urly.RawQuery)
+			if err != nil {
+				return err
+			}
+			logger.Logkv(
+				"event", eventClientOpenFork,
+				"command", command,
+				"arguments", arguments,
+				"message", fmt.Sprintf("Executing command source: %s %s", command, arguments),
+			)
+			// FIXME This assumes none of the command line arguments contain spaces.
+			// To support arbitrary command lines and, in particular, shell commands, we need to find a different way
+			// to separate individual arguments. For example, we could use a query list with the arguments as
+			// keys and empty values. Or, we could simply use a "arg" key and specify it multiple times.
+			// url.Values object is a multimap, after all.
+			arglist := strings.Split(arguments, " ")
+			cmd, err := protocol.NewForkReader(command, arglist)
+			if err != nil {
+				return err
+			}
+			client.input = cmd
 		default:
 			return ErrInvalidProtocol
 		}
@@ -485,14 +517,14 @@ func (client *Client) start(url *url.URL) error {
 		util.StoreBool(&client.running, true)
 		logger.Logkv(
 			"event", eventClientPull,
-			"url", url.String(),
-			"message", fmt.Sprintf("Starting to pull stream %s.", url),
+			"urly", urly.String(),
+			"message", fmt.Sprintf("Starting to pull stream %s.", urly),
 		)
-		err := client.pull(url)
+		err := client.pull(urly)
 		logger.Logkv(
 			"event", eventClientClosed,
-			"url", url.String(),
-			"message", fmt.Sprintf("Socket for stream %s closed", url),
+			"urly", urly.String(),
+			"message", fmt.Sprintf("Socket for stream %s closed", urly),
 		)
 
 		// cleanup
