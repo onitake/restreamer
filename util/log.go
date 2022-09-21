@@ -85,7 +85,7 @@ type Logger interface {
 	// Example usage:
 	//   logger.Logd(Dict{ "key": "value" }, Dict{ "key": "value2" })
 	Logd(lines ...Dict)
-	// Log is a convenience function that sends a single log line to the logger.
+	// Logkv is a convenience function that sends a single log line to the logger.
 	// The arguments are alternating key -> value pairs that are assembled into a dictionary.
 	//
 	// This function is slightliy easier to use in many cases, because it doesn't require
