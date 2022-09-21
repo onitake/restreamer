@@ -28,6 +28,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -485,6 +486,29 @@ func (client *Client) start(urly *url.URL) error {
 				)
 			}
 			client.input = protocol.NewFixedReader(conn, client.packetSize)
+		case "fork":
+			command := urly.Hostname()
+			arguments, err := url.QueryUnescape(urly.RawQuery)
+			if err != nil {
+				return err
+			}
+			logger.Logkv(
+				"event", eventClientOpenFork,
+				"command", command,
+				"arguments", arguments,
+				"message", fmt.Sprintf("Executing command source: %s %s", command, arguments),
+			)
+			// FIXME This assumes none of the command line arguments contain spaces.
+			// To support arbitrary command lines and, in particular, shell commands, we need to find a different way
+			// to separate individual arguments. For example, we could use a query list with the arguments as
+			// keys and empty values. Or, we could simply use a "arg" key and specify it multiple times.
+			// url.Values object is a multimap, after all.
+			arglist := strings.Split(arguments, " ")
+			cmd, err := protocol.NewForkReader(command, arglist)
+			if err != nil {
+				return err
+			}
+			client.input = cmd
 		default:
 			return ErrInvalidProtocol
 		}

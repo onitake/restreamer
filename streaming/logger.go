@@ -52,6 +52,7 @@ const (
 	eventClientReadTimeout      = "read_timeout"
 	eventClientOpenUdp          = "open_udp"
 	eventClientOpenUdpMulticast = "open_multicast"
+	eventClientOpenFork         = "open_fork"
 	//
 	errorClientConnect       = "connect"
 	errorClientParse         = "parse"
