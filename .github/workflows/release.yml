@@ -66,4 +66,4 @@ jobs:
         with:
           tag: ${{ steps.release_version.outputs.version }}
           create_release: true
-          release_name: "restreamer ${{ steps.release_version.outputs.version }}"
+          release_name: ${{ steps.release_version.outputs.version }}
