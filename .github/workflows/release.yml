@@ -59,7 +59,7 @@ jobs:
         # remove the leading v (if present) and match the relaxed SemVer part
         run: |
           export release_version=$(echo ${{ github.ref_name }} | sed -E 's/^v?(([0-9]+.)*[0-9]+)/\1/')
-          echo ::set-output name=version::$release_version
+          echo "version=${release_version}" >> "${GITHUB_OUTPUT}"
 
       - name: Create GitHub release
         uses: swisstxt/github-action-release-artifacts@main
