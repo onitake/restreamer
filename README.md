@@ -78,6 +78,20 @@ make GOOS=windows GOARCH=amd64
 You can also use `make test` to run the test suite, or `make fmt` to run `go fmt` on all sources.
 
 
+## Releases
+
+Release builds are automatically done by a GitHub Action whenever a tag is pushed.
+
+Make sure that your tags conform to semantic versioning and begin with a "v". 
+Example: v0.9.1
+
+Note: The release upload my sometimes fail due to issues with the GitHub asset API.
+Retry the release step until all artifacts have been uploaded.
+
+Once the upload is complete, open the newly generated release and add the changelog
+to the description.
+
+
 ## Configuration
 
 All configuration is done through a configuration file named `restreamer.json`.
