@@ -17,6 +17,7 @@ clean:
 	rm -rf restreamer ${RELEASE_BINARIES}
 
 test:
+	go vet ./...
 	go test ./...
 
 fmt:
