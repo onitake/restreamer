@@ -27,8 +27,8 @@ jobs:
       - name: Build
         run: make
 
-  build:
-    name: Release build and run unit tests with Go 1.19
+  test-release:
+    name: Build and run unit tests with Go 1.19
     runs-on: ubuntu-latest
     steps:
 
@@ -40,16 +40,8 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
-      - name: Build
-        run: make release
-
       - name: Test
         run: make test
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3.1.0
-        with:
-          name: restreamer
-          path: restreamer-*
-          if-no-files-found: warn
-          retention-days: 1
+      - name: Build
+        run: make
