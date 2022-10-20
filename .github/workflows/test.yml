@@ -1,0 +1,55 @@
+name: Build and test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+
+  test-latest:
+    name: Build and run unit tests with latest Go 1.x
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1'
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: make
+
+      - name: Test
+        run: make test
+
+  build:
+    name: Release build and run unit tests with Go 1.19
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '^1.19'
+
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: make release
+
+      - name: Test
+        run: make test
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3.1.0
+        with:
+          name: restreamer
+          path: restreamer-*
+          if-no-files-found: warn
+          retention-days: 7
