@@ -21,11 +21,11 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
-      - name: Test
-        run: make test
-
       - name: Build
         run: make
+
+      - name: Test
+        run: make test
 
   test-release:
     name: Build and run unit tests with Go 1.19
@@ -40,8 +40,8 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3
 
-      - name: Test
-        run: make test
-
       - name: Build
         run: make
+
+      - name: Test
+        run: make test
