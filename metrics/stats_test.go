@@ -59,34 +59,34 @@ BytesPerSecondDropped    uint64
 Connected                bool
 */
 
-func testStatistics01(t *testing.T, s Statistics) {
+func testStatisticsStartStop(t *testing.T, s Statistics) {
 	s.Start()
 	s.Stop()
 }
 
-func testStatistics02(t *testing.T, s Statistics) {
-	s.RegisterStream("t02")
-	s.RemoveStream("t02")
+func testStatisticsRegisterRemove(t *testing.T, s Statistics) {
+	s.RegisterStream("testStatisticsRegisterRemove")
+	s.RemoveStream("testStatisticsRegisterRemove")
 }
 
-func testStatistics03(t *testing.T, s Statistics) {
-	s.RegisterStream("t03")
-	s.GetStreamStatistics("t03")
-	s.RemoveStream("t03")
+func testStatisticsRegisterGetRemove(t *testing.T, s Statistics) {
+	s.RegisterStream("testStatisticsRegisterGetRemove")
+	s.GetStreamStatistics("testStatisticsRegisterGetRemove")
+	s.RemoveStream("testStatisticsRegisterGetRemove")
 }
 
-func testStatistics04(t *testing.T, s Statistics, max, full int64) {
+func testStatisticsLimits(t *testing.T, s Statistics, max, full int64) {
 	r := s.GetGlobalStatistics()
 	if r.MaxConnections != max {
-		t.Errorf("t04: Max connection value (=%v) not matched (=%v)", r.MaxConnections, max)
+		t.Errorf("testStatisticsLimits: Max connection value (=%v) not matched (=%v)", r.MaxConnections, max)
 	}
 	if r.FullConnections != full {
-		t.Errorf("t04: Full connection value (=%v) not matched (=%v)", r.FullConnections, full)
+		t.Errorf("testStatisticsLimits: Full connection value (=%v) not matched (=%v)", r.FullConnections, full)
 	}
 }
 
-func testStatistics05(t *testing.T, s Statistics) {
-	c := s.RegisterStream("t05")
+func testStatisticsStateChange(t *testing.T, s Statistics) {
+	c := s.RegisterStream("testStatisticsStateChange")
 	s.Start()
 	<-time.After(1 * time.Second)
 	c.ConnectionAdded()
@@ -94,23 +94,23 @@ func testStatistics05(t *testing.T, s Statistics) {
 	<-time.After(1 * time.Second)
 	r := s.GetStreamStatistics("t05")
 	s.Stop()
-	t.Logf("t05: %v", r)
-	s.RemoveStream("t05")
+	t.Logf("testStatisticsStateChange: %v", r)
+	s.RemoveStream("testStatisticsStateChange")
 	if r.Connections != 1 {
-		t.Errorf("t05: Connected value (=%v) not matched (=%v)", r.Connections, 1)
+		t.Errorf("testStatisticsStateChange: Connected value (=%v) not matched (=%v)", r.Connections, 1)
 	}
 }
 
 func TestDummyStatistics(t *testing.T) {
-	testStatistics01(t, &DummyStatistics{})
-	testStatistics02(t, &DummyStatistics{})
-	testStatistics03(t, &DummyStatistics{})
+	testStatisticsStartStop(t, &DummyStatistics{})
+	testStatisticsRegisterRemove(t, &DummyStatistics{})
+	testStatisticsRegisterGetRemove(t, &DummyStatistics{})
 }
 
 func TestRealStatistics(t *testing.T) {
-	testStatistics01(t, NewStatistics(0, 0))
-	testStatistics02(t, NewStatistics(0, 0))
-	testStatistics03(t, NewStatistics(0, 0))
-	testStatistics04(t, NewStatistics(10, 20), 10, 20)
-	testStatistics05(t, NewStatistics(0, 0))
+	testStatisticsStartStop(t, NewStatistics(0, 0))
+	testStatisticsRegisterRemove(t, NewStatistics(0, 0))
+	testStatisticsRegisterGetRemove(t, NewStatistics(0, 0))
+	testStatisticsLimits(t, NewStatistics(10, 20), 10, 20)
+	testStatisticsStateChange(t, NewStatistics(0, 0))
 }
