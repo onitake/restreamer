@@ -36,28 +36,28 @@ SHA256SUMS: $(RELEASE_BINARIES)
 	sha256sum $^ > $@
 
 restreamer-linux-amd64:
-	podman run -e GOOS=linux -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=linux -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-linux-386:
-	podman run -e GOOS=linux -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=linux -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-linux-arm:
-	podman run -e GOOS=linux -e GOARCH=arm -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=linux -e GOARCH=arm -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-linux-arm64:
-	podman run -e GOOS=linux -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=linux -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-darwin-amd64:
-	podman run -e GOOS=darwin -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=darwin -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-darwin-arm64:
-	podman run -e GOOS=darwin -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=darwin -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-windows-amd64.exe:
-	podman run -e GOOS=windows -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=windows -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-windows-386.exe:
-	podman run -e GOOS=windows -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=windows -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
 
 restreamer-windows-arm64.exe:
-	podman run -e GOOS=windows -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 -ti --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	podman run -e GOOS=windows -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
