@@ -64,6 +64,6 @@ jobs:
       - name: Create GitHub release
         uses: swisstxt/github-action-release-artifacts@main
         with:
-          tag: ${{ steps.release_version.outputs.version }}
+          tag: ${{ github.ref_name }}
           create_release: true
           release_name: ${{ steps.release_version.outputs.version }}
