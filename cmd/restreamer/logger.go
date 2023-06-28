@@ -39,6 +39,7 @@ const (
 	errorMainMissingNotificationUser = "missing_notification_user"
 	errorMainMissingStreamUser       = "missing_stream_user"
 	errorMainInvalidAuthentication   = "invalid_authentication"
+	errorMainPreambleRead            = "preamble_read"
 )
 
 var logger = util.NewGlobalModuleLogger(moduleMain, nil)

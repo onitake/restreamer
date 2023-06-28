@@ -57,7 +57,9 @@ func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string
 }
 
 // Serve starts serving data to a client, continuously feeding packets from the queue.
-func (conn *Connection) Serve() {
+// An optional preamble buffer can be passed that will be sent before streaming the live payload
+// (but after the HTTP response headers).
+func (conn *Connection) Serve(preamble []byte) {
 	// set the content type (important)
 	conn.writer.Header().Set("Content-Type", "video/mpeg")
 	// a stream is always current
@@ -85,8 +87,21 @@ func (conn *Connection) Serve() {
 		"message", "Sent header",
 	)
 
-	// start reading packets
 	running := true
+
+	// send the preamble
+	if len(preamble) > 0 {
+		_, err := conn.writer.Write(preamble)
+		if err != nil {
+			logger.Logkv(
+				"event", eventConnectionClosed,
+				"message", "Downstream connection closed during preamble",
+			)
+			running = false
+		}
+	}
+
+	// start reading packets
 	for running {
 		select {
 		case packet, ok := <-conn.Queue:
