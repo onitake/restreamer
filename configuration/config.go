@@ -76,7 +76,7 @@ type Resource struct {
 	// the next PAT, PMT, SPS and PPS packets.
 	// Make sure that the format of the preamble content matches the stream, or you will end up with badly
 	// configured decoder!
-	Preamble string `json:preamble`
+	Preamble string `json:"preamble"`
 }
 
 // UserCredentials is a set of credentials for a single user
