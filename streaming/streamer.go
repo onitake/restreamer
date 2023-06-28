@@ -161,6 +161,8 @@ type Streamer struct {
 	auth auth.Authenticator
 	// promCounter allows enabling/disabling Prometheus packet metrics.
 	promCounter bool
+	// cacheSize is the number of bytes to keep in precache
+	cacheSize int
 }
 
 // ConnectionBroker represents a policy handler for new connections.
@@ -178,9 +180,10 @@ type ConnectionBroker interface {
 // NewStreamer creates a new packet streamer.
 // queue is an input packet queue.
 // qsize is the length of each connection's queue (in packets).
+// cachesize is the size of the precache buffer, in number of packets
 // broker handles policy enforcement
 // stats is a statistics collector object.
-func NewStreamer(name string, qsize uint, broker ConnectionBroker, auth auth.Authenticator) *Streamer {
+func NewStreamer(name string, cachesize uint, qsize uint, broker ConnectionBroker, auth auth.Authenticator) *Streamer {
 	streamer := &Streamer{
 		name:      name,
 		broker:    broker,
@@ -189,6 +192,7 @@ func NewStreamer(name string, qsize uint, broker ConnectionBroker, auth auth.Aut
 		stats:     &metrics.DummyCollector{},
 		request:   make(chan *ConnectionRequest),
 		auth:      auth,
+		cacheSize: int(cachesize) * protocol.MpegTsPacketSize,
 	}
 	// start the command eater
 	go streamer.eatCommands()
@@ -248,9 +252,10 @@ func (streamer *Streamer) eatCommands() {
 // This routine will block; you should run it asynchronously like this:
 //
 // queue := make(chan protocol.MpegTsPacket, inputQueueSize)
-// go func() {
-//   log.Fatal(streamer.Stream(queue))
-// }
+//
+//	go func() {
+//	  log.Fatal(streamer.Stream(queue))
+//	}
 //
 // or simply:
 //
@@ -271,6 +276,9 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 		Command: streamerCommandStart,
 	}
 
+	// prepare the precache buffer
+	precache := util.CreateSlidingWindow(streamer.cacheSize)
+
 	logger.Logkv(
 		"event", eventStreamerStart,
 		"message", "Starting streaming",
@@ -286,7 +294,10 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 				//log.Printf("Got packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
 				//log.Printf("Got packet (length %d)\n", len(packet))
 
+				precache.Put(packet)
+
 				for conn := range pool {
+
 					select {
 					case conn.Queue <- packet:
 						// packet distributed, done
@@ -338,6 +349,9 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 					)
 					pool[request.Connection] = true
 					request.Ok = true
+					// write precached data
+					// TODO maybe don't write this directly, use the queue?
+					request.Connection.writer.Write(precache.Get())
 				} else {
 					logger.Logkv(
 						"event", eventStreamerError,
