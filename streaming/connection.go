@@ -17,7 +17,9 @@
 package streaming
 
 import (
+	"context"
 	"github.com/onitake/restreamer/protocol"
+	"github.com/onitake/restreamer/util"
 	"net/http"
 	"time"
 )
@@ -27,15 +29,14 @@ import (
 // This is meant to be called directly from a ServeHTTP handler.
 // No separate thread is created.
 type Connection struct {
-	// Queue is the per-connection packet queue
-	Queue chan protocol.MpegTsPacket
+	// queue is the per-connection packet queue
+	queue chan protocol.MpegTsPacket
 	// ClientAddress is the remote client address
 	ClientAddress string
-	// the destination socket
+	// writer is the destination socket
 	writer http.ResponseWriter
-	// Closed is true if Serve was ended because of a closed channel.
-	// This is simply there to avoid a double close.
-	Closed bool
+	// closed is used to protect against double closure
+	closed util.AtomicBool
 }
 
 // NewConnection creates a new connection object.
@@ -45,15 +46,43 @@ type Connection struct {
 // and will be used for logging.
 func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) *Connection {
 	conn := &Connection{
-		Queue:         make(chan protocol.MpegTsPacket, qsize),
+		queue:         make(chan protocol.MpegTsPacket, qsize),
 		ClientAddress: clientaddr,
 		writer:        destination,
 	}
 	return conn
 }
 
+// Send writes a packet into the output queue.
+// It returns true if the packet was processed, or false if the queue was full.
+func (conn *Connection) Send(packet protocol.MpegTsPacket) bool {
+	select {
+	case conn.queue <- packet:
+		// packet distributed, done
+		//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
+		return true
+	default:
+		// queue is full
+		//log.Print(ErrSlowRead)
+		return false
+	}
+}
+
+// Close closes the queue and stops the client connection.
+// This can be called multiple times, and even asynchronously.
+func (conn *Connection) Close() error {
+	// The Go standard library recommends against using atomics if there are other means, but they are sooo handy.
+	if util.CompareAndSwapBool(&conn.closed, false, true) {
+		close(conn.queue)
+		// important: we need to set this to nil, to avoid writing
+	}
+	return nil
+}
+
 // Serve starts serving data to a client, continuously feeding packets from the queue.
-func (conn *Connection) Serve() {
+// The context argument is used to react to Done() status - you should pass the request's Context() object here.
+// Returns true if we exited because the queue was closed, false if the external connection was closed instead.
+func (conn *Connection) Serve(ctx context.Context) bool {
 	// set the content type (important)
 	conn.writer.Header().Set("Content-Type", "video/mpeg")
 	// a stream is always current
@@ -81,21 +110,13 @@ func (conn *Connection) Serve() {
 		"message", "Sent header",
 	)
 
-	// see if can get notified about connection closure
-	notifier, ok := conn.writer.(http.CloseNotifier)
-	if !ok {
-		logger.Logkv(
-			"event", eventConnectionError,
-			"error", errorConnectionNoCloseNotify,
-			"message", "Writer does not support CloseNotify",
-		)
-	}
-
+	// this is the exit status indicator
+	qclosed := false
 	// start reading packets
 	running := true
 	for running {
 		select {
-		case packet, ok := <-conn.Queue:
+		case packet, ok := <-conn.queue:
 			if ok {
 				// packet received, log
 				//log.Printf("Sending packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
@@ -119,25 +140,38 @@ func (conn *Connection) Serve() {
 					"message", "Shutting down client connection",
 				)
 				running = false
-				conn.Closed = true
+				// indicate that the queue was closed
+				qclosed = true
 			}
-		case <-notifier.CloseNotify():
+		case <-ctx.Done():
 			// connection closed while we were waiting for more data
 			logger.Logkv(
 				"event", eventConnectionClosedWait,
 				"message", "Downstream connection closed (while waiting)",
 			)
+			// stop processing events
+			// we do NOT close the queue here, this will be done when the writer completes
 			running = false
 		}
 	}
 
-	// we cannot drain the channel here, as it might not be closed yet.
-	// better let our caller handle closure and draining.
+	// we're not draining the queue yet, this will happen when Drain() is called
+	// (i.e. after the connection has been removed from the pool)
 
 	logger.Logkv(
 		"event", eventConnectionDone,
 		"message", "Streaming finished",
 	)
+
+	return qclosed
+}
+
+// Drain drains the built-in queue.
+// You should call this when all writers have been removed and the queue is closed.
+func (conn *Connection) Drain() {
+	for range conn.queue {
+		// drain any leftovers
+	}
 }
 
 // ServeStreamError returns an appropriate error response to the client.
