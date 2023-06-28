@@ -6,14 +6,14 @@ on:
 
 jobs:
   build:
-    name: Release build and run unit tests with Go 1.19
+    name: Release build and run unit tests with Go 1.20
     runs-on: ubuntu-latest
     steps:
 
       - name: Set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: '^1.19'
+          go-version: '^1.20'
 
       - name: Check out code into the Go module directory
         uses: actions/checkout@v3

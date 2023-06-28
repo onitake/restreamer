@@ -3,7 +3,7 @@
 # use go netcode instead of libc
 export CGO_ENABLED = 0
 # set the build container Go version
-GO_VERSION = 1.19
+GO_VERSION = 1.20
 
 # all release binaries to build by default
 RELEASE_BINARIES := restreamer-linux-amd64 restreamer-linux-386 restreamer-linux-arm restreamer-linux-arm64 restreamer-darwin-amd64 restreamer-darwin-arm64 restreamer-windows-amd64.exe restreamer-windows-386.exe  restreamer-windows-arm64.exe
