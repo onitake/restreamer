@@ -59,6 +59,7 @@ const (
 	errorClientInterface     = "interface"
 	errorClientSetBufferSize = "buffersize"
 	errorClientClose         = "close"
+	errorClientStream        = "stream"
 	//
 	eventConnectionDebug      = "debug"
 	eventConnectionError      = "error"

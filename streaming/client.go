@@ -606,7 +606,15 @@ func (client *Client) pull(url *url.URL) error {
 						"url", url.String(),
 					)
 					queue = make(chan protocol.MpegTsPacket, client.queueSize)
-					go client.streamer.Stream(queue)
+					go func() {
+						if err := client.streamer.Stream(queue); err != nil {
+							logger.Logkv(
+								"event", eventClientError,
+								"error", errorClientStream,
+								"message", err.Error(),
+							)
+						}
+					}()
 				}
 
 				// report the packet
