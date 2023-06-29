@@ -303,7 +303,9 @@ func (logger *FileLogger) writeLog(line interface{}) {
 		data, err := json.Marshal(line)
 		if err == nil {
 			format := fmt.Sprintf("[%s] %s\n", time.Now().Format(timeFormat), data)
-			logger.log.Write([]byte(format))
+			if _, err := logger.log.Write([]byte(format)); err != nil {
+				fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot write log line to file\",\"line\":\"%v\",\"goerror\":\"%v\"}\n", line, err)
+			}
 			logger.lines++
 		} else {
 			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%v\"}\n", line)
