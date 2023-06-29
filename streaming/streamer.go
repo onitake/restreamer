@@ -161,6 +161,8 @@ type Streamer struct {
 	auth auth.Authenticator
 	// promCounter allows enabling/disabling Prometheus packet metrics.
 	promCounter bool
+	// preamble contains a static preamble that is sent before the actual streamed data
+	preamble []byte
 }
 
 // ConnectionBroker represents a policy handler for new connections.
@@ -203,6 +205,10 @@ func (streamer *Streamer) SetCollector(stats metrics.Collector) {
 // SetNotifier assigns an event notifier
 func (streamer *Streamer) SetNotifier(events event.Notifiable) {
 	streamer.events = events
+}
+
+func (streamer *Streamer) SetPreamble(preamble []byte) {
+	streamer.preamble = preamble
 }
 
 func (streamer *Streamer) SetInhibit(inhibit bool) {
@@ -446,7 +452,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 		)
 
 		start := time.Now()
-		conn.Serve()
+		conn.Serve(streamer.preamble)
 		duration := time.Since(start)
 
 		// done, remove the stale connection

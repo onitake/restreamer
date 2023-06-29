@@ -80,6 +80,10 @@
 			"": "Maximum receive unit, the packet size for datagram sockets (UDP).",
 			"": "This value is important, because individual datagrams can only be received as a whole. Excess data is discarded.",
 			"mru": 1500,
+			"": "Specify a file name to a static preamble that will be sent to each newly connected client.",
+			"": "This can help when a decoder isn't capable of initializing in the middle of a transmission,",
+			"": "but it can also make things much worse. You have been warned.",
+			"preamble": "preamble.ts",
 			"": "Access control for this resource. If not present, no authentication is necessary.",
 			"": "Otherwise, an authentication token that matches one of the users is required.",
 			"authentication": {

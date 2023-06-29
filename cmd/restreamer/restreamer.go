@@ -26,6 +26,7 @@ import (
 	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
+	"io"
 	"log"
 	"math/rand"
 	"net/http"
@@ -161,6 +162,26 @@ func main() {
 			streamer := streaming.NewStreamer(streamdef.Serve, config.OutputBuffer, controller, authenticator)
 			streamer.SetCollector(reg)
 			streamer.SetNotifier(queue)
+
+			if streamdef.Preamble != "" {
+				prein, err := os.Open(streamdef.Preamble)
+				if err != nil {
+					logger.Logkv(
+						"event", eventMainError,
+						"error", errorMainPreambleRead,
+						"message", fmt.Sprintf("Cannot open preamble file: %v", err),
+					)
+				}
+				preamble, err := io.ReadAll(prein)
+				if err != nil {
+					logger.Logkv(
+						"event", eventMainError,
+						"error", errorMainPreambleRead,
+						"message", fmt.Sprintf("Cannot read preamble file: %v", err),
+					)
+				}
+				streamer.SetPreamble(preamble)
+			}
 
 			// shuffle the list here, not later
 			// should give a bit more randomness

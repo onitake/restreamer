@@ -71,6 +71,12 @@ type Resource struct {
 	// Mru (maximum receive unit) is the size of the datagram receive buffer.
 	// Only used for UDP and RTP protocols.
 	Mru uint `json:"mru"`
+	// Preamble specifies the name of a file containing a static preamble, that is sent to each client before
+	// actual data is streamed. It can be used to synchronize the decoder quickly, instead of needing to wait for
+	// the next PAT, PMT, SPS and PPS packets.
+	// Make sure that the format of the preamble content matches the stream, or you will end up with badly
+	// configured decoder!
+	Preamble string `json:"preamble"`
 }
 
 // UserCredentials is a set of credentials for a single user

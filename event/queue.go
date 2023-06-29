@@ -195,9 +195,10 @@ func (reporter *Queue) handleHeartbeat(when time.Time) {
 func (reporter *Queue) handleConnect(connected int) {
 	logger.Logkv(
 		"event", queueEventConnect,
-		"message", fmt.Sprintf("Number of connections changed by %d, new number of connections: %d", connected, reporter.connections),
+		"message", fmt.Sprintf("Number of connections changed by %d, current number %d, new number %d", connected, reporter.connections, reporter.connections+connected),
 		"connected", connected,
-		"connections", reporter.connections,
+		"current_connections", reporter.connections,
+		"new_connections", reporter.connections+connected,
 	)
 	// calculate the new connection count
 	var newconn int
