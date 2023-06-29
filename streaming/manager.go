@@ -36,7 +36,7 @@ func NewStateManager() *StateManager {
 	}
 }
 
-// Registers a new notification channel.
+// Register registers a new notification channel.
 //
 // It is not possible to register a channel twice.
 // Any additional registrations will be ignored.
@@ -44,14 +44,14 @@ func (manager *StateManager) Register(channel chan<- bool) {
 	manager.notifiables[channel] = true
 }
 
-// Removes a registered channel.
+// Unregister removes a registered channel.
 //
 // If this channel was not registered previously, no action is taken.
 func (manager *StateManager) Unregister(channel chan<- bool) {
 	delete(manager.notifiables, channel)
 }
 
-// Sends a state change to all registered notification channels and clears the list.
+// Notify sends a state change to all registered notification channels and clears the list.
 func (manager *StateManager) Notify() {
 	for notifiable := range manager.notifiables {
 		notifiable <- true

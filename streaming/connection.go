@@ -17,6 +17,7 @@
 package streaming
 
 import (
+	"context"
 	"github.com/onitake/restreamer/protocol"
 	"net/http"
 	"time"
@@ -36,6 +37,8 @@ type Connection struct {
 	// Closed is true if Serve was ended because of a closed channel.
 	// This is simply there to avoid a double close.
 	Closed bool
+	// context contains the cached context object for this connection
+	context context.Context
 }
 
 // NewConnection creates a new connection object.
@@ -43,11 +46,12 @@ type Connection struct {
 //
 // clientaddr should point to the remote address of the connecting client
 // and will be used for logging.
-func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string) *Connection {
+func NewConnection(destination http.ResponseWriter, qsize int, clientaddr string, ctx context.Context) *Connection {
 	conn := &Connection{
 		Queue:         make(chan protocol.MpegTsPacket, qsize),
 		ClientAddress: clientaddr,
 		writer:        destination,
+		context:       ctx,
 	}
 	return conn
 }
@@ -81,16 +85,6 @@ func (conn *Connection) Serve() {
 		"message", "Sent header",
 	)
 
-	// see if can get notified about connection closure
-	notifier, ok := conn.writer.(http.CloseNotifier)
-	if !ok {
-		logger.Logkv(
-			"event", eventConnectionError,
-			"error", errorConnectionNoCloseNotify,
-			"message", "Writer does not support CloseNotify",
-		)
-	}
-
 	// start reading packets
 	running := true
 	for running {
@@ -121,11 +115,12 @@ func (conn *Connection) Serve() {
 				running = false
 				conn.Closed = true
 			}
-		case <-notifier.CloseNotify():
+		case <-conn.context.Done():
 			// connection closed while we were waiting for more data
 			logger.Logkv(
 				"event", eventConnectionClosedWait,
 				"message", "Downstream connection closed (while waiting)",
+				"error", conn.context.Err(),
 			)
 			running = false
 		}

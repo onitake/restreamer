@@ -39,7 +39,7 @@ type FixedReader struct {
 	buffer     *bytes.Buffer
 }
 
-// NewPacketBuffer creates a new buffered reader that pulls in data from an
+// NewFixedReader creates a new buffered reader that pulls in data from an
 // io.Reader in chunks of psize bytes.
 func NewFixedReader(reader io.Reader, psize int) *FixedReader {
 	return &FixedReader{

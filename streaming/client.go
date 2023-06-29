@@ -39,7 +39,7 @@ var (
 	// ErrNoConnection is thrown when trying to read
 	// from a stream that is not connected
 	ErrNoConnection = errors.New("restreamer: socket not connected")
-	// ErrNoConnection is thrown when trying to
+	// ErrAlreadyConnected is thrown when trying to
 	// connect to an already established upstream socket
 	ErrAlreadyConnected = errors.New("restreamer: socket is already connected")
 	// ErrInvalidResponse is thrown when an unsupported
@@ -77,26 +77,6 @@ func init() {
 	metrics.MustRegister(metricSourceConnected)
 	metrics.MustRegister(metricPacketsReceived)
 	metrics.MustRegister(metricBytesReceived)
-}
-
-// connectCloser represents types that have a Connect() and a Close() method.
-// It extends on the io.Closer type.
-type connectCloser interface {
-	// support the Closer interface
-	io.Closer
-	// and the Connect() method
-	Connect() error
-}
-
-// dummyConnectCloser is a no-action implementation of the connectCloser interface.
-type dummyConnectCloser struct {
-}
-
-func (*dummyConnectCloser) Close() error {
-	return nil
-}
-func (*dummyConnectCloser) Connect() error {
-	return nil
 }
 
 // Client implements a streaming HTTP client with failover support.
@@ -143,8 +123,6 @@ type Client struct {
 	running util.AtomicBool
 	// stats is the statistics collector for this client
 	stats metrics.Collector
-	// listener is a downstream object that can handle connect/disconnect notifications
-	listener connectCloser
 	// queueSize is the size of the input queue
 	queueSize uint
 	// interf denotes a specific network interface to create the connection on
@@ -236,7 +214,6 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 		streamer:       streamer,
 		running:        util.AtomicFalse,
 		stats:          &metrics.DummyCollector{},
-		listener:       &dummyConnectCloser{},
 		queueSize:      qsize,
 		interf:         pintf,
 		readBufferSize: int(bufferSize * protocol.MpegTsPacketSize),
@@ -248,14 +225,6 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 // SetCollector assigns a stats collector.
 func (client *Client) SetCollector(stats metrics.Collector) {
 	client.stats = stats
-}
-
-// SetStateListener adds a listener that will be notified when the client
-// connection is closed or reconnected.
-//
-// Only one listener is supported.
-func (client *Client) SetStateListener(listener connectCloser) {
-	client.listener = listener
 }
 
 // SetInhibit calls the SetInhibit function on the attached streamer.
@@ -337,21 +306,21 @@ func (client *Client) loop() {
 		}
 
 		// pick the next server
-		url := client.urls[next]
+		nexturl := client.urls[next]
 		next = (next + 1) % len(client.urls)
 
 		// connect
 		logger.Logkv(
 			"event", eventClientConnecting,
-			"url", url.String(),
+			"url", nexturl.String(),
 		)
-		err := client.start(url)
+		err := client.start(nexturl)
 		if err != nil {
 			// not handled, log
 			logger.Logkv(
 				"event", eventClientError,
 				"error", errorClientConnect,
-				"url", url.String(),
+				"url", nexturl.String(),
 				"message", err.Error(),
 			)
 		}
@@ -359,7 +328,7 @@ func (client *Client) loop() {
 		if client.Wait == 0 {
 			logger.Logkv(
 				"event", eventClientOffline,
-				"url", url.String(),
+				"url", nexturl.String(),
 				"message", "Reconnecting disabled. Stream will stay offline.",
 			)
 		}
@@ -528,7 +497,13 @@ func (client *Client) start(urly *url.URL) error {
 		)
 
 		// cleanup
-		client.Close()
+		if err := client.Close(); err != nil {
+			logger.Logkv(
+				"event", eventClientError,
+				"error", errorClientClose,
+				"message", err.Error(),
+			)
+		}
 		client.input = nil
 		client.response = nil
 
@@ -558,7 +533,13 @@ func (client *Client) pull(url *url.URL) error {
 					"event", eventClientReadTimeout,
 					"message", "Read timeout exceeded, closing connection",
 				)
-				client.input.Close()
+				if err := client.input.Close(); err != nil {
+					logger.Logkv(
+						"event", eventClientError,
+						"error", errorClientClose,
+						"message", err.Error(),
+					)
+				}
 			})
 		}
 		// read a packet
@@ -588,7 +569,6 @@ func (client *Client) pull(url *url.URL) error {
 			if packet != nil {
 				// report connection up
 				if queue == nil {
-					client.listener.Connect()
 					client.stats.SourceConnected()
 					metricSourceConnected.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Set(1.0)
 					logger.Logkv(
@@ -596,7 +576,15 @@ func (client *Client) pull(url *url.URL) error {
 						"url", url.String(),
 					)
 					queue = make(chan protocol.MpegTsPacket, client.queueSize)
-					go client.streamer.Stream(queue)
+					go func() {
+						if err := client.streamer.Stream(queue); err != nil {
+							logger.Logkv(
+								"event", eventClientError,
+								"error", errorClientStream,
+								"message", err.Error(),
+							)
+						}
+					}()
 				}
 
 				// report the packet

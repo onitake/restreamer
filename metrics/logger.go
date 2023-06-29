@@ -28,4 +28,4 @@ const (
 	errorMetricsPrometheus = "prometheus"
 )
 
-var logger util.Logger = util.NewGlobalModuleLogger(moduleMetrics, nil)
+var logger = util.NewGlobalModuleLogger(moduleMetrics, nil)

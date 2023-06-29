@@ -59,7 +59,7 @@ func CompareAndSwapBool(addr *AtomicBool, old, new bool) (swapped bool) {
 
 // LoadBool atomically loads *addr.
 func LoadBool(addr *AtomicBool) (val bool) {
-	var r int32 = atomic.LoadInt32((*int32)(addr))
+	var r = atomic.LoadInt32((*int32)(addr))
 	return r != int32(AtomicFalse)
 }
 
@@ -78,6 +78,6 @@ func SwapBool(addr *AtomicBool, new bool) (old bool) {
 	if new {
 		n = int32(AtomicTrue)
 	}
-	var r int32 = atomic.SwapInt32((*int32)(addr), n)
+	var r = atomic.SwapInt32((*int32)(addr), n)
 	return r != int32(AtomicFalse)
 }

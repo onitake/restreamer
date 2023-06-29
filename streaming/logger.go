@@ -58,6 +58,8 @@ const (
 	errorClientParse         = "parse"
 	errorClientInterface     = "interface"
 	errorClientSetBufferSize = "buffersize"
+	errorClientClose         = "close"
+	errorClientStream        = "stream"
 	//
 	eventConnectionDebug      = "debug"
 	eventConnectionError      = "error"
@@ -89,6 +91,8 @@ const (
 	errorProxyLimitExceeded   = "limitexceeded"
 	errorProxyShortRead       = "shortread"
 	errorProxyGet             = "get"
+	errorProxyWrite           = "write"
+	errorProxyHash            = "hash"
 	eventStreamerError        = "error"
 	eventStreamerQueueStart   = "queuestart"
 	eventStreamerStart        = "start"
@@ -105,4 +109,4 @@ const (
 	errorStreamerOffline        = "offline"
 )
 
-var logger util.Logger = util.NewGlobalModuleLogger(moduleStreaming, nil)
+var logger = util.NewGlobalModuleLogger(moduleStreaming, nil)

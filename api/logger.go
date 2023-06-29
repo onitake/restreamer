@@ -26,6 +26,7 @@ const (
 	eventApiError = "error"
 	//
 	errorApiJsonEncode = "json_encode"
+	errorApiWrite      = "write"
 )
 
-var logger util.Logger = util.NewGlobalModuleLogger(moduleApi, nil)
+var logger = util.NewGlobalModuleLogger(moduleApi, nil)

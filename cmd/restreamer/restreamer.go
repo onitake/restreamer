@@ -26,7 +26,6 @@ import (
 	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
-	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"math/rand"
 	"net/http"
@@ -64,7 +63,7 @@ func main() {
 	if config.Profile {
 		EnableProfiling()
 		// If profiling is enabled, we also want the Go runtime metrics collector
-		metrics.DefaultRegisterer.Register(prometheus.NewGoCollector())
+		metrics.EnableGoRuntimeCollector()
 	}
 
 	if config.Log != "" {
@@ -88,32 +87,32 @@ func main() {
 
 	enableheartbeat := false
 
-	queue := event.NewEventQueue(int(config.FullConnections))
+	queue := event.NewQueue(int(config.FullConnections))
 	for _, note := range config.Notifications {
 		var err error
-		var typ event.EventType
+		var typ event.Type
 		switch note.Event {
 		case "limit_hit":
-			typ = event.EventLimitHit
+			typ = event.TypeLimitHit
 		case "limit_miss":
-			typ = event.EventLimitMiss
+			typ = event.TypeLimitMiss
 		case "heartbeat":
-			typ = event.EventHeartbeat
+			typ = event.TypeHeartbeat
 		default:
 			err = errors.New(fmt.Sprintf("Unknown event type: %s", note.Event))
 		}
 		var handler event.Handler
 		switch note.Type {
 		case "url":
-			auth := auth.NewUserAuthenticator(note.Authentication, auth.NewAuthenticator(note.Authentication, config.UserList))
-			if auth == nil {
+			authenticator := auth.NewUserAuthenticator(note.Authentication, auth.NewAuthenticator(note.Authentication, config.UserList))
+			if authenticator == nil {
 				logger.Logkv(
 					"event", eventMainError,
 					"error", errorMainInvalidAuthentication,
 					"message", fmt.Sprintf("Invalid authentication configuration, possibly a missing user"),
 				)
 			}
-			urlhandler, err := event.NewUrlHandler(note.Url, auth)
+			urlhandler, err := event.NewUrlHandler(note.Url, authenticator)
 			if err == nil {
 				handler = urlhandler
 			}
@@ -122,7 +121,7 @@ func main() {
 		}
 		if err == nil {
 			queue.RegisterEventHandler(typ, handler)
-			if typ == event.EventHeartbeat {
+			if typ == event.TypeHeartbeat {
 				enableheartbeat = true
 				logger.Logkv(
 					"event", "enable_heartbeat",
@@ -157,9 +156,9 @@ func main() {
 
 			reg := stats.RegisterStream(streamdef.Serve)
 
-			auth := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
+			authenticator := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
 
-			streamer := streaming.NewStreamer(streamdef.Serve, config.OutputBuffer, controller, auth)
+			streamer := streaming.NewStreamer(streamdef.Serve, config.OutputBuffer, controller, authenticator)
 			streamer.SetCollector(reg)
 			streamer.SetNotifier(queue)
 
@@ -191,8 +190,8 @@ func main() {
 				"remote", streamdef.Remote,
 				"message", fmt.Sprintf("Configuring static resource %s on %s", streamdef.Serve, streamdef.Remote),
 			)
-			auth := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
-			proxy, err := streaming.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache, auth)
+			authenticator := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
+			proxy, err := streaming.NewProxy(streamdef.Remote, config.Timeout, streamdef.Cache, authenticator)
 			if err != nil {
 				log.Print(err)
 			} else {
@@ -202,7 +201,7 @@ func main() {
 			}
 
 		case "api":
-			auth := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
+			authenticator := auth.NewAuthenticator(streamdef.Authentication, config.UserList)
 
 			switch streamdef.Api {
 			case "health":
@@ -212,7 +211,7 @@ func main() {
 					"serve", streamdef.Serve,
 					"message", fmt.Sprintf("Registering global health API on %s", streamdef.Serve),
 				)
-				mux.Handle(streamdef.Serve, api.NewHealthApi(stats, auth))
+				mux.Handle(streamdef.Serve, api.NewHealthApi(stats, authenticator))
 			case "statistics":
 				logger.Logkv(
 					"event", eventMainConfigApi,
@@ -220,7 +219,7 @@ func main() {
 					"serve", streamdef.Serve,
 					"message", fmt.Sprintf("Registering global statistics API on %s", streamdef.Serve),
 				)
-				mux.Handle(streamdef.Serve, api.NewStatisticsApi(stats, auth))
+				mux.Handle(streamdef.Serve, api.NewStatisticsApi(stats, authenticator))
 			case "check":
 				logger.Logkv(
 					"event", eventMainConfigApi,
@@ -230,7 +229,7 @@ func main() {
 				)
 				client := clients[streamdef.Remote]
 				if client != nil {
-					mux.Handle(streamdef.Serve, api.NewStreamStateApi(client, auth))
+					mux.Handle(streamdef.Serve, api.NewStreamStateApi(client, authenticator))
 				} else {
 					logger.Logkv(
 						"event", eventMainError,
@@ -249,7 +248,7 @@ func main() {
 				)
 				client := clients[streamdef.Remote]
 				if client != nil {
-					mux.Handle(streamdef.Serve, api.NewStreamControlApi(client, auth))
+					mux.Handle(streamdef.Serve, api.NewStreamControlApi(client, authenticator))
 				} else {
 					logger.Logkv(
 						"event", eventMainError,
@@ -266,7 +265,7 @@ func main() {
 					"serve", streamdef.Serve,
 					"message", fmt.Sprintf("Registering Prometheus API on %s", streamdef.Serve),
 				)
-				mux.Handle(streamdef.Serve, api.NewPrometheusApi(auth))
+				mux.Handle(streamdef.Serve, api.NewPrometheusApi(authenticator))
 			default:
 				logger.Logkv(
 					"event", eventMainError,

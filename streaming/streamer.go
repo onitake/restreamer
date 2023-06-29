@@ -248,9 +248,10 @@ func (streamer *Streamer) eatCommands() {
 // This routine will block; you should run it asynchronously like this:
 //
 // queue := make(chan protocol.MpegTsPacket, inputQueueSize)
-// go func() {
-//   log.Fatal(streamer.Stream(queue))
-// }
+//
+//	go func() {
+//	  log.Fatal(streamer.Stream(queue))
+//	}
 //
 // or simply:
 //
@@ -406,7 +407,7 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	}
 
 	// create the connection object first
-	conn := NewConnection(writer, streamer.queueSize, request.RemoteAddr)
+	conn := NewConnection(writer, streamer.queueSize, request.RemoteAddr, request.Context())
 	// and pass it on
 	command := &ConnectionRequest{
 		Command:    StreamerCommandAdd,

@@ -26,10 +26,14 @@ func TestValue(t *testing.T) {
 		t.Error("Invalid AtomicBool default value, expected AtomicFalse")
 	}
 	a := AtomicFalse
+	// DO NOT remove, this is a sanity check
+	//goland:noinspection GoBoolExpressions
 	if a != AtomicFalse {
 		t.Error("Invalid AtomicBool value, expected AtomicFalse")
 	}
 	c := AtomicTrue
+	// DO NOT remove, this is a sanity check
+	//goland:noinspection GoBoolExpressions
 	if c != AtomicTrue {
 		t.Error("Invalid AtomicBool value, expected AtomicTrue")
 	}

@@ -28,10 +28,10 @@ type Authenticator interface {
 	// Authenticate parses an Authorization header and tries to authenticate the request.
 	// Returns true if the authentication succeeded, false otherwise.
 	Authenticate(authorization string) bool
-	// Adds a new user to the list.
+	// AddUser adds a new user to the list.
 	// Implementations may interpret users and passwords differently.
 	AddUser(user, password string)
-	// Removes a user from the list.
+	// RemoveUser removes a user from the list.
 	// Implementations may interpret users differently.
 	RemoveUser(user string)
 	// GetLogin returns an authentication string that can be sent to a remote system.
@@ -115,13 +115,13 @@ type basicAuthenticator struct {
 
 // newBasicAuthenticator creates a new Authenticator that supports basic authentication.
 // If the whitelist is empty, no requests are allowed.
-func newBasicAuthenticator(whitelist []string, credentials map[string]configuration.UserCredentials, realm string) *basicAuthenticator {
+func newBasicAuthenticator(allowlist []string, credentials map[string]configuration.UserCredentials, realm string) *basicAuthenticator {
 	auth := &basicAuthenticator{
 		tokens: make(map[string]bool),
 		users:  make(map[string]string),
 		realm:  realm,
 	}
-	for _, user := range whitelist {
+	for _, user := range allowlist {
 		cred, ok := credentials[user]
 		if ok {
 			auth.AddUser(user, cred.Password)

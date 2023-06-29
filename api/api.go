@@ -80,10 +80,22 @@ func (api *healthApi) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK)
-		writer.Write(response)
+		if _, err := writer.Write(response); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+		if _, err := writer.Write([]byte(http.StatusText(http.StatusInternalServerError))); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 		logger.Logkv(
 			"event", eventApiError,
 			"error", errorApiJsonEncode,
@@ -168,10 +180,22 @@ func (api *statisticsApi) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	response, err := json.Marshal(&stats)
 	if err == nil {
 		writer.WriteHeader(http.StatusOK)
-		writer.Write(response)
+		if _, err := writer.Write(response); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	} else {
 		writer.WriteHeader(http.StatusInternalServerError)
-		writer.Write([]byte(http.StatusText(http.StatusInternalServerError)))
+		if _, err := writer.Write([]byte(http.StatusText(http.StatusInternalServerError))); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 		logger.Logkv(
 			"event", eventApiError,
 			"error", errorApiJsonEncode,
@@ -212,10 +236,22 @@ func (api *streamStateApi) ServeHTTP(writer http.ResponseWriter, request *http.R
 
 	if api.client.Connected() {
 		writer.WriteHeader(http.StatusOK)
-		writer.Write([]byte("200 ok"))
+		if _, err := writer.Write([]byte("200 ok")); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	} else {
 		writer.WriteHeader(http.StatusNotFound)
-		writer.Write([]byte("404 not found"))
+		if _, err := writer.Write([]byte("404 not found")); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	}
 }
 
@@ -233,7 +269,7 @@ type streamControlApi struct {
 	auth auth.Authenticator
 }
 
-// NewStreamStateApi creates a new stream status API object,
+// NewStreamControlApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
 func NewStreamControlApi(inhibit inhibitor, auth auth.Authenticator) http.Handler {
 	return &streamControlApi{
@@ -261,14 +297,32 @@ func (api *streamControlApi) ServeHTTP(writer http.ResponseWriter, request *http
 	if len(query["offline"]) > 0 {
 		api.inhibit.SetInhibit(true)
 		writer.WriteHeader(http.StatusAccepted)
-		writer.Write([]byte("202 accepted"))
+		if _, err := writer.Write([]byte("202 accepted")); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	} else if len(query["online"]) > 0 {
 		api.inhibit.SetInhibit(false)
 		writer.WriteHeader(http.StatusAccepted)
-		writer.Write([]byte("202 accepted"))
+		if _, err := writer.Write([]byte("202 accepted")); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	} else {
 		writer.WriteHeader(http.StatusBadRequest)
-		writer.Write([]byte("400 bad request"))
+		if _, err := writer.Write([]byte("400 bad request")); err != nil {
+			logger.Logkv(
+				"event", eventApiError,
+				"error", errorApiWrite,
+				"message", err.Error(),
+			)
+		}
 	}
 }
 

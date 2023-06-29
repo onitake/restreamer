@@ -157,6 +157,7 @@ func DefaultConfiguration() *Configuration {
 func LoadConfigurationFile(filename string) (*Configuration, error) {
 	fd, err := os.Open(filename)
 	if err == nil {
+		//goland:noinspection GoUnhandledErrorResult
 		defer fd.Close()
 		return LoadConfiguration(fd)
 	} else {

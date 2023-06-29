@@ -43,7 +43,7 @@ func NewUrlHandler(urly string, userauth *auth.UserAuthenticator) (*UrlHandler, 
 	}
 }
 
-func (handler *UrlHandler) HandleEvent(typ EventType, args ...interface{}) {
+func (handler *UrlHandler) HandleEvent(typ Type, args ...interface{}) {
 	logger.Logkv(
 		"event", urlHandlerEventNotify,
 		"message", fmt.Sprintf("Event received, notifying %s", handler.Url),

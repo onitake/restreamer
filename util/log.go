@@ -34,9 +34,9 @@ const (
 	timeFormat string = time.RFC3339
 	// hupSignal is a signal identifier for a "reopen the log" notification.
 	// Distinct from UserSignal.
-	hupSignal internalSignal = internalSignal("HUP")
+	hupSignal = internalSignal("HUP")
 	// shutdownSignal is a signal identifier for a "stop logging" notification.
-	shutdownSignal internalSignal = internalSignal("SDN")
+	shutdownSignal = internalSignal("SDN")
 	// srcFileUnknown is the string stored in KeySrcFile when the caller's file name cannot be determined
 	srcFileUnknown string = "<UNKNOWN>"
 	// srcLineUnknown is the number stored in KeySrcLine when the caller's source code line number cannot be determined
@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	globalStandardLogger MultiLogger = MultiLogger{
+	globalStandardLogger = MultiLogger{
 		&ConsoleLogger{},
 	}
 )
@@ -164,7 +164,7 @@ type ModuleLogger struct {
 	AddTimestamp bool
 }
 
-// Log adds predefined values to each log line and writes it to the encapsulated log.
+// Logd adds predefined values to each log line and writes it to the encapsulated log.
 func (logger *ModuleLogger) Logd(lines ...Dict) {
 	proclines := make([]Dict, len(lines))
 	for i, line := range lines {
@@ -194,10 +194,10 @@ type DummyLogger struct{}
 func (*DummyLogger) Logd(lines ...Dict)             {}
 func (*DummyLogger) Logkv(keyValues ...interface{}) {}
 
-// Multilogger logs to several backend loggers at once.
+// MultiLogger logs to several backend loggers at once.
 type MultiLogger []Logger
 
-// Log writes the same log lines to all backing loggers.
+// Logd writes the same log lines to all backing loggers.
 func (logger MultiLogger) Logd(lines ...Dict) {
 	for _, backer := range logger {
 		backer.Logd(lines...)
@@ -211,7 +211,7 @@ func (logger MultiLogger) Logkv(keyValues ...interface{}) {
 // ConsoleLogger is a simple logger that prints to stdout.
 type ConsoleLogger struct{}
 
-// Log writes a log line to stdout.
+// Logd writes a log line to stdout.
 //
 // Your best bet if you don't want/need a full-blown file logging queue with
 // signal-initiated reopening or a central logging server.
@@ -278,7 +278,7 @@ func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	return logger, nil
 }
 
-// Log writes a series of log lines, prefixed by a time stamp in RFC3339 format.
+// Logd writes a series of log lines, prefixed by a time stamp in RFC3339 format.
 func (logger *FileLogger) Logd(lines ...Dict) {
 	// send these down the queue
 	for _, line := range lines {
@@ -303,7 +303,9 @@ func (logger *FileLogger) writeLog(line interface{}) {
 		data, err := json.Marshal(line)
 		if err == nil {
 			format := fmt.Sprintf("[%s] %s\n", time.Now().Format(timeFormat), data)
-			logger.log.Write([]byte(format))
+			if _, err := logger.log.Write([]byte(format)); err != nil {
+				fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot write log line to file\",\"line\":\"%v\",\"goerror\":\"%v\"}\n", line, err)
+			}
 			logger.lines++
 		} else {
 			fmt.Printf("{\"event\":\"error\",\"message\":\"Cannot encode log line\",\"line\":\"%v\"}\n", line)
@@ -315,13 +317,13 @@ func (logger *FileLogger) writeLog(line interface{}) {
 	}
 }
 
-// Closes the log file and disables further logging.
+// Close closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
 	fmt.Printf("{\"event\":\"close_signal\",\"message\":\"Closing log\"}\n")
 	logger.signals <- hupSignal
 }
 
-// Closes the log and stops/removes the signal handler
+// closeLog closes the log and stops/removes the signal handler
 func (logger *FileLogger) closeLog() error {
 	fmt.Printf("{\"event\":\"close\",\"message\":\"Really closing log\"}\n")
 
@@ -362,9 +364,9 @@ func (logger *FileLogger) handle() {
 
 	for running {
 		select {
-		case signal := <-logger.signals:
+		case sig := <-logger.signals:
 			// check signal type
-			switch signal {
+			switch sig {
 			case UserSignal:
 				// reopen the log file
 				err := logger.reopenLog()

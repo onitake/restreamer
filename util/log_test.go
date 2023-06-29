@@ -170,7 +170,9 @@ func TestConsoleLogger00(t *testing.T) {
 	}(m00, r00, wg)
 	o00 := os.Stdout
 	defer func(r, w, o *os.File) {
+		//goland:noinspection GoUnhandledErrorResult
 		defer r.Close()
+		//goland:noinspection GoUnhandledErrorResult
 		defer w.Close()
 		os.Stdout = o
 	}(r00, w00, o00)
