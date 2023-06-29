@@ -73,13 +73,13 @@ func TestBasicAuthenticator02(t *testing.T) {
 	user := "user"
 	password := randStringBytes(16)
 	realm := "Test Realm"
-	whitelist := []string{}
+	var allowlist []string
 	cred := map[string]configuration.UserCredentials{
 		user: {
 			Password: password,
 		},
 	}
-	auth := newBasicAuthenticator(whitelist, cred, realm)
+	auth := newBasicAuthenticator(allowlist, cred, realm)
 	str := base64.StdEncoding.EncodeToString([]byte(user + ":" + password))
 	if auth.Authenticate("Basic " + str) {
 		t.Errorf("Basic authenticator allowed non-whitelisted user")

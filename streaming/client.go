@@ -82,9 +82,7 @@ func init() {
 // connectCloser represents types that have a Connect() and a Close() method.
 // It extends on the io.Closer type.
 type connectCloser interface {
-	// support the Closer interface
 	io.Closer
-	// and the Connect() method
 	Connect() error
 }
 

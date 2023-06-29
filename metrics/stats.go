@@ -126,19 +126,20 @@ func (stats *realCollector) clone() *realCollector {
 // Useful if you want to calculate a delta, then replace the previous
 // value with the current one:
 // prev := realCollector{}
-// for {
-//   current := realCollector{...current values...}
-//   prev.invsub(current)
-//   doSomethingWithPrev(prev)
-//   prev = current
-// }
-func (from *realCollector) invsub(to *realCollector) {
-	from.connections = to.connections - from.connections
-	from.packetsReceived = to.packetsReceived - from.packetsReceived
-	from.packetsSent = to.packetsSent - from.packetsSent
-	from.packetsDropped = to.packetsDropped - from.packetsDropped
-	from.connected = to.connected
-	from.duration = to.duration - from.duration
+//
+//	for {
+//	  current := realCollector{...current values...}
+//	  prev.invsub(current)
+//	  doSomethingWithPrev(prev)
+//	  prev = current
+//	}
+func (stats *realCollector) invsub(to *realCollector) {
+	stats.connections = to.connections - stats.connections
+	stats.packetsReceived = to.packetsReceived - stats.packetsReceived
+	stats.packetsSent = to.packetsSent - stats.packetsSent
+	stats.packetsDropped = to.packetsDropped - stats.packetsDropped
+	stats.connected = to.connected
+	stats.duration = to.duration - stats.duration
 }
 
 // StreamStatistics is the current state of a single stream

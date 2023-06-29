@@ -115,13 +115,13 @@ type basicAuthenticator struct {
 
 // newBasicAuthenticator creates a new Authenticator that supports basic authentication.
 // If the whitelist is empty, no requests are allowed.
-func newBasicAuthenticator(whitelist []string, credentials map[string]configuration.UserCredentials, realm string) *basicAuthenticator {
+func newBasicAuthenticator(allowlist []string, credentials map[string]configuration.UserCredentials, realm string) *basicAuthenticator {
 	auth := &basicAuthenticator{
 		tokens: make(map[string]bool),
 		users:  make(map[string]string),
 		realm:  realm,
 	}
-	for _, user := range whitelist {
+	for _, user := range allowlist {
 		cred, ok := credentials[user]
 		if ok {
 			auth.AddUser(user, cred.Password)

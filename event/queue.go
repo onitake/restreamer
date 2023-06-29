@@ -47,15 +47,15 @@ type stateChange struct {
 	when time.Time
 }
 
-// EventQueue encapsulates state for a connection load reporting callback.
+// Queue encapsulates state for a connection load reporting callback.
 //
 // The hit/miss pairs define a hysteresis range to avoid "flapping" reports
 // when the number of connections changes quickly around a limit.
-type EventQueue struct {
+type Queue struct {
 	// limit sets the number of connections when a hit is reported
 	limit int
 	// handlers contains all event handlers
-	handlers map[EventType]map[Handler]bool
+	handlers map[Type]map[Handler]bool
 	// internal notification channel for the reporting thread
 	notifier chan *stateChange
 	// connections contains the number of active connections.
@@ -69,16 +69,16 @@ type EventQueue struct {
 	waiter *sync.WaitGroup
 }
 
-// Creates a new connection load report notifier.
+// NewQueue creates a new connection load report notifier.
 //
 // limit specifies the reporting threshold.
-func NewEventQueue(limit int) *EventQueue {
+func NewQueue(limit int) *Queue {
 	if limit < 0 {
 		panic("limit is out of range")
 	}
-	return &EventQueue{
+	return &Queue{
 		limit:    limit,
-		handlers: make(map[EventType]map[Handler]bool),
+		handlers: make(map[Type]map[Handler]bool),
 		waiter:   &sync.WaitGroup{},
 	}
 }
@@ -86,7 +86,7 @@ func NewEventQueue(limit int) *EventQueue {
 // Start launches the reporting goroutine.
 //
 // To stop the reporter, call Shutdown().
-func (reporter *EventQueue) Start() {
+func (reporter *Queue) Start() {
 	logger.Logkv(
 		"event", "check_start",
 		"message", "Checking if the handler can be started",
@@ -117,7 +117,7 @@ func (reporter *EventQueue) Start() {
 // Shutdown stops the load reporter and waits for completion.
 //
 // You must not send any notifications after calling this method.
-func (reporter *EventQueue) Shutdown() {
+func (reporter *Queue) Shutdown() {
 	logger.Logkv(
 		"event", queueEventStopping,
 		"message", "Stopping notification handler",
@@ -130,7 +130,7 @@ func (reporter *EventQueue) Shutdown() {
 }
 
 // run is the notification handling loop
-func (reporter *EventQueue) run() {
+func (reporter *Queue) run() {
 	logger.Logkv(
 		"event", queueEventStarted,
 		"message", "Notification handler started",
@@ -162,7 +162,7 @@ func (reporter *EventQueue) run() {
 }
 
 // handle handles a single message
-func (reporter *EventQueue) handle(message *stateChange) {
+func (reporter *Queue) handle(message *stateChange) {
 	switch message.typ {
 	case changeConnect:
 		reporter.handleConnect(message.connected)
@@ -178,21 +178,21 @@ func (reporter *EventQueue) handle(message *stateChange) {
 }
 
 // handleHeartbeat handles a periodic heartbeat
-func (reporter *EventQueue) handleHeartbeat(when time.Time) {
+func (reporter *Queue) handleHeartbeat(when time.Time) {
 	logger.Logkv(
 		"event", queueEventHeartbeat,
 		"message", fmt.Sprintf("Periodic heartbeat at: %v", when),
 		"when", when,
 	)
-	for handler, ok := range reporter.handlers[EventHeartbeat] {
+	for handler, ok := range reporter.handlers[TypeHeartbeat] {
 		if ok {
-			handler.HandleEvent(EventHeartbeat, when)
+			handler.HandleEvent(TypeHeartbeat, when)
 		}
 	}
 }
 
 // handleConnect handles a connected clients state change
-func (reporter *EventQueue) handleConnect(connected int) {
+func (reporter *Queue) handleConnect(connected int) {
 	logger.Logkv(
 		"event", queueEventConnect,
 		"message", fmt.Sprintf("Number of connections changed by %d, new number of connections: %d", connected, reporter.connections),
@@ -235,9 +235,9 @@ func (reporter *EventQueue) handleConnect(connected int) {
 					"new", newconn,
 					"limit", reporter.limit,
 				)
-				for handler, ok := range reporter.handlers[EventLimitMiss] {
+				for handler, ok := range reporter.handlers[TypeLimitMiss] {
 					if ok {
-						handler.HandleEvent(EventLimitMiss, reporter.connections, newconn, reporter.limit)
+						handler.HandleEvent(TypeLimitMiss, reporter.connections, newconn, reporter.limit)
 					}
 				}
 			}
@@ -251,9 +251,9 @@ func (reporter *EventQueue) handleConnect(connected int) {
 					"new", newconn,
 					"limit", reporter.limit,
 				)
-				for handler, ok := range reporter.handlers[EventLimitHit] {
+				for handler, ok := range reporter.handlers[TypeLimitHit] {
 					if ok {
-						handler.HandleEvent(EventLimitHit, reporter.connections, newconn, reporter.limit)
+						handler.HandleEvent(TypeLimitHit, reporter.connections, newconn, reporter.limit)
 					}
 				}
 			}
@@ -263,7 +263,7 @@ func (reporter *EventQueue) handleConnect(connected int) {
 	reporter.connections = newconn
 }
 
-func (reporter *EventQueue) RegisterEventHandler(typ EventType, handler Handler) {
+func (reporter *Queue) RegisterEventHandler(typ Type, handler Handler) {
 	if reporter.running {
 		logger.Logkv(
 			"event", queueEventError,
@@ -278,7 +278,7 @@ func (reporter *EventQueue) RegisterEventHandler(typ EventType, handler Handler)
 	}
 }
 
-func (reporter *EventQueue) UnregisterEventHandler(typ EventType, handler Handler) {
+func (reporter *Queue) UnregisterEventHandler(typ Type, handler Handler) {
 	if reporter.running {
 		logger.Logkv(
 			"event", queueEventError,
@@ -298,7 +298,7 @@ func (reporter *EventQueue) UnregisterEventHandler(typ EventType, handler Handle
 	}
 }
 
-func (reporter *EventQueue) NotifyConnect(connected int) {
+func (reporter *Queue) NotifyConnect(connected int) {
 	// construct the notification message and pass it down the queue
 	message := &stateChange{
 		typ:       changeConnect,
@@ -307,7 +307,7 @@ func (reporter *EventQueue) NotifyConnect(connected int) {
 	reporter.notifier <- message
 }
 
-func (reporter *EventQueue) NotifyHeartbeat(when time.Time) {
+func (reporter *Queue) NotifyHeartbeat(when time.Time) {
 	// construct the notification message and pass it down the queue
 	message := &stateChange{
 		typ:  changeHeartbeat,

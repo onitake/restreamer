@@ -107,11 +107,11 @@ func testWithProxy(t *testing.T, l *mockProxyLogger, proxy *Proxy) {
 func TestProxy(t *testing.T) {
 	l := &mockProxyLogger{t, make(chan bool)}
 
-	auth := auth.NewAuthenticator(configuration.Authentication{}, nil)
+	authenticator := auth.NewAuthenticator(configuration.Authentication{}, nil)
 
-	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0, auth)
+	direct, _ := NewProxy("file:///tmp/test.txt", 10, 0, authenticator)
 	testWithProxy(t, l, direct)
 
-	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1, auth)
+	cached, _ := NewProxy("file:///tmp/test.txt", 10, 1, authenticator)
 	testWithProxy(t, l, cached)
 }

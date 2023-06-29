@@ -362,9 +362,9 @@ func (logger *FileLogger) handle() {
 
 	for running {
 		select {
-		case signal := <-logger.signals:
+		case sig := <-logger.signals:
 			// check signal type
-			switch signal {
+			switch sig {
 			case UserSignal:
 				// reopen the log file
 				err := logger.reopenLog()

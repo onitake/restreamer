@@ -81,11 +81,11 @@ type mockHandler struct {
 	Miss *sync.WaitGroup
 }
 
-func (h *mockHandler) HandleEvent(t EventType, args ...interface{}) {
+func (h *mockHandler) HandleEvent(t Type, args ...interface{}) {
 	switch t {
-	case EventLimitHit:
+	case TypeLimitHit:
 		h.Hit.Done()
-	case EventLimitMiss:
+	case TypeLimitMiss:
 		h.Miss.Done()
 	}
 }
@@ -94,7 +94,7 @@ func TestCreateLoadReporter00(t *testing.T) {
 	l := &mockLogger{t, ""}
 
 	l.Stage = "t00"
-	c00 := NewEventQueue(0)
+	c00 := NewQueue(0)
 	logger = l
 	c00.Start()
 	c00.Shutdown()
@@ -104,7 +104,7 @@ func TestCreateLoadReporter01(t *testing.T) {
 	l := &mockLogger{t, ""}
 
 	l.Stage = "t01"
-	c01 := NewEventQueue(0)
+	c01 := NewQueue(0)
 	logger = l
 	c01.Start()
 	c01.Start()
@@ -112,7 +112,7 @@ func TestCreateLoadReporter01(t *testing.T) {
 }
 
 func TestCreateLoadReporter02(t *testing.T) {
-	c02 := NewEventQueue(0)
+	c02 := NewQueue(0)
 	l02 := &mockLogConnectable{
 		t,
 		"t02",
@@ -130,7 +130,7 @@ func TestCreateLoadReporter03(t *testing.T) {
 	l := &mockLogger{t, ""}
 
 	l.Stage = "t03"
-	c03 := NewEventQueue(0)
+	c03 := NewQueue(0)
 	logger = l
 	c03.Start()
 	c03.Shutdown()
@@ -139,7 +139,7 @@ func TestCreateLoadReporter03(t *testing.T) {
 }
 
 func TestCreateLoadReporter04(t *testing.T) {
-	c04 := NewEventQueue(0)
+	c04 := NewQueue(0)
 	l04 := &mockLogConnectable{
 		t,
 		"t04",
@@ -161,7 +161,7 @@ func TestCreateLoadReporter04(t *testing.T) {
 func TestCreateLoadReporter05(t *testing.T) {
 	l := &mockLogger{t, ""}
 
-	c05 := NewEventQueue(10)
+	c05 := NewQueue(10)
 	l.Stage = "t05"
 	logger = l
 	h05 := &mockHandler{
@@ -171,8 +171,8 @@ func TestCreateLoadReporter05(t *testing.T) {
 	}
 	h05.Hit.Add(3)
 	h05.Miss.Add(2)
-	c05.RegisterEventHandler(EventLimitHit, h05)
-	c05.RegisterEventHandler(EventLimitMiss, h05)
+	c05.RegisterEventHandler(TypeLimitHit, h05)
+	c05.RegisterEventHandler(TypeLimitMiss, h05)
 	c05.Start()
 	c05.NotifyConnect(10)
 	c05.NotifyConnect(-1)

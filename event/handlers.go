@@ -16,14 +16,14 @@
 
 package event
 
-type EventType int
+type Type int
 
 const (
-	EventLimitHit EventType = iota
-	EventLimitMiss
-	EventHeartbeat
+	TypeLimitHit Type = iota
+	TypeLimitMiss
+	TypeHeartbeat
 )
 
 type Handler interface {
-	HandleEvent(EventType, ...interface{})
+	HandleEvent(Type, ...interface{})
 }
