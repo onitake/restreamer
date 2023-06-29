@@ -27,7 +27,7 @@ import (
 const (
 	// UserSignal is a unique identifier for the signal that is sent through the
 	// notification channel when a user event occurs.
-	UserSignal syscall.Signal = syscall.SIGUSR1
+	UserSignal = syscall.SIGUSR1
 )
 
 // RegisterUserSignalHandler registers a process signal handler that reacts to

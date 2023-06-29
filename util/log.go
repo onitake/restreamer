@@ -34,9 +34,9 @@ const (
 	timeFormat string = time.RFC3339
 	// hupSignal is a signal identifier for a "reopen the log" notification.
 	// Distinct from UserSignal.
-	hupSignal internalSignal = internalSignal("HUP")
+	hupSignal = internalSignal("HUP")
 	// shutdownSignal is a signal identifier for a "stop logging" notification.
-	shutdownSignal internalSignal = internalSignal("SDN")
+	shutdownSignal = internalSignal("SDN")
 	// srcFileUnknown is the string stored in KeySrcFile when the caller's file name cannot be determined
 	srcFileUnknown string = "<UNKNOWN>"
 	// srcLineUnknown is the number stored in KeySrcLine when the caller's source code line number cannot be determined
@@ -49,7 +49,7 @@ const (
 )
 
 var (
-	globalStandardLogger MultiLogger = MultiLogger{
+	globalStandardLogger = MultiLogger{
 		&ConsoleLogger{},
 	}
 )

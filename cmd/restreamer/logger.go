@@ -41,4 +41,4 @@ const (
 	errorMainInvalidAuthentication   = "invalid_authentication"
 )
 
-var logger util.Logger = util.NewGlobalModuleLogger(moduleMain, nil)
+var logger = util.NewGlobalModuleLogger(moduleMain, nil)
