@@ -18,6 +18,7 @@ package streaming
 
 import (
 	"context"
+	"fmt"
 	"github.com/onitake/restreamer/protocol"
 	"net/http"
 	"time"
@@ -135,7 +136,7 @@ func (conn *Connection) Serve(preamble []byte) {
 			logger.Logkv(
 				"event", eventConnectionClosedWait,
 				"message", "Downstream connection closed (while waiting)",
-				"error", conn.context.Err(),
+				"error", fmt.Sprintf("%v", conn.context.Err()),
 			)
 			running = false
 		}
