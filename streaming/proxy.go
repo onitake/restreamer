@@ -240,7 +240,14 @@ func (proxy *Proxy) fetch() {
 func Etag(data []byte) string {
 	// 64-bit FNV-1a checksum of the data, formatted as a hex string
 	hash := fnv.New64a()
-	hash.Write(data)
+	if _, err := hash.Write(data); err != nil {
+		logger.Logkv(
+			"event", eventProxyError,
+			"error", errorProxyHash,
+			"message", err.Error(),
+		)
+		return ""
+	}
 	return fmt.Sprintf("%016x", hash.Sum64())
 }
 
@@ -393,6 +400,12 @@ func (proxy *Proxy) ServeHTTP(writer http.ResponseWriter, request *http.Request)
 		writer.Header().Set("Content-Length", strconv.Itoa(len(res.data)))
 		writer.WriteHeader(res.statusCode)
 		// and push the content
-		writer.Write(res.data)
+		if _, err := writer.Write(res.data); err != nil {
+			logger.Logkv(
+				"event", eventProxyError,
+				"error", errorProxyWrite,
+				"message", err.Error(),
+			)
+		}
 	}
 }

@@ -170,6 +170,7 @@ func TestFixedReaderClose(t *testing.T) {
 	if g[0] != 0 || g[1] != 1 {
 		t.Fatal("Expected number sequence")
 	}
+	//goland:noinspection GoUnhandledErrorResult
 	f.Close()
 	g3 := make([]byte, 2)
 	n3, err3 := f.Read(g3)
@@ -193,6 +194,7 @@ func TestFixedReaderCloseRemain(t *testing.T) {
 	if g[0] != 0 || g[1] != 1 {
 		t.Fatal("Expected number sequence")
 	}
+	//goland:noinspection GoUnhandledErrorResult
 	f.Close()
 	g2 := make([]byte, 2)
 	n2, err2 := f.Read(g2)

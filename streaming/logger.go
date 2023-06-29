@@ -58,6 +58,7 @@ const (
 	errorClientParse         = "parse"
 	errorClientInterface     = "interface"
 	errorClientSetBufferSize = "buffersize"
+	errorClientClose         = "close"
 	//
 	eventConnectionDebug      = "debug"
 	eventConnectionError      = "error"
@@ -89,6 +90,8 @@ const (
 	errorProxyLimitExceeded   = "limitexceeded"
 	errorProxyShortRead       = "shortread"
 	errorProxyGet             = "get"
+	errorProxyWrite           = "write"
+	errorProxyHash            = "hash"
 	eventStreamerError        = "error"
 	eventStreamerQueueStart   = "queuestart"
 	eventStreamerStart        = "start"

@@ -528,7 +528,13 @@ func (client *Client) start(urly *url.URL) error {
 		)
 
 		// cleanup
-		client.Close()
+		if err := client.Close(); err != nil {
+			logger.Logkv(
+				"event", eventClientError,
+				"error", errorClientClose,
+				"message", err.Error(),
+			)
+		}
 		client.input = nil
 		client.response = nil
 
@@ -558,7 +564,13 @@ func (client *Client) pull(url *url.URL) error {
 					"event", eventClientReadTimeout,
 					"message", "Read timeout exceeded, closing connection",
 				)
-				client.input.Close()
+				if err := client.input.Close(); err != nil {
+					logger.Logkv(
+						"event", eventClientError,
+						"error", errorClientClose,
+						"message", err.Error(),
+					)
+				}
 			})
 		}
 		// read a packet
