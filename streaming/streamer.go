@@ -248,9 +248,10 @@ func (streamer *Streamer) eatCommands() {
 // This routine will block; you should run it asynchronously like this:
 //
 // queue := make(chan protocol.MpegTsPacket, inputQueueSize)
-// go func() {
-//   log.Fatal(streamer.Stream(queue))
-// }
+//
+//	go func() {
+//	  log.Fatal(streamer.Stream(queue))
+//	}
 //
 // or simply:
 //

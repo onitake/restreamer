@@ -164,7 +164,7 @@ type ModuleLogger struct {
 	AddTimestamp bool
 }
 
-// Log adds predefined values to each log line and writes it to the encapsulated log.
+// Logd adds predefined values to each log line and writes it to the encapsulated log.
 func (logger *ModuleLogger) Logd(lines ...Dict) {
 	proclines := make([]Dict, len(lines))
 	for i, line := range lines {
@@ -194,10 +194,10 @@ type DummyLogger struct{}
 func (*DummyLogger) Logd(lines ...Dict)             {}
 func (*DummyLogger) Logkv(keyValues ...interface{}) {}
 
-// Multilogger logs to several backend loggers at once.
+// MultiLogger logs to several backend loggers at once.
 type MultiLogger []Logger
 
-// Log writes the same log lines to all backing loggers.
+// Logd writes the same log lines to all backing loggers.
 func (logger MultiLogger) Logd(lines ...Dict) {
 	for _, backer := range logger {
 		backer.Logd(lines...)
@@ -211,7 +211,7 @@ func (logger MultiLogger) Logkv(keyValues ...interface{}) {
 // ConsoleLogger is a simple logger that prints to stdout.
 type ConsoleLogger struct{}
 
-// Log writes a log line to stdout.
+// Logd writes a log line to stdout.
 //
 // Your best bet if you don't want/need a full-blown file logging queue with
 // signal-initiated reopening or a central logging server.
@@ -278,7 +278,7 @@ func NewFileLogger(logfile string, sigusr bool) (*FileLogger, error) {
 	return logger, nil
 }
 
-// Log writes a series of log lines, prefixed by a time stamp in RFC3339 format.
+// Logd writes a series of log lines, prefixed by a time stamp in RFC3339 format.
 func (logger *FileLogger) Logd(lines ...Dict) {
 	// send these down the queue
 	for _, line := range lines {
@@ -315,13 +315,13 @@ func (logger *FileLogger) writeLog(line interface{}) {
 	}
 }
 
-// Closes the log file and disables further logging.
+// Close closes the log file and disables further logging.
 func (logger *FileLogger) Close() {
 	fmt.Printf("{\"event\":\"close_signal\",\"message\":\"Closing log\"}\n")
 	logger.signals <- hupSignal
 }
 
-// Closes the log and stops/removes the signal handler
+// closeLog closes the log and stops/removes the signal handler
 func (logger *FileLogger) closeLog() error {
 	fmt.Printf("{\"event\":\"close\",\"message\":\"Really closing log\"}\n")
 

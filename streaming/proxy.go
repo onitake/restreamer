@@ -235,7 +235,7 @@ func (proxy *Proxy) fetch() {
 	)
 }
 
-// eTag calculates a hash value of data and returns it as a hex string.
+// Etag calculates a hash value of data and returns it as a hex string.
 // Suitable for HTTP Etags.
 func Etag(data []byte) string {
 	// 64-bit FNV-1a checksum of the data, formatted as a hex string

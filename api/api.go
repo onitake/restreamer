@@ -269,7 +269,7 @@ type streamControlApi struct {
 	auth auth.Authenticator
 }
 
-// NewStreamStateApi creates a new stream status API object,
+// NewStreamControlApi creates a new stream status API object,
 // serving the "connected" status of a stream connection.
 func NewStreamControlApi(inhibit inhibitor, auth auth.Authenticator) http.Handler {
 	return &streamControlApi{

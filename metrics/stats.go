@@ -34,10 +34,10 @@ type Collector interface {
 	// PacketReceived notifies that a packet was received.
 	// TODO pass the endpoint here
 	PacketReceived()
-	// PacketReceived notifies that a packet was sent.
+	// PacketSent notifies that a packet was sent.
 	// TODO pass the endpoint here
 	PacketSent()
-	// PacketReceived notifies that a packet was dropped.
+	// PacketDropped notifies that a packet was dropped.
 	// TODO pass the endpoint here
 	PacketDropped()
 	// SourceConnected notifies that upstream is live.

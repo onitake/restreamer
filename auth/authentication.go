@@ -28,10 +28,10 @@ type Authenticator interface {
 	// Authenticate parses an Authorization header and tries to authenticate the request.
 	// Returns true if the authentication succeeded, false otherwise.
 	Authenticate(authorization string) bool
-	// Adds a new user to the list.
+	// AddUser adds a new user to the list.
 	// Implementations may interpret users and passwords differently.
 	AddUser(user, password string)
-	// Removes a user from the list.
+	// RemoveUser removes a user from the list.
 	// Implementations may interpret users differently.
 	RemoveUser(user string)
 	// GetLogin returns an authentication string that can be sent to a remote system.

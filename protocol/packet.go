@@ -23,7 +23,7 @@ import (
 const (
 	// MpegTsPacketSize is the TS packet size (188 bytes)
 	MpegTsPacketSize = 188
-	// SyncByte is the byte value of the TS synchronization code (0x47)
+	// MpegTsSyncByte is the byte value of the TS synchronization code (0x47)
 	MpegTsSyncByte = 0x47
 )
 

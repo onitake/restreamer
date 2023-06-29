@@ -39,7 +39,7 @@ var (
 	// ErrNoConnection is thrown when trying to read
 	// from a stream that is not connected
 	ErrNoConnection = errors.New("restreamer: socket not connected")
-	// ErrNoConnection is thrown when trying to
+	// ErrAlreadyConnected is thrown when trying to
 	// connect to an already established upstream socket
 	ErrAlreadyConnected = errors.New("restreamer: socket is already connected")
 	// ErrInvalidResponse is thrown when an unsupported
