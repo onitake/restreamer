@@ -335,21 +335,21 @@ func (client *Client) loop() {
 		}
 
 		// pick the next server
-		url := client.urls[next]
+		nexturl := client.urls[next]
 		next = (next + 1) % len(client.urls)
 
 		// connect
 		logger.Logkv(
 			"event", eventClientConnecting,
-			"url", url.String(),
+			"url", nexturl.String(),
 		)
-		err := client.start(url)
+		err := client.start(nexturl)
 		if err != nil {
 			// not handled, log
 			logger.Logkv(
 				"event", eventClientError,
 				"error", errorClientConnect,
-				"url", url.String(),
+				"url", nexturl.String(),
 				"message", err.Error(),
 			)
 		}
@@ -357,7 +357,7 @@ func (client *Client) loop() {
 		if client.Wait == 0 {
 			logger.Logkv(
 				"event", eventClientOffline,
-				"url", url.String(),
+				"url", nexturl.String(),
 				"message", "Reconnecting disabled. Stream will stay offline.",
 			)
 		}
