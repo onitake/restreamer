@@ -79,24 +79,6 @@ func init() {
 	metrics.MustRegister(metricBytesReceived)
 }
 
-// connectCloser represents types that have a Connect() and a Close() method.
-// It extends on the io.Closer type.
-type connectCloser interface {
-	io.Closer
-	Connect() error
-}
-
-// dummyConnectCloser is a no-action implementation of the connectCloser interface.
-type dummyConnectCloser struct {
-}
-
-func (*dummyConnectCloser) Close() error {
-	return nil
-}
-func (*dummyConnectCloser) Connect() error {
-	return nil
-}
-
 // Client implements a streaming HTTP client with failover support.
 //
 // Logging specification:
@@ -141,8 +123,6 @@ type Client struct {
 	running util.AtomicBool
 	// stats is the statistics collector for this client
 	stats metrics.Collector
-	// listener is a downstream object that can handle connect/disconnect notifications
-	listener connectCloser
 	// queueSize is the size of the input queue
 	queueSize uint
 	// interf denotes a specific network interface to create the connection on
@@ -234,7 +214,6 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 		streamer:       streamer,
 		running:        util.AtomicFalse,
 		stats:          &metrics.DummyCollector{},
-		listener:       &dummyConnectCloser{},
 		queueSize:      qsize,
 		interf:         pintf,
 		readBufferSize: int(bufferSize * protocol.MpegTsPacketSize),
@@ -246,14 +225,6 @@ func NewClient(name string, uris []string, streamer *Streamer, timeout uint, rec
 // SetCollector assigns a stats collector.
 func (client *Client) SetCollector(stats metrics.Collector) {
 	client.stats = stats
-}
-
-// SetStateListener adds a listener that will be notified when the client
-// connection is closed or reconnected.
-//
-// Only one listener is supported.
-func (client *Client) SetStateListener(listener connectCloser) {
-	client.listener = listener
 }
 
 // SetInhibit calls the SetInhibit function on the attached streamer.
@@ -598,7 +569,6 @@ func (client *Client) pull(url *url.URL) error {
 			if packet != nil {
 				// report connection up
 				if queue == nil {
-					client.listener.Connect()
 					client.stats.SourceConnected()
 					metricSourceConnected.With(prometheus.Labels{"stream": client.name, "url": url.String()}).Set(1.0)
 					logger.Logkv(
