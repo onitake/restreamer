@@ -19,6 +19,7 @@ package metrics
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"net/http"
 )
@@ -35,9 +36,15 @@ var (
 
 func init() {
 	// register the standard metrics
-	DefaultRegisterer.Register(prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}))
+	DefaultRegisterer.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	// the Go metrics are NOT enabled by default as they can have a serious performance impact.
-	// if you want them, you need to register them yourself.
+	// if you want them, you need to register with a call to EnableGoRuntimeCollector().
+}
+
+// EnableGoRuntimeCollector enables the Prometheus Go runtime collector.
+// Warning: This can have a serious impact on runtime performance. Enable at your own risk.
+func EnableGoRuntimeCollector() {
+	DefaultRegisterer.MustRegister(collectors.NewGoCollector())
 }
 
 // promErrorLogger is an internal error logger that prints to the kvl log.

@@ -26,7 +26,6 @@ import (
 	"github.com/onitake/restreamer/metrics"
 	"github.com/onitake/restreamer/streaming"
 	"github.com/onitake/restreamer/util"
-	"github.com/prometheus/client_golang/prometheus"
 	"log"
 	"math/rand"
 	"net/http"
@@ -64,7 +63,7 @@ func main() {
 	if config.Profile {
 		EnableProfiling()
 		// If profiling is enabled, we also want the Go runtime metrics collector
-		metrics.DefaultRegisterer.Register(prometheus.NewGoCollector())
+		metrics.EnableGoRuntimeCollector()
 	}
 
 	if config.Log != "" {
