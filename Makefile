@@ -14,7 +14,7 @@ RELEASE_BINARIES := restreamer-linux-amd64 restreamer-linux-386 restreamer-linux
 all: restreamer
 
 clean:
-	rm -rf restreamer ${RELEASE_BINARIES}
+	rm -rf restreamer SHA256SUMS ${RELEASE_BINARIES}
 
 test:
 	go vet ./...
