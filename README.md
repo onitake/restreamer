@@ -1,4 +1,4 @@
-[![language](https://img.shields.io/badge/language-go-%2300ADD8.svg?style=flat-square)](https://golang.org/) [![release](https://img.shields.io/github/release/onitake/restreamer.svg?style=flat-square)](https://github.com/onitake/restreamer/releases) [![buildstatus](https://img.shields.io/travis/onitake/restreamer.svg?style=flat-square)](https://travis-ci.org/onitake/restreamer) [![goreport](https://goreportcard.com/badge/github.com/onitake/restreamer?style=flat-square)](https://goreportcard.com/report/github.com/onitake/restreamer) ![license](https://img.shields.io/github/license/onitake/restreamer?style=flat-square)
+[![language](https://img.shields.io/badge/language-go-%2300ADD8.svg?style=flat-square)](https://golang.org/) [![release](https://img.shields.io/github/release/onitake/restreamer.svg?style=flat-square)](https://github.com/onitake/restreamer/releases) [![goreport](https://goreportcard.com/badge/github.com/onitake/restreamer?style=flat-square)](https://goreportcard.com/report/github.com/onitake/restreamer) ![license](https://img.shields.io/github/license/onitake/restreamer?style=flat-square)
 
 ![restreamer logo](doc/logo.png)
 
@@ -6,7 +6,7 @@
 
 HTTP transport stream proxy
 
-Copyright © 2016-2019 Gregor Riepl;
+Copyright © 2016-2024 Gregor Riepl;
 All rights reserved.
 
 Please see the LICENSE file for details on permitted use of this software.
