@@ -4,6 +4,8 @@
 export CGO_ENABLED = 0
 # set the build container Go version
 GO_VERSION = 1.20
+# for overriding the container runtime (needed for GitHub)
+DOCKER = podman
 
 # all release binaries to build by default
 RELEASE_BINARIES := restreamer-linux-amd64 restreamer-linux-386 restreamer-linux-arm restreamer-linux-arm64 restreamer-darwin-amd64 restreamer-darwin-arm64 restreamer-windows-amd64.exe restreamer-windows-386.exe  restreamer-windows-arm64.exe
@@ -37,28 +39,28 @@ SHA256SUMS: $(RELEASE_BINARIES)
 	sha256sum $^ > $@
 
 restreamer-linux-amd64:
-	podman run -e GOOS=linux -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=linux -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-linux-386:
-	podman run -e GOOS=linux -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=linux -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-linux-arm:
-	podman run -e GOOS=linux -e GOARCH=arm -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=linux -e GOARCH=arm -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-linux-arm64:
-	podman run -e GOOS=linux -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=linux -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-darwin-amd64:
-	podman run -e GOOS=darwin -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=darwin -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-darwin-arm64:
-	podman run -e GOOS=darwin -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=darwin -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-windows-amd64.exe:
-	podman run -e GOOS=windows -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=windows -e GOARCH=amd64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-windows-386.exe:
-	podman run -e GOOS=windows -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=windows -e GOARCH=386 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
 
 restreamer-windows-arm64.exe:
-	podman run -e GOOS=windows -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(shell pwd):/go/restreamer -w /go/restreamer golang:${GO_VERSION} go build -o $@ ./cmd/restreamer
+	$(DOCKER) run -e GOOS=windows -e GOARCH=arm64 -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer -w /go/restreamer golang:${GO_VERSION} sh -c "git config --global --add safe.directory /go/restreamer; go build -o $@ ./cmd/restreamer"
