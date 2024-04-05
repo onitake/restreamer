@@ -3,7 +3,7 @@
 # use go netcode instead of libc
 export CGO_ENABLED = 0
 # set the build container Go version
-GO_VERSION = 1.20
+GO_VERSION = 1.22.1
 # for overriding the container runtime (needed for GitHub)
 DOCKER = podman
 
