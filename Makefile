@@ -31,7 +31,10 @@ docker:
 restreamer:
 	go build ./cmd/restreamer
 
-# release builds - use podman to cross-compile to various architectures
+# release builds - use container runtime to cross-compile to various architectures
+
+release-test:
+	$(DOCKER) run -e GOCACHE=/go/.cache -e CGO_ENABLED=0 --rm -v $(abspath .):/go/restreamer:ro -w /go/restreamer golang:${GO_VERSION} sh -c "go vet ./... && go test ./..."
 
 release: SHA256SUMS
 
