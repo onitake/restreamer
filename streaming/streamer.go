@@ -294,23 +294,15 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 				//log.Printf("Got packet (length %d)\n", len(packet))
 
 				for conn := range pool {
-					select {
-					case conn.Queue <- packet:
-						// packet distributed, done
-						//log.Printf("Queued packet (length %d):\n%s\n", len(packet), hex.Dump(packet))
-
+					if conn.Send(packet) {
 						// report the packet
 						streamer.stats.PacketSent()
 						if streamer.promCounter {
 							metricPacketsSent.With(prometheus.Labels{"stream": streamer.name}).Inc()
 							metricBytesSent.With(prometheus.Labels{"stream": streamer.name}).Add(protocol.MpegTsPacketSize)
 						}
-
-					default:
-						// queue is full
-						//log.Print(ErrSlowRead)
-
-						// report the drop
+					} else {
+						// queue full, report the dropped packet
 						streamer.stats.PacketDropped()
 						if streamer.promCounter {
 							metricPacketsDropped.With(prometheus.Labels{"stream": streamer.name}).Inc()
@@ -331,9 +323,6 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 					"event", eventStreamerClientRemove,
 					"message", fmt.Sprintf("Removing client %s from pool", request.Address),
 				)
-				if !request.Connection.Closed {
-					close(request.Connection.Queue)
-				}
 				delete(pool, request.Connection)
 			case StreamerCommandAdd:
 				// check if the connection can be accepted
@@ -362,7 +351,10 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 				inhibit = true
 				// close all downstream connections
 				for conn := range pool {
-					close(conn.Queue)
+					conn.Close()
+					// avoid waiting for the removal round-trip, this will make us less racy
+					// double deletes are safe, so nothing bad will happen when we do get the remove command later
+					delete(pool, request.Connection)
 				}
 				// TODO implement inhibit in the check api
 			case StreamerCommandAllow:
@@ -391,7 +383,8 @@ func (streamer *Streamer) Stream(queue <-chan protocol.MpegTsPacket) error {
 		// drain any leftovers
 	}
 	for conn := range pool {
-		close(conn.Queue)
+		// ensure this queue/connection is closed
+		conn.Close()
 	}
 
 	// start the command eater again
@@ -451,20 +444,28 @@ func (streamer *Streamer) ServeHTTP(writer http.ResponseWriter, request *http.Re
 			"remote", request.RemoteAddr,
 		)
 
+		// here's where the action happens
 		start := time.Now()
 		conn.Serve(streamer.preamble)
 		duration := time.Since(start)
 
 		// done, remove the stale connection
-		streamer.request <- &ConnectionRequest{
+		command = &ConnectionRequest{
 			Command:    StreamerCommandRemove,
 			Address:    request.RemoteAddr,
 			Connection: conn,
+			Waiter:     &sync.WaitGroup{},
 		}
-		// and drain the queue AFTER we have sent the shutdown signal
-		for range conn.Queue {
-			// drain any leftovers
-		}
+		command.Waiter.Add(1)
+		streamer.request <- command
+		// and wait for completion
+		command.Waiter.Wait()
+
+		// we are now safe to close and drain the queue
+		// double close is prevented by the connection object
+		conn.Close()
+		conn.Drain()
+
 		logger.Logkv(
 			"event", eventStreamerClosed,
 			"message", fmt.Sprintf("Connection from %s closed", request.RemoteAddr),
